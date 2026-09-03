@@ -1,9 +1,22 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
     id("org.jetbrains.kotlin.plugin.serialization")
+}
+
+/**
+ * 读取发布签名配置:优先环境变量(CI 用),其次 local.properties(本机,不入库)。
+ */
+fun releaseProp(key: String): String? {
+    System.getenv(key)?.let { if (it.isNotBlank()) return it }
+    val props = Properties()
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { props.load(it) }
+    return props.getProperty(key)?.takeIf { it.isNotBlank() }
 }
 
 android {
@@ -14,8 +27,8 @@ android {
         applicationId = "com.chen.schedule"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -23,9 +36,20 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = releaseProp("RELEASE_STORE_FILE")?.let { file(it) }
+            storePassword = releaseProp("RELEASE_STORE_PASSWORD")
+            keyAlias = releaseProp("RELEASE_KEY_ALIAS")
+            keyPassword = releaseProp("RELEASE_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

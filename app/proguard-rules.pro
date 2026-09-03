@@ -26,3 +26,6 @@
 
 # Jsoup
 -keep class org.jsoup.** { *; }
+
+# JSpecify 注解(jsoup 可选依赖,仅缺失类警告)
+-dontwarn org.jspecify.**
