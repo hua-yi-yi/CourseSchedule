@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">课程表</string>
+    <string name="nav_timetable">课程表</string>
+    <string name="nav_import">导入</string>
+    <string name="nav_settings">设置</string>
+    <string name="add_course">添加课程</string>
+    <string name="edit_course">编辑课程</string>
+    <string name="delete_course">删除课程</string>
+    <string name="course_name">课程名称</string>
+    <string name="teacher">教师</string>
+    <string name="classroom">教室</string>
+    <string name="day_of_week">星期</string>
+    <string name="start_slot">开始节次</string>
+    <string name="end_slot">结束节次</string>
+    <string name="start_week">起始周</string>
+    <string name="end_week">结束周</string>
+    <string name="week_type">周类型</string>
+    <string name="all_weeks">每周</string>
+    <string name="odd_weeks">单周</string>
+    <string name="even_weeks">双周</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="confirm">确认</string>
+    <string name="import_json">导入 JSON</string>
+    <string name="import_csv">导入 CSV</string>
+    <string name="scraper_import">教务导入</string>
+    <string name="backup_data">备份数据</string>
+    <string name="restore_data">恢复数据</string>
+    <string name="clear_data">清空数据</string>
+    <string name="schedule_config">作息时间配置</string>
+    <string name="semester_management">学期管理</string>
+    <string name="widget_description">今日课程:显示当前学期、周次与今天的课程列表</string>
+    <string name="week_widget_description">周课表:4×4 大组件,展示当前学期的整周课程网格</string>
+</resources>

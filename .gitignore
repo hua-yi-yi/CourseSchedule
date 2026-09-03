@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+app/build/
+captures/
+
+# 本地配置(含本机 SDK 路径,不应提交)
+local.properties
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 其他
+*.log
+.kotlin/
