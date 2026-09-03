@@ -33,8 +33,21 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME"
           ls "$ANDROID_HOME" 2>/dev/null | head -5 || echo "SDK dir missing"
 
+      - name: Install SDK components
+        run: |
+          sdkmanager --install "platforms;android-34" "build-tools;34.0.0" || true
+          yes | sdkmanager --licenses || true
+
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --stacktrace
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
 
       # 若配置了 Secrets(见 README),还原 keystore 并构建签名正式包;
       # 否则降级构建 debug 包。
