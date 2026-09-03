@@ -81,9 +81,27 @@ name,teacher,classroom,dayOfWeek,startSlot,endSlot,startWeek,endWeek,weekType,no
 # 需要 JDK 17 与 Android SDK(compileSdk 34)
 ./gradlew :app:assembleDebug        # 构建 Debug APK
 ./gradlew :app:testDebugUnitTest    # 运行单元测试
+./gradlew :app:assembleRelease      # 构建签名正式版(R8 混淆+资源压缩,~2.3MB)
 ```
 
 > `local.properties` 中的 `sdk.dir` 按本机 SDK 路径修改(该文件不应提交到版本库)。
+> Release 签名密钥位于本机 `~/.android/keystores/`(不入库),密码通过 `local.properties` 或 CI Secrets 提供。
+
+## 发布版本(GitHub Actions 自动)
+
+1. 本地提交并推送代码
+2. 打 tag 并推送:
+
+```bash
+git tag -a v1.0.2 -m "v1.0.2"
+git push origin v1.0.2
+```
+
+3. CI 自动:跑单元测试 → 构建**签名正式版** → 创建 Release 并挂载 APK
+
+> 首次需在仓库 **Settings → Secrets and variables → Actions** 配置:
+> `RELEASE_KEYSTORE_B64`(keystore 的 base64)、`RELEASE_STORE_PASSWORD`、`RELEASE_KEY_PASSWORD`、`RELEASE_KEY_ALIAS`。
+> 未配置时 CI 降级构建 debug APK。
 
 ## 测试
 
