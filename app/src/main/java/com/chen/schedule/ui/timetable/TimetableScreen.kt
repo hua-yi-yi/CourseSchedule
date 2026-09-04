@@ -21,14 +21,19 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -69,6 +74,8 @@ fun TimetableScreen(
     onAddCourse: (Long) -> Unit,
     onEditCourse: (Long, Long) -> Unit,
     onNavigateToScheduleConfig: () -> Unit,
+    onNavigateToImport: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     viewModel: TimetableViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -84,24 +91,25 @@ fun TimetableScreen(
             )
         }
     ) { padding ->
-        if (state.currentSemester == null) {
-            // 还没有学期 - 空状态
-            EmptySemesterState(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = padding.calculateBottomPadding())
-                    .statusBarsPadding(),
-                onNavigateToScheduleConfig = onNavigateToScheduleConfig
-            )
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = padding.calculateBottomPadding())
-                    .statusBarsPadding()
-            ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = padding.calculateBottomPadding())
+                .statusBarsPadding()
+        ) {
+            val semester = state.currentSemester
+            if (semester == null) {
+                // 还没有学期 - 空状态(左上角菜单仍可用)
+                TopMenu(
+                    onNavigateToImport = onNavigateToImport,
+                    onNavigateToSettings = onNavigateToSettings
+                )
+                EmptySemesterState(
+                    modifier = Modifier.fillMaxSize(),
+                    onNavigateToScheduleConfig = onNavigateToScheduleConfig
+                )
+            } else {
                 // ===== 头部:学期信息 + 视图切换 =====
-                val semester = state.currentSemester ?: return@Column
                 val actualWeek = WeekCalculator.currentWeek(semester.startDate, semester.totalWeeks)
                 HeaderSection(
                     semesterName = semester.name,
@@ -109,7 +117,9 @@ fun TimetableScreen(
                     totalWeeks = semester.totalWeeks,
                     isCurrentWeek = state.currentWeek == actualWeek,
                     isDayView = state.isDayView,
-                    onToggleView = viewModel::toggleView
+                    onToggleView = viewModel::toggleView,
+                    onNavigateToImport = onNavigateToImport,
+                    onNavigateToSettings = onNavigateToSettings
                 )
 
                 // ===== 周切换 =====
@@ -179,6 +189,39 @@ fun TimetableScreen(
 
 /* ===================== 头部 ===================== */
 
+/** 左上角菜单栏:包含「导入课表」与「设置」 */
+@Composable
+private fun TopMenu(
+    onNavigateToImport: () -> Unit,
+    onNavigateToSettings: () -> Unit
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { menuOpen = true }) {
+            Icon(
+                Icons.Default.Menu,
+                contentDescription = "菜单",
+                tint = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        DropdownMenu(
+            expanded = menuOpen,
+            onDismissRequest = { menuOpen = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("导入课表") },
+                leadingIcon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
+                onClick = { menuOpen = false; onNavigateToImport() }
+            )
+            DropdownMenuItem(
+                text = { Text("设置") },
+                leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                onClick = { menuOpen = false; onNavigateToSettings() }
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HeaderSection(
@@ -187,14 +230,22 @@ private fun HeaderSection(
     totalWeeks: Int,
     isCurrentWeek: Boolean,
     isDayView: Boolean,
-    onToggleView: () -> Unit
+    onToggleView: () -> Unit,
+    onNavigateToImport: () -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // 左上角菜单栏
+        TopMenu(
+            onNavigateToImport = onNavigateToImport,
+            onNavigateToSettings = onNavigateToSettings
+        )
+
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

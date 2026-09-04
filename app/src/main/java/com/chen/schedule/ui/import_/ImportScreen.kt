@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CloudDownload
@@ -43,6 +44,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -131,6 +133,7 @@ name,teacher,classroom,dayOfWeek,startSlot,endSlot,startWeek,endWeek,weekType,no
 @Composable
 fun ImportScreen(
     onScraperLogin: () -> Unit,
+    onNavigateBack: () -> Unit,
     viewModel: ImportViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -152,7 +155,12 @@ fun ImportScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("导入课表", fontWeight = FontWeight.Bold) }
+                title = { Text("导入课表", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                    }
+                }
             )
         },
         snackbarHost = {
