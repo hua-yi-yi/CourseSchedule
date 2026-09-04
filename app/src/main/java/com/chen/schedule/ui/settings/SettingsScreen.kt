@@ -25,9 +25,13 @@ import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -41,6 +45,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -175,8 +180,9 @@ fun SettingsScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(title = { Text("设置") })
+            TopAppBar(title = { Text("设置", fontWeight = FontWeight.Bold) })
         }
     ) { padding ->
         Column(
@@ -184,53 +190,60 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
         ) {
-            // Semester & Schedule
-            SettingsSection(title = "学期与作息") {
+            Spacer(Modifier.height(4.dp))
+
+            // ===== 学期与作息 =====
+            SettingsGroup(title = "学期与作息") {
                 SettingsItem(
                     icon = Icons.Default.Schedule,
                     title = "作息时间配置",
                     subtitle = "设置学期信息与节次时间",
+                    showChevron = true,
                     onClick = onNavigateToScheduleConfig
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // Data management
-            SettingsSection(title = "数据管理") {
+            // ===== 数据管理 =====
+            SettingsGroup(title = "数据管理") {
                 SettingsItem(
                     icon = Icons.Default.Backup,
                     title = "备份数据",
                     subtitle = "导出课程数据为 JSON 文件",
-                    onClick = {
-                        exportLauncher.launch("course_schedule_backup.json")
-                    }
+                    showChevron = true,
+                    onClick = { exportLauncher.launch("course_schedule_backup.json") }
                 )
+                GroupDivider()
                 SettingsItem(
                     icon = Icons.Default.Restore,
                     title = "恢复数据",
                     subtitle = "从 JSON 文件导入课程数据",
-                    onClick = {
-                        importLauncher.launch(arrayOf("application/json", "*/*"))
-                    }
+                    showChevron = true,
+                    onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) }
                 )
+                GroupDivider()
                 SettingsItem(
                     icon = Icons.Default.DeleteForever,
                     title = "清空数据",
                     subtitle = "删除当前学期的所有课程数据",
+                    showChevron = true,
+                    dangerIcon = true,
                     onClick = { showClearDialog = true }
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // Widget
-            SettingsSection(title = "桌面") {
+            // ===== 桌面小组件 =====
+            SettingsGroup(title = "桌面小组件") {
                 SettingsItem(
                     icon = Icons.Default.Widgets,
-                    title = "添加今日课程小组件",
+                    title = "今日课程小组件",
                     subtitle = "4×1 横条,显示今天的课程",
+                    showChevron = true,
                     onClick = {
                         scope.launch {
                             val pinned = GlanceAppWidgetManager(context).requestPinGlanceAppWidget(
@@ -245,10 +258,12 @@ fun SettingsScreen(
                         }
                     }
                 )
+                GroupDivider()
                 SettingsItem(
                     icon = Icons.Default.CalendarMonth,
-                    title = "添加周课表小组件",
+                    title = "周课表小组件",
                     subtitle = "4×4 大组件,展示整周课程网格",
+                    showChevron = true,
                     onClick = {
                         scope.launch {
                             val pinned = GlanceAppWidgetManager(context).requestPinGlanceAppWidget(
@@ -265,16 +280,17 @@ fun SettingsScreen(
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // About
-            SettingsSection(title = "关于") {
+            // ===== 关于 =====
+            SettingsGroup(title = "关于") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("版本 1.0.0", style = MaterialTheme.typography.bodyMedium)
+                    Text("版本 1.0.1", style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.weight(1f))
                     Text(
                         "Android 课程表",
@@ -284,32 +300,37 @@ fun SettingsScreen(
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // Contact
-            SettingsSection(title = "联系开发者") {
+            // ===== 联系开发者 =====
+            SettingsGroup(title = "联系开发者") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("QQ", style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.weight(1f))
                     Text(
                         "3180635398",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
+
+            Spacer(Modifier.height(24.dp))
         }
     }
 
-    // Clear data confirmation dialog
+    // 清空数据确认弹窗
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
-            title = { Text("确认清空") },
+            shape = MaterialTheme.shapes.extraLarge,
+            title = { Text("确认清空", fontWeight = FontWeight.Bold) },
             text = { Text("确定要删除当前学期的所有课程数据吗？此操作不可撤销。\n\n建议先备份数据。") },
             confirmButton = {
                 TextButton(onClick = {
@@ -330,54 +351,84 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsSection(
+private fun SettingsGroup(
     title: String,
     content: @Composable () -> Unit
 ) {
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 4.dp)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
         )
-        content()
+    ) {
+        Column {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 2.dp)
+            )
+            content()
+        }
     }
 }
 
 @Composable
+private fun GroupDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 56.dp, end = 0.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    )
+}
+
+@Composable
 private fun SettingsItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     subtitle: String,
+    showChevron: Boolean,
+    dangerIcon: Boolean = false,
     onClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(end = 16.dp)
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+    ListItem(
+        modifier = Modifier.clickable { onClick() },
+        colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+        leadingContent = {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (dangerIcon) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+        },
+        headlineContent = {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (dangerIcon) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurface
+            )
+        },
+        supportingContent = {
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        },
+        trailingContent = if (showChevron) {
+            {
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            null
         }
-        Icon(
-            Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+    )
 }

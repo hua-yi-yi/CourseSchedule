@@ -14,13 +14,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.chen.schedule.domain.model.DayOfWeek
@@ -67,12 +67,15 @@ fun CourseEditScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text(if (state.isEditing) "编辑课程" else "添加课程") },
+                title = {
+                    Text(if (state.isEditing) "编辑课程" else "添加课程", fontWeight = FontWeight.Bold)
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                     }
                 },
                 actions = {
@@ -134,31 +137,33 @@ fun CourseEditScreen(
             Spacer(Modifier.height(12.dp))
 
             // Day of week
-            Text("星期", style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(4.dp))
+            Text("星期", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(6.dp))
             Row(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 DayOfWeek.entries.forEach { day ->
                     val selected = state.dayOfWeek == day.index
-                    Card(
+                    Box(
                         modifier = Modifier
                             .weight(1f)
                             .padding(2.dp)
-                            .clickable { viewModel.updateDayOfWeek(day.index) },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (selected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(8.dp)) {
-                            Text(
-                                day.label,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.onSurface,
-                                style = MaterialTheme.typography.bodySmall
+                            .clip(MaterialTheme.shapes.small)
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceContainerHighest
                             )
-                        }
+                            .clickable { viewModel.updateDayOfWeek(day.index) }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            day.label,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                        )
                     }
                 }
             }
@@ -208,29 +213,31 @@ fun CourseEditScreen(
             Spacer(Modifier.height(12.dp))
 
             // Week type
-            Text("周类型", style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(4.dp))
+            Text("周类型", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(6.dp))
             Row(modifier = Modifier.fillMaxWidth()) {
                 WeekType.entries.forEach { wt ->
                     val selected = state.weekType == wt
-                    Card(
+                    Box(
                         modifier = Modifier
                             .weight(1f)
                             .padding(2.dp)
-                            .clickable { viewModel.updateWeekType(wt) },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (selected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(8.dp)) {
-                            Text(
-                                wt.label,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.onSurface,
-                                style = MaterialTheme.typography.bodySmall
+                            .clip(MaterialTheme.shapes.small)
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceContainerHighest
                             )
-                        }
+                            .clickable { viewModel.updateWeekType(wt) }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            wt.label,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                        )
                     }
                 }
             }
@@ -238,29 +245,36 @@ fun CourseEditScreen(
             Spacer(Modifier.height(12.dp))
 
             // Color picker
-            Text("课程颜色", style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(4.dp))
+            Text("课程颜色", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(6.dp))
             Column {
                 courseColors.chunked(6).forEach { row ->
                     Row {
                         row.forEach { color ->
+                            val selected = state.color == color
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
-                                    .padding(3.dp)
+                                    .size(40.dp)
+                                    .padding(4.dp)
                                     .clip(CircleShape)
-                                    .then(
-                                        if (state.color == color) Modifier
-                                            .then(
-                                                Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                            )
-                                        else Modifier
+                                    .border(
+                                        width = if (selected) 2.5.dp else 0.dp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        shape = CircleShape
                                     )
-                                    .then(
-                                        Modifier.background(Color(color), CircleShape)
+                                    .background(Color(color), CircleShape)
+                                    .clickable { viewModel.updateColor(color) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (selected) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = "已选中",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
                                     )
-                                    .clickable { viewModel.updateColor(color) }
-                            )
+                                }
+                            }
                         }
                     }
                 }
@@ -306,7 +320,12 @@ fun NumberPicker(
         readOnly = true,
         trailingIcon = {
             Box(modifier = Modifier.clickable { expanded = true }) {
-                Text("▼", modifier = Modifier.padding(8.dp))
+                Icon(
+                    Icons.Default.ArrowDropDown,
+                    contentDescription = "选择",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     range.forEach { n ->
                         DropdownMenuItem(

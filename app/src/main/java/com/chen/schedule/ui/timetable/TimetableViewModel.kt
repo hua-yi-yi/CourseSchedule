@@ -103,6 +103,19 @@ class TimetableViewModel @Inject constructor(
         _state.update { it.copy(showWeekend = !it.showWeekend) }
     }
 
+    /** 跳转到「今天」:回到当前周、选中今天、切换到日视图 */
+    fun openToday() {
+        val s = _state.value
+        val actualWeek = s.currentSemester?.let { WeekCalculator.currentWeek(it.startDate, it.totalWeeks) } ?: 1
+        _state.update {
+            it.copy(
+                currentWeek = actualWeek,
+                selectedDay = java.time.LocalDate.now().dayOfWeek.value,
+                isDayView = true
+            )
+        }
+    }
+
     fun getFilteredCourses(): List<Course> {
         val s = _state.value
         return s.courses.filter { course ->

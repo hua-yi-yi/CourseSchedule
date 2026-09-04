@@ -149,8 +149,11 @@ fun ImportScreen(
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(title = { Text("导入课表") })
+            TopAppBar(
+                title = { Text("导入课表", fontWeight = FontWeight.Bold) }
+            )
         },
         snackbarHost = {
             if (state.message.isNotBlank()) {
@@ -179,14 +182,14 @@ fun ImportScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .border(
-                            2.dp,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            RoundedCornerShape(12.dp)
+                            1.5.dp,
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                            MaterialTheme.shapes.large
                         ),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = MaterialTheme.shapes.large
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         // Title row
@@ -271,8 +274,8 @@ fun ImportScreen(
             // ===== 粘贴文本导入（优先） =====
             item {
                 Spacer(Modifier.height(20.dp))
-                Text("粘贴文本导入", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(4.dp))
+                Text("粘贴文本导入", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
                 Text(
                     "把 AI 返回的 JSON 或 CSV 文本直接粘贴到下方，自动识别格式导入",
                     style = MaterialTheme.typography.bodyMedium,
@@ -285,8 +288,8 @@ fun ImportScreen(
             // ===== 手动导入文件 =====
             item {
                 Spacer(Modifier.height(20.dp))
-                Text("手动导入文件", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(4.dp))
+                Text("手动导入文件", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
                 Text(
                     "选择已准备好的 JSON 或 CSV 文件导入课程表",
                     style = MaterialTheme.typography.bodyMedium,
@@ -321,8 +324,9 @@ fun ImportScreen(
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -386,8 +390,9 @@ fun ImportScreen(
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -470,8 +475,9 @@ fun ImportScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 2.dp),
+                        shape = MaterialTheme.shapes.large,
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                         )
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
@@ -503,8 +509,8 @@ fun ImportScreen(
                 HorizontalDivider()
                 Spacer(Modifier.height(24.dp))
 
-                Text("教务系统自动导入", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
+                Text("教务系统自动导入", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
                 Text(
                     "通过适配器自动从学校教务系统抓取课程表，首次使用需填写教务地址并登录",
                     style = MaterialTheme.typography.bodyMedium,
@@ -514,6 +520,7 @@ fun ImportScreen(
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                     )
