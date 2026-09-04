@@ -73,13 +73,15 @@ jobs:
             ./gradlew :app:assembleDebug
           fi
 
-      - name: Locate APK
+      # 重命名 APK 为友好名(含 tag 版本), 用于上传与 Release 附件
+      - name: Rename APK
         run: |
           if [ "${SIGNED_BUILD:-}" = "1" ]; then
-            echo "APK_PATH=app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_ENV"
+            cp app/build/outputs/apk/release/app-release.apk "CourseSchedule-${GITHUB_REF_NAME}.apk"
           else
-            echo "APK_PATH=app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_ENV"
+            cp app/build/outputs/apk/debug/app-debug.apk "CourseSchedule-${GITHUB_REF_NAME}.apk"
           fi
+          echo "APK_PATH=CourseSchedule-${GITHUB_REF_NAME}.apk" >> "$GITHUB_ENV"
 
       # 推送 tag(如 v1.0.1)时自动创建 Release 并挂载 APK
       - name: Publish Release
