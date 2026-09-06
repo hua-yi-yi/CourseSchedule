@@ -20,7 +20,9 @@ class ScheduleLogicTest {
 
     @Test
     fun `开学后20天为第3周`() {
-        assertEquals(3, WeekCalculator.currentWeek(now - 20 * dayMillis, 16, now))
+        val zone = java.time.ZoneId.of("Asia/Shanghai")
+        val start = java.time.LocalDate.parse("2026-08-17").atStartOfDay(zone).toInstant().toEpochMilli()
+        assertEquals(3, WeekCalculator.currentWeek(start, 16, start + 20 * dayMillis, zone))
     }
 
     @Test

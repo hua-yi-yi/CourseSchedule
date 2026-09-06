@@ -61,7 +61,7 @@ fun WeekView(
     val density = LocalDensity.current
 
     val semesterMonday = semesterStartDate?.let {
-        Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+        com.chen.schedule.util.WeekCalculator.semesterMonday(it)
     }
     val today = LocalDate.now()
 
@@ -225,8 +225,9 @@ fun WeekView(
                             .background(accent.copy(alpha = 0.16f))
                             .border(1.dp, accent.copy(alpha = 0.38f), RoundedCornerShape(9.dp))
                             .clickable { onCourseClick(course) }
-                            .padding(horizontal = 7.dp, vertical = 5.dp),
-                        compact = span == 1
+                            .padding(horizontal = if (cellWidthDp < 60.dp) 3.dp else 7.dp, vertical = 5.dp),
+                        compact = span == 1,
+                        narrow = cellWidthDp < 60.dp
                     )
                 }
             }
@@ -241,22 +242,23 @@ internal fun CourseBlock(
     span: Int,
     accent: Color,
     modifier: Modifier = Modifier,
-    compact: Boolean = false
+    compact: Boolean = false,
+    narrow: Boolean = false
 ) {
     Row(modifier = modifier) {
-        Box(
+        if (!narrow) Box(
             modifier = Modifier
                 .width(3.dp)
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(2.dp))
                 .background(accent)
         )
-        Column(modifier = Modifier.padding(start = 6.dp).fillMaxWidth()) {
+        Column(modifier = Modifier.padding(start = if (narrow) 0.dp else 6.dp).fillMaxWidth()) {
             Text(
                 course.name,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines = 2,
+                maxLines = if (narrow && span > 1) 3 else 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -283,6 +285,8 @@ internal fun CourseBlock(
                     Text(
                         "${course.startSlot}-${course.endSlot}节",
                         fontSize = 9.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         color = accent
                     )
                 }

@@ -27,12 +27,15 @@ data class CourseEditState(
     val color: Long = 0xFF4CAF50,
     val note: String = "",
     val isEditing: Boolean = false,
+    val isSaving: Boolean = false,
+    val error: String? = null,
     val saved: Boolean = false
 )
 
 @HiltViewModel
 class CourseEditViewModel @Inject constructor(
-    private val courseRepository: CourseRepository
+    private val courseRepository: CourseRepository,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(CourseEditState())
@@ -69,39 +72,53 @@ class CourseEditViewModel @Inject constructor(
     fun updateTeacher(teacher: String) = _state.update { it.copy(teacher = teacher) }
     fun updateClassroom(classroom: String) = _state.update { it.copy(classroom = classroom) }
     fun updateDayOfWeek(day: Int) = _state.update { it.copy(dayOfWeek = day) }
-    fun updateStartSlot(slot: Int) = _state.update { it.copy(startSlot = slot) }
-    fun updateEndSlot(slot: Int) = _state.update { it.copy(endSlot = slot) }
-    fun updateStartWeek(week: Int) = _state.update { it.copy(startWeek = week) }
-    fun updateEndWeek(week: Int) = _state.update { it.copy(endWeek = week) }
+    fun updateStartSlot(slot: Int) = _state.update { it.copy(startSlot = slot, endSlot = maxOf(slot, it.endSlot)) }
+    fun updateEndSlot(slot: Int) = _state.update { it.copy(endSlot = slot, startSlot = minOf(slot, it.startSlot)) }
+    fun updateStartWeek(week: Int) = _state.update { it.copy(startWeek = week, endWeek = maxOf(week, it.endWeek)) }
+    fun updateEndWeek(week: Int) = _state.update { it.copy(endWeek = week, startWeek = minOf(week, it.startWeek)) }
     fun updateWeekType(weekType: WeekType) = _state.update { it.copy(weekType = weekType) }
     fun updateColor(color: Long) = _state.update { it.copy(color = color) }
     fun updateNote(note: String) = _state.update { it.copy(note = note) }
 
     fun save(semesterId: Long, courseId: Long? = null) {
+        val s = _state.value
+        if (s.isSaving || s.saved) return
+        if (s.name.isBlank() || s.startSlot < 1 || s.endSlot < s.startSlot ||
+            s.startWeek < 1 || s.endWeek < s.startWeek || s.dayOfWeek !in 1..7) {
+            _state.update { it.copy(error = "请填写课程名称，并检查节次和周次范围") }
+            return
+        }
+        _state.update { it.copy(isSaving = true, error = null) }
         viewModelScope.launch {
-            val s = _state.value
-            val course = Course(
-                id = courseId ?: 0,
-                name = s.name,
-                teacher = s.teacher,
-                classroom = s.classroom,
-                dayOfWeek = s.dayOfWeek,
-                startSlot = s.startSlot,
-                endSlot = s.endSlot,
-                startWeek = s.startWeek,
-                endWeek = s.endWeek,
-                weekType = s.weekType,
-                color = s.color,
-                semesterId = semesterId,
-                note = s.note
-            )
-            if (courseId != null) {
-                courseRepository.update(course)
-                courseRepository.updateColorByNameAndSemester(course.name, semesterId, course.color)
-            } else {
-                courseRepository.insert(course)
+            try {
+                val course = Course(
+                    id = courseId ?: 0,
+                    name = s.name.trim(),
+                    teacher = s.teacher,
+                    classroom = s.classroom,
+                    dayOfWeek = s.dayOfWeek,
+                    startSlot = s.startSlot,
+                    endSlot = s.endSlot,
+                    startWeek = s.startWeek,
+                    endWeek = s.endWeek,
+                    weekType = s.weekType,
+                    color = s.color,
+                    semesterId = semesterId,
+                    note = s.note
+                )
+                if (courseId != null) {
+                    courseRepository.update(course)
+                    courseRepository.updateColorByNameAndSemester(course.name, semesterId, course.color)
+                } else {
+                    courseRepository.insert(course)
+                }
+                _state.update { it.copy(saved = true, isSaving = false) }
+                com.chen.schedule.widget.WidgetUpdater.refreshAll(context)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(isSaving = false, error = "保存失败，请重试") }
             }
-            _state.update { it.copy(saved = true) }
         }
     }
 }

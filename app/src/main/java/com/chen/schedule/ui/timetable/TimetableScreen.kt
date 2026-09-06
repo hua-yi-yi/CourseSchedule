@@ -49,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -80,11 +81,12 @@ fun TimetableScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var selectedCourse by remember { mutableStateOf<Course?>(null) }
+    var pendingDelete by remember { mutableStateOf<Course?>(null) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            ExtendedFloatingActionButton(
+            if (state.currentSemester != null) ExtendedFloatingActionButton(
                 onClick = { state.currentSemester?.let { onAddCourse(it.id) } },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("添加课程") }
@@ -131,7 +133,7 @@ fun TimetableScreen(
                     onPrevWeek = viewModel::prevWeek,
                     onNextWeek = viewModel::nextWeek,
                     onToggleWeekend = viewModel::toggleWeekend,
-                    onGoToday = viewModel::openToday
+                    onGoToday = { viewModel.setWeek(actualWeek) }
                 )
 
                 if (state.isDayView) {
@@ -141,9 +143,9 @@ fun TimetableScreen(
                         showWeekend = state.showWeekend
                     )
                     DayView(
+                        isToday = state.currentWeek == actualWeek && state.selectedDay == LocalDate.now().dayOfWeek.value,
                         courses = viewModel.getFilteredCourses(),
                         timeSlots = state.timeSlots,
-                        showWeekend = state.showWeekend,
                         onCourseClick = { selectedCourse = it }
                     )
                 } else {
@@ -168,6 +170,21 @@ fun TimetableScreen(
         }
     }
 
+    pendingDelete?.let { course ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("删除课程？") },
+            text = { Text("将删除「${course.name}」的这条上课安排，此操作无法撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteCourse(course)
+                    pendingDelete = null
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("保留课程") } }
+        )
+    }
+
     // 课程详情弹窗
     selectedCourse?.let { course ->
         CourseDetailDialog(
@@ -180,7 +197,7 @@ fun TimetableScreen(
                 }
             },
             onDelete = {
-                viewModel.deleteCourse(course)
+                pendingDelete = course
                 selectedCourse = null
             }
         )
@@ -326,10 +343,10 @@ private fun WeekSelector(
                     .padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onPrevWeek) {
+                IconButton(onClick = onPrevWeek, enabled = currentWeek > 1) {
                     Icon(
                         Icons.Default.ChevronLeft, "上一周",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek > 1) 1f else 0.3f)
                     )
                 }
 
@@ -364,10 +381,10 @@ private fun WeekSelector(
                     )
                 }
 
-                IconButton(onClick = onNextWeek) {
+                IconButton(onClick = onNextWeek, enabled = currentWeek < totalWeeks) {
                     Icon(
                         Icons.Default.ChevronRight, "下一周",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek < totalWeeks) 1f else 0.3f)
                     )
                 }
             }
@@ -471,26 +488,14 @@ private fun TodaySummaryCard(
 ) {
     val todayIndex = LocalDate.now().dayOfWeek.value
     val todayCourses = courses.filter { it.dayOfWeek == todayIndex }.sortedBy { it.startSlot }
-    if (todayCourses.isEmpty()) return
-
-    val now = LocalTime.now()
-    val currentSlotNumber = timeSlots.firstOrNull { slot ->
-        try {
-            val start = LocalTime.parse(slot.startTime, DateTimeFormatter.ofPattern("HH:mm"))
-            val end = LocalTime.parse(slot.endTime, DateTimeFormatter.ofPattern("HH:mm"))
-            now in start..end
-        } catch (_: Exception) {
-            false
-        }
-    }?.slotNumber
-
-    val next = todayCourses.firstOrNull { it.startSlot >= (currentSlotNumber ?: 1) } ?: todayCourses.first()
     val nd = LocalDate.now()
-    val summary = if (todayCourses.size == 1) {
-        "共 1 节课 · 下一节 ${next.name}"
-    } else {
-        "共 ${todayCourses.size} 节课 · 下一节 ${next.name}"
+    val now by produceState(initialValue = LocalTime.now()) {
+        while (true) {
+            value = LocalTime.now()
+            kotlinx.coroutines.delay(30_000)
+        }
     }
+    val summary = com.chen.schedule.util.TodaySummary.describe(todayCourses, timeSlots, now)
 
     Card(
         modifier = Modifier

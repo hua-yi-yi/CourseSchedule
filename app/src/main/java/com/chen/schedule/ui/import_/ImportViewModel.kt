@@ -41,7 +41,7 @@ class ImportViewModel @Inject constructor(
 
     fun importFromJsonUri(uri: Uri) {
         viewModelScope.launch {
-            _state.update { it.copy(isImporting = true, message = "") }
+            _state.update { it.copy(isImporting = true, message = "", isError = false, previewCourses = emptyList()) }
             try {
                 val inputStream = context.contentResolver.openInputStream(uri)
                 val jsonString = inputStream?.bufferedReader()?.readText() ?: ""
@@ -55,7 +55,7 @@ class ImportViewModel @Inject constructor(
 
     fun importFromCsvUri(uri: Uri) {
         viewModelScope.launch {
-            _state.update { it.copy(isImporting = true, message = "") }
+            _state.update { it.copy(isImporting = true, message = "", isError = false, previewCourses = emptyList()) }
             try {
                 val inputStream = context.contentResolver.openInputStream(uri)
                 val csvString = inputStream?.bufferedReader()?.readText() ?: ""
@@ -69,14 +69,14 @@ class ImportViewModel @Inject constructor(
 
     fun importFromJsonText(jsonString: String) {
         viewModelScope.launch {
-            _state.update { it.copy(isImporting = true, message = "") }
+            _state.update { it.copy(isImporting = true, message = "", isError = false, previewCourses = emptyList()) }
             parseJsonText(jsonString)
         }
     }
 
     fun importFromCsvText(csvString: String) {
         viewModelScope.launch {
-            _state.update { it.copy(isImporting = true, message = "") }
+            _state.update { it.copy(isImporting = true, message = "", isError = false, previewCourses = emptyList()) }
             parseCsvText(csvString)
         }
     }
@@ -85,7 +85,7 @@ class ImportViewModel @Inject constructor(
         val result = JsonImporter.parse(jsonString)
         result.fold(
             onSuccess = { courses ->
-                _state.update { it.copy(previewCourses = courses, message = "解析成功，共 ${courses.size} 门课程", isImporting = false) }
+                _state.update { it.copy(previewCourses = courses, isError = false, message = "解析成功，共 ${courses.size} 门课程", isImporting = false) }
             },
             onFailure = { e ->
                 _state.update { it.copy(message = "JSON 解析失败: ${e.message}", isError = true, isImporting = false) }
@@ -97,7 +97,7 @@ class ImportViewModel @Inject constructor(
         val result = CsvImporter.parse(csvString)
         result.fold(
             onSuccess = { courses ->
-                _state.update { it.copy(previewCourses = courses, message = "解析成功，共 ${courses.size} 门课程", isImporting = false) }
+                _state.update { it.copy(previewCourses = courses, isError = false, message = "解析成功，共 ${courses.size} 门课程", isImporting = false) }
             },
             onFailure = { e ->
                 _state.update { it.copy(message = "CSV 解析失败: ${e.message}", isError = true, isImporting = false) }

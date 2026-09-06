@@ -85,7 +85,7 @@ fun CourseEditScreen(
                                 viewModel.save(semesterId, courseId)
                             }
                         },
-                        enabled = state.name.isNotBlank()
+                        enabled = state.name.isNotBlank() && !state.isSaving
                     ) {
                         Icon(Icons.Default.Check, "保存", tint = if (state.name.isNotBlank())
                             MaterialTheme.colorScheme.primary
@@ -103,6 +103,11 @@ fun CourseEditScreen(
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
+            state.error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.height(8.dp))
+            }
+            if (state.isSaving) Text("正在保存…", color = MaterialTheme.colorScheme.primary)
             // Course name
             OutlinedTextField(
                 value = state.name,

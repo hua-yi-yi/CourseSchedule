@@ -52,7 +52,7 @@ private val DTIME_COL = 56
 fun DayView(
     courses: List<Course>,
     timeSlots: List<TimeSlot>,
-    showWeekend: Boolean,
+    isToday: Boolean = true,
     onCourseClick: (Course) -> Unit
 ) {
     val slots = timeSlots.ifEmpty {
@@ -64,7 +64,7 @@ fun DayView(
     val density = LocalDensity.current
 
     val now = LocalTime.now()
-    val currentSlot = visibleSlots.find { slot ->
+    val currentSlot = visibleSlots.takeIf { isToday }?.find { slot ->
         try {
             val start = LocalTime.parse(slot.startTime, DateTimeFormatter.ofPattern("HH:mm"))
             val end = LocalTime.parse(slot.endTime, DateTimeFormatter.ofPattern("HH:mm"))
@@ -105,8 +105,7 @@ fun DayView(
                         )
                     }
                 }
-                return@Column
-            }
+            } else {
 
             if (currentSlot != null) {
                 Row(
@@ -288,6 +287,7 @@ fun DayView(
                         }
                     }
                 }
+            }
             }
         }
     }

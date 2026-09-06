@@ -1,22 +1,21 @@
 package com.chen.schedule.util
 
-/**
- * 学期周次计算:课程表视图、桌面小组件共用的唯一实现。
- */
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
+
+/** Calendar weeks run Monday through Sunday in the device time zone. */
 object WeekCalculator {
+    fun semesterMonday(startDate: Long, zone: ZoneId = ZoneId.systemDefault()): LocalDate =
+        Instant.ofEpochMilli(startDate).atZone(zone).toLocalDate()
+            .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
-    private const val MILLIS_PER_DAY = 1000L * 60 * 60 * 24
-
-    /**
-     * 根据学期开学日期计算当前是第几周(1-based,并钳制在 [1, totalWeeks])。
-     *
-     * @param startDate 开学日期时间戳
-     * @param totalWeeks 学期总周数
-     * @param nowMillis 当前时间(可注入以便测试)
-     */
-    fun currentWeek(startDate: Long, totalWeeks: Int, nowMillis: Long = System.currentTimeMillis()): Int {
-        val diffDays = (nowMillis - startDate) / MILLIS_PER_DAY
-        val week = (diffDays / 7 + 1).toInt()
-        return week.coerceIn(1, totalWeeks.coerceAtLeast(1))
+    fun currentWeek(startDate: Long, totalWeeks: Int, nowMillis: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): Int {
+        val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+        val days = ChronoUnit.DAYS.between(semesterMonday(startDate, zone), today)
+        return (Math.floorDiv(days, 7) + 1).coerceIn(1L, totalWeeks.coerceAtLeast(1).toLong()).toInt()
     }
 }

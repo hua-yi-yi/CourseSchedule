@@ -29,9 +29,9 @@ data class TimetableState(
     val currentSemester: Semester? = null,
     val timeSlots: List<TimeSlot> = emptyList(),
     val currentWeek: Int = 1,
-    val selectedDay: Int = 1, // Monday = DayOfWeek.MON.index
+    val selectedDay: Int = java.time.LocalDate.now().dayOfWeek.value, // Monday = DayOfWeek.MON.index
     val isDayView: Boolean = false,
-    val showWeekend: Boolean = false
+    val showWeekend: Boolean = java.time.LocalDate.now().dayOfWeek.value > 5
 )
 
 @HiltViewModel
@@ -78,7 +78,7 @@ class TimetableViewModel @Inject constructor(
     }
 
     fun setWeek(week: Int) {
-        _state.update { it.copy(currentWeek = week) }
+        _state.update { it.copy(currentWeek = week.coerceIn(1, (it.currentSemester?.totalWeeks ?: 16).coerceAtLeast(1))) }
     }
 
     fun prevWeek() {
@@ -100,7 +100,7 @@ class TimetableViewModel @Inject constructor(
     }
 
     fun toggleWeekend() {
-        _state.update { it.copy(showWeekend = !it.showWeekend) }
+        _state.update { it.copy(showWeekend = !it.showWeekend, selectedDay = if (it.showWeekend && it.selectedDay > 5) 1 else it.selectedDay) }
     }
 
     /** 跳转到「今天」:回到当前周、选中今天、切换到日视图 */
@@ -111,7 +111,8 @@ class TimetableViewModel @Inject constructor(
             it.copy(
                 currentWeek = actualWeek,
                 selectedDay = java.time.LocalDate.now().dayOfWeek.value,
-                isDayView = true
+                isDayView = true,
+                showWeekend = s.showWeekend || java.time.LocalDate.now().dayOfWeek.value > 5
             )
         }
     }
