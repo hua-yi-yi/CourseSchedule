@@ -1,7 +1,6 @@
 package com.chen.schedule.ui.navigation
 
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
@@ -32,77 +31,75 @@ sealed class Screen(val route: String) {
 fun AppNavHost() {
     val navController = rememberNavController()
 
-    Scaffold { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Timetable.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(Screen.Timetable.route) {
-                TimetableScreen(
-                    onAddCourse = { semesterId ->
-                        navController.navigate(Screen.CourseEdit.createRoute(semesterId = semesterId))
-                    },
-                    onEditCourse = { courseId, semesterId ->
-                        navController.navigate(Screen.CourseEdit.createRoute(courseId, semesterId))
-                    },
-                    onNavigateToScheduleConfig = {
-                        navController.navigate(Screen.ScheduleConfig.route)
-                    },
-                    onNavigateToImport = {
-                        navController.navigate(Screen.Import.route)
-                    },
-                    onNavigateToSettings = {
-                        navController.navigate(Screen.Settings.route)
-                    }
-                )
-            }
+    NavHost(
+        navController = navController,
+        startDestination = Screen.Timetable.route,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        composable(Screen.Timetable.route) {
+            TimetableScreen(
+                onAddCourse = { semesterId ->
+                    navController.navigate(Screen.CourseEdit.createRoute(semesterId = semesterId))
+                },
+                onEditCourse = { courseId, semesterId ->
+                    navController.navigate(Screen.CourseEdit.createRoute(courseId, semesterId))
+                },
+                onNavigateToScheduleConfig = {
+                    navController.navigate(Screen.ScheduleConfig.route)
+                },
+                onNavigateToImport = {
+                    navController.navigate(Screen.Import.route)
+                },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route)
+                }
+            )
+        }
 
-            composable(Screen.Import.route) {
-                ImportScreen(
-                    onScraperLogin = {
-                        navController.navigate(Screen.ScraperLogin.route)
-                    },
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
+        composable(Screen.Import.route) {
+            ImportScreen(
+                onScraperLogin = {
+                    navController.navigate(Screen.ScraperLogin.route)
+                },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(Screen.Settings.route) {
-                SettingsScreen(
-                    onNavigateToScheduleConfig = {
-                        navController.navigate(Screen.ScheduleConfig.route)
-                    },
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onNavigateToScheduleConfig = {
+                    navController.navigate(Screen.ScheduleConfig.route)
+                },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(
-                route = Screen.CourseEdit.route,
-                arguments = listOf(
-                    navArgument("courseId") { type = NavType.LongType; defaultValue = -1L },
-                    navArgument("semesterId") { type = NavType.LongType }
-                )
-            ) { backStackEntry ->
-                val courseId = backStackEntry.arguments?.getLong("courseId") ?: -1L
-                val semesterId = backStackEntry.arguments?.getLong("semesterId") ?: 0L
-                CourseEditScreen(
-                    courseId = if (courseId == -1L) null else courseId,
-                    semesterId = semesterId,
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
+        composable(
+            route = Screen.CourseEdit.route,
+            arguments = listOf(
+                navArgument("courseId") { type = NavType.LongType; defaultValue = -1L },
+                navArgument("semesterId") { type = NavType.LongType }
+            )
+        ) { backStackEntry ->
+            val courseId = backStackEntry.arguments?.getLong("courseId") ?: -1L
+            val semesterId = backStackEntry.arguments?.getLong("semesterId") ?: 0L
+            CourseEditScreen(
+                courseId = if (courseId == -1L) null else courseId,
+                semesterId = semesterId,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(Screen.ScheduleConfig.route) {
-                ScheduleConfigScreen(
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
+        composable(Screen.ScheduleConfig.route) {
+            ScheduleConfigScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(Screen.ScraperLogin.route) {
-                ScraperLoginScreen(
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
+        composable(Screen.ScraperLogin.route) {
+            ScraperLoginScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
     }
 }
