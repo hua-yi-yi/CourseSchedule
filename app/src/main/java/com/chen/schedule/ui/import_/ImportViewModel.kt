@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class ImportState(
@@ -43,10 +45,10 @@ class ImportViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isImporting = true, message = "", isError = false, previewCourses = emptyList()) }
             try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val jsonString = inputStream?.bufferedReader()?.readText() ?: ""
-                inputStream?.close()
-                parseJsonText(jsonString)
+                withContext(Dispatchers.IO) {
+                    val jsonString = requireNotNull(context.contentResolver.openInputStream(uri)).bufferedReader().use { it.readText() }
+                    withContext(Dispatchers.Default) { parseJsonText(jsonString) }
+                }
             } catch (e: Exception) {
                 _state.update { it.copy(message = "读取文件失败: ${e.message}", isError = true, isImporting = false) }
             }
@@ -57,10 +59,10 @@ class ImportViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isImporting = true, message = "", isError = false, previewCourses = emptyList()) }
             try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val csvString = inputStream?.bufferedReader()?.readText() ?: ""
-                inputStream?.close()
-                parseCsvText(csvString)
+                withContext(Dispatchers.IO) {
+                    val csvString = requireNotNull(context.contentResolver.openInputStream(uri)).bufferedReader().use { it.readText() }
+                    withContext(Dispatchers.Default) { parseCsvText(csvString) }
+                }
             } catch (e: Exception) {
                 _state.update { it.copy(message = "读取文件失败: ${e.message}", isError = true, isImporting = false) }
             }
@@ -70,14 +72,14 @@ class ImportViewModel @Inject constructor(
     fun importFromJsonText(jsonString: String) {
         viewModelScope.launch {
             _state.update { it.copy(isImporting = true, message = "", isError = false, previewCourses = emptyList()) }
-            parseJsonText(jsonString)
+            withContext(Dispatchers.Default) { parseJsonText(jsonString) }
         }
     }
 
     fun importFromCsvText(csvString: String) {
         viewModelScope.launch {
             _state.update { it.copy(isImporting = true, message = "", isError = false, previewCourses = emptyList()) }
-            parseCsvText(csvString)
+            withContext(Dispatchers.Default) { parseCsvText(csvString) }
         }
     }
 
@@ -106,23 +108,20 @@ class ImportViewModel @Inject constructor(
     }
 
     fun confirmImport() {
+        if (_state.value.isImporting || _state.value.previewCourses.isEmpty()) return
+        val preview = _state.value.previewCourses
+        _state.update { it.copy(isImporting = true) }
         viewModelScope.launch {
-            val currentSemester = semesterRepository.getCurrentSemester()
-            if (currentSemester == null) {
-                _state.update { it.copy(message = "请先在设置中创建学期", isError = true) }
-                return@launch
-            }
-
-            val courses = CoursePalette.assignColors(_state.value.previewCourses)
-                .map { it.copy(semesterId = currentSemester.id) }
-            courseRepository.insertAll(courses)
-            WidgetUpdater.refreshAll(context)
-            _state.update {
-                it.copy(
-                    previewCourses = emptyList(),
-                    message = "成功导入 ${courses.size} 门课程",
-                    isError = false
-                )
+            try {
+                val currentSemester = semesterRepository.getCurrentSemester() ?: error("请先在设置中创建学期")
+                val courses = CoursePalette.assignColors(preview).map { it.copy(semesterId = currentSemester.id) }
+                courseRepository.insertAll(courses)
+                _state.update { it.copy(previewCourses = emptyList(), message = "成功导入 ${courses.size} 门课程", isError = false) }
+                WidgetUpdater.refreshAll(context)
+            } catch (e: Exception) {
+                _state.update { it.copy(message = "导入失败: ${e.message}", isError = true) }
+            } finally {
+                _state.update { it.copy(isImporting = false) }
             }
         }
     }

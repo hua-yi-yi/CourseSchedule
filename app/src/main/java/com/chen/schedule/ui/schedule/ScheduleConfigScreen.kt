@@ -68,6 +68,7 @@ fun ScheduleConfigScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    var pendingSeason by remember { mutableStateOf<String?>(null) }
     var importText by remember { mutableStateOf("") }
     var showFormatHelp by remember { mutableStateOf(false) }
 
@@ -78,6 +79,17 @@ fun ScheduleConfigScreen(
         }
     }
 
+    pendingSeason?.let { season ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingSeason = null },
+            title = { Text("套用作息模板") },
+            text = { Text("将替换当前全部作息时间，包括自定义时间。此操作为手动切换。") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = {
+                viewModel.applyTimeSlotSeason(season); pendingSeason = null
+            }) { Text("替换") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { pendingSeason = null }) { Text("取消") } }
+        )
+    }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -226,14 +238,14 @@ fun ScheduleConfigScreen(
 
                 Spacer(Modifier.height(4.dp))
 
-                // Preset buttons
+                // Season selector
                 Row {
-                    OutlinedButton(onClick = { viewModel.applyPreset("45min") }) {
-                        Text("45分钟模板")
+                    OutlinedButton(onClick = { pendingSeason = "summer" }) {
+                        Text("夏季作息")
                     }
                     Spacer(Modifier.width(8.dp))
-                    OutlinedButton(onClick = { viewModel.applyPreset("40min") }) {
-                        Text("40分钟模板")
+                    OutlinedButton(onClick = { pendingSeason = "winter" }) {
+                        Text("冬季作息")
                     }
                 }
 
@@ -337,7 +349,6 @@ fun ScheduleConfigScreen(
                             Button(
                                 onClick = {
                                     viewModel.importTimeSlotsFromText(importText)
-                                    importText = ""
                                 },
                                 modifier = Modifier.weight(1f),
                                 enabled = importText.isNotBlank()

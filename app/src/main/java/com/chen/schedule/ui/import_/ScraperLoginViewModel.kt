@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class ScraperLoginState(
-    val url: String = "",
+    val url: String = "https://jwgl.haust.edu.cn/eams/homeExt.action",
     val username: String = "",
     val password: String = "",
     val captchaBytes: ByteArray? = null,
@@ -62,6 +62,11 @@ class ScraperLoginViewModel @Inject constructor(
         if (raw.isEmpty()) return "请输入教务系统地址"
         val base = if (raw.startsWith("http://") || raw.startsWith("https://")) raw.trimEnd('/')
         else "https://${raw.trimEnd('/')}"
+        val parsed = android.net.Uri.parse(base)
+        if (parsed.host.equals("jwgl.haust.edu.cn", ignoreCase = true) ||
+            parsed.path.orEmpty().startsWith("/eams", ignoreCase = true)) {
+            return "河南科技大学请使用上方「VPN / 校内导入」入口；此账号表单仅适用于正方经典版"
+        }
         scraper.config = scraper.config.copy(
             baseUrl = base,
             loginUrl = "$base/default2.aspx",

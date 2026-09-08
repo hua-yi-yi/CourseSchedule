@@ -1,5 +1,9 @@
 package com.chen.schedule.ui.settings
 
+import androidx.room.withTransaction
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.chen.schedule.util.ScheduleBackup
 import android.content.Context
 import android.net.Uri
 import android.widget.Toast
@@ -78,6 +82,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    private val database: com.chen.schedule.data.local.AppDatabase,
     private val courseRepository: CourseRepository,
     private val semesterRepository: SemesterRepository,
     private val timeSlotRepository: TimeSlotRepository,
@@ -87,40 +92,17 @@ class SettingsViewModel @Inject constructor(
     fun exportToUri(uri: Uri) {
         viewModelScope.launch {
             try {
-                val sem = semesterRepository.getCurrentSemester() ?: run {
-                    android.widget.Toast.makeText(context, "没有当前学期", android.widget.Toast.LENGTH_SHORT).show()
-                    return@launch
-                }
-                val list = courseRepository.getCoursesBySemester(sem.id).first()
-                if (list.isEmpty()) {
-                    android.widget.Toast.makeText(context, "当前学期没有课程数据", android.widget.Toast.LENGTH_SHORT).show()
-                    return@launch
-                }
-                val data = CourseImportData(
-                    semesterName = sem.name,
-                    courses = list.map { c ->
-                        CourseJson(
-                            name = c.name,
-                            teacher = c.teacher,
-                            classroom = c.classroom,
-                            dayOfWeek = c.dayOfWeek,
-                            startSlot = c.startSlot,
-                            endSlot = c.endSlot,
-                            startWeek = c.startWeek,
-                            endWeek = c.endWeek,
-                            weekType = when (c.weekType) {
-                                WeekType.ODD -> "odd"
-                                WeekType.EVEN -> "even"
-                                else -> "all"
-                            },
-                            color = c.color,
-                            note = c.note
-                        )
+                withContext(Dispatchers.IO) {
+                    val data = database.withTransaction {
+                        val sem = semesterRepository.getCurrentSemester() ?: error("没有当前学期")
+                        ScheduleBackup(semester = sem,
+                            courses = courseRepository.getCoursesBySemester(sem.id).first(),
+                            timeSlots = timeSlotRepository.getAllTimeSlots().first())
                     }
-                )
-                val json = Json { prettyPrint = true }.encodeToString(CourseImportData.serializer(), data)
-                context.contentResolver.openOutputStream(uri)?.use { os ->
-                    os.write(json.toByteArray())
+                    val json = Json { prettyPrint = true }.encodeToString(ScheduleBackup.serializer(), data)
+                    requireNotNull(context.contentResolver.openOutputStream(uri)).use {
+                        it.write(json.toByteArray(Charsets.UTF_8))
+                    }
                 }
                 android.widget.Toast.makeText(context, "导出成功", android.widget.Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
@@ -131,25 +113,51 @@ class SettingsViewModel @Inject constructor(
 
     fun clearAllData() {
         viewModelScope.launch {
-            val sem = semesterRepository.getCurrentSemester() ?: return@launch
-            courseRepository.deleteAllBySemester(sem.id)
-            WidgetUpdater.refreshAll(context)
+            try {
+                val sem = semesterRepository.getCurrentSemester() ?: error("没有当前学期")
+                courseRepository.deleteAllBySemester(sem.id)
+                WidgetUpdater.refreshAll(context)
+                Toast.makeText(context, "数据已清空", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "清空失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
     fun importData(uri: Uri) {
         viewModelScope.launch {
             try {
-                val jsonString = context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText() ?: ""
-                val courses = JsonImporter.parse(jsonString).getOrThrow()
-                val currentSemester = semesterRepository.getCurrentSemester()
-                if (currentSemester == null) {
-                    android.widget.Toast.makeText(context, "请先创建学期", android.widget.Toast.LENGTH_SHORT).show()
-                    return@launch
+                val count = withContext(Dispatchers.IO) {
+                    val jsonString = requireNotNull(context.contentResolver.openInputStream(uri)).bufferedReader().use { it.readText() }
+                    val format = Json { ignoreUnknownKeys = true }
+                    val element = format.parseToJsonElement(jsonString)
+                    val backup = if (element is kotlinx.serialization.json.JsonObject && "backupVersion" in element)
+                        format.decodeFromString(ScheduleBackup.serializer(), jsonString) else null
+                    require(backup == null || backup.backupVersion == 1) { "不支持此备份版本" }
+                    val courses = backup?.courses ?: JsonImporter.parse(jsonString).getOrThrow()
+                    require(backup != null || courses.isNotEmpty()) { "未找到课程，未修改现有数据" }
+                    require(courses.all { it.name.isNotBlank() && it.dayOfWeek in 1..7 && it.startSlot > 0 && it.endSlot >= it.startSlot && it.startWeek > 0 && it.endWeek >= it.startWeek }) { "课程数据无效" }
+                    backup?.let {
+                        require(it.semester.totalWeeks in 1..53) { "学期周数无效" }
+                        if (it.timeSlots.isNotEmpty()) com.chen.schedule.util.TimeSlotParser.parse(
+                            it.timeSlots.joinToString("\n") { slot -> "${slot.slotNumber} ${slot.startTime}-${slot.endTime}" })
+                    }
+                    database.withTransaction {
+                        val current = semesterRepository.getCurrentSemester()
+                        val id = current?.id ?: semesterRepository.insert(
+                            backup?.semester?.copy(id = 0, isCurrent = true) ?: error("请先创建学期"))
+                        backup?.let {
+                            semesterRepository.update(it.semester.copy(id = id, isCurrent = true))
+                            timeSlotRepository.replaceAll(it.timeSlots.map { slot -> slot.copy(id = 0) })
+                        }
+                        courseRepository.deleteAllBySemester(id)
+                        courseRepository.insertAll(courses.map { it.copy(id = 0, semesterId = id) })
+                    }
+                    courses.size
                 }
-                courseRepository.insertAll(courses.map { it.copy(semesterId = currentSemester.id) })
                 WidgetUpdater.refreshAll(context)
-                android.widget.Toast.makeText(context, "成功导入 ${courses.size} 门课程", android.widget.Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "成功恢复 $count 门课程", Toast.LENGTH_SHORT).show()
+
             } catch (e: Exception) {
                 android.widget.Toast.makeText(context, "导入失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
             }
@@ -166,6 +174,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var pendingRestore by remember { mutableStateOf<Uri?>(null) }
     var showClearDialog by remember { mutableStateOf(false) }
 
     // Export launcher
@@ -179,9 +188,16 @@ fun SettingsScreen(
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
-        uri?.let { viewModel.importData(it) }
+        pendingRestore = uri
     }
 
+    pendingRestore?.let { uri ->
+        AlertDialog(onDismissRequest = { pendingRestore = null },
+            title = { Text("恢复备份") },
+            text = { Text("将替换当前学期的课程；完整备份还会恢复学期信息与作息时间。建议先备份现有数据。") },
+            confirmButton = { TextButton(onClick = { viewModel.importData(uri); pendingRestore = null }) { Text("恢复") } },
+            dismissButton = { TextButton(onClick = { pendingRestore = null }) { Text("取消") } })
+    }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -222,7 +238,7 @@ fun SettingsScreen(
                 SettingsItem(
                     icon = Icons.Default.Backup,
                     title = "备份数据",
-                    subtitle = "导出课程数据为 JSON 文件",
+                    subtitle = "备份当前学期、课程及作息时间",
                     showChevron = true,
                     onClick = { exportLauncher.launch("course_schedule_backup.json") }
                 )
@@ -230,7 +246,7 @@ fun SettingsScreen(
                 SettingsItem(
                     icon = Icons.Default.Restore,
                     title = "恢复数据",
-                    subtitle = "从 JSON 文件导入课程数据",
+                    subtitle = "从备份替换恢复当前学期",
                     showChevron = true,
                     onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) }
                 )
@@ -300,7 +316,7 @@ fun SettingsScreen(
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("版本 1.0.1", style = MaterialTheme.typography.bodyMedium)
+                    Text("版本 ${com.chen.schedule.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.weight(1f))
                     Text(
                         "Android 课程表",
@@ -346,7 +362,6 @@ fun SettingsScreen(
                 TextButton(onClick = {
                     viewModel.clearAllData()
                     showClearDialog = false
-                    Toast.makeText(context, "数据已清空", Toast.LENGTH_SHORT).show()
                 }) {
                     Text("确认清空", color = MaterialTheme.colorScheme.error)
                 }

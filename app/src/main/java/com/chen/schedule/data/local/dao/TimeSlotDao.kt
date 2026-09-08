@@ -29,6 +29,12 @@ interface TimeSlotDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(timeSlots: List<TimeSlotEntity>)
 
+    @androidx.room.Transaction
+    suspend fun replaceAll(slots: List<TimeSlotEntity>) {
+        deleteAll()
+        insertAll(slots)
+    }
+
     @Query("DELETE FROM time_slots")
     suspend fun deleteAll()
 }

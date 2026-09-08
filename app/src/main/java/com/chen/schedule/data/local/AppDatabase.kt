@@ -11,10 +11,17 @@ import com.chen.schedule.data.local.entity.TimeSlotEntity
 
 @Database(
     entities = [CourseEntity::class, SemesterEntity::class, TimeSlotEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
+    companion object {
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE time_slots ADD COLUMN season INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+    }
     abstract fun courseDao(): CourseDao
     abstract fun semesterDao(): SemesterDao
     abstract fun timeSlotDao(): TimeSlotDao

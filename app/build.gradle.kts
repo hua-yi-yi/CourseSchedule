@@ -68,6 +68,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -124,6 +125,8 @@ dependencies {
 
     // DataStore (for preferences/settings)
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+    implementation("androidx.webkit:webkit:1.10.0")
 
     // Core
     implementation("androidx.core:core-ktx:1.12.0")

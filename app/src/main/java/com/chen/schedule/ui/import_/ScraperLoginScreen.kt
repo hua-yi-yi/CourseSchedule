@@ -53,6 +53,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun ScraperLoginScreen(
     onNavigateBack: () -> Unit,
+    onHaustImport: () -> Unit,
     viewModel: ScraperLoginViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -81,12 +82,16 @@ fun ScraperLoginScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                "输入教务系统地址并登录,自动获取本学期课程表。部分学校验证码为必填项,可先获取验证码。",
+                "河南科技大学请使用下方专用入口，在学校页面登录后读取课表。其他正方经典版学校可使用账号导入。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(16.dp))
 
+            Button(onClick = onHaustImport, modifier = Modifier.fillMaxWidth()) {
+                Text("河南科技大学 · VPN / 校内导入")
+            }
+            Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = state.url,
                 onValueChange = viewModel::onUrlChange,

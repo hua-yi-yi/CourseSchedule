@@ -1,5 +1,6 @@
 package com.chen.schedule.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -46,5 +47,7 @@ data class TimeSlotEntity(
     val slotNumber: Int,
     val startTime: String,
     val endTime: String,
-    val name: String = ""
+    val name: String = "",
+    /** 作息套别:0=通用(默认),1=夏季(5/1–9/30),2=冬季(10/1–4/30)。 */
+    @ColumnInfo(defaultValue = "0") val season: Int = 0
 )

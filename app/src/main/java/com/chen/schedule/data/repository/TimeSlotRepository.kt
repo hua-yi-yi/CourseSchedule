@@ -27,15 +27,20 @@ class TimeSlotRepository @Inject constructor(
     suspend fun insertAll(timeSlots: List<TimeSlot>) =
         timeSlotDao.insertAll(timeSlots.map { it.toEntity() })
 
+    suspend fun replaceAll(timeSlots: List<TimeSlot>) =
+        timeSlotDao.replaceAll(timeSlots.map { it.toEntity() })
+
     suspend fun deleteAll() = timeSlotDao.deleteAll()
 
     private fun TimeSlotEntity.toDomain() = TimeSlot(
         id = id, slotNumber = slotNumber,
-        startTime = startTime, endTime = endTime, name = name
+        startTime = startTime, endTime = endTime, name = name,
+        season = season
     )
 
     private fun TimeSlot.toEntity() = TimeSlotEntity(
         id = id, slotNumber = slotNumber,
-        startTime = startTime, endTime = endTime, name = name
+        startTime = startTime, endTime = endTime, name = name,
+        season = season
     )
 }

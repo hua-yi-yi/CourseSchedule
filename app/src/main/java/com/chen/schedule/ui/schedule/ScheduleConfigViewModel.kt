@@ -102,11 +102,14 @@ class ScheduleConfigViewModel @Inject constructor(
     fun saveSemester() {
         viewModelScope.launch {
             val s = _state.value
-            val df = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val dateStr = "${s.semesterYear}-${s.semesterMonth.padStart(2, '0')}-${s.semesterDay.padStart(2, '0')}"
             val startDate = try {
-                df.parse(dateStr)?.time ?: System.currentTimeMillis()
-            } catch (_: Exception) { System.currentTimeMillis() }
+                require(s.semesterTotalWeeks in 1..53) { "总周数应为 1–53" }
+                java.time.LocalDate.of(s.semesterYear.toInt(), s.semesterMonth.toInt(), s.semesterDay.toInt())
+                    .atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            } catch (_: Exception) {
+                _state.update { it.copy(message = "请输入有效日期及 1–53 的总周数", isError = true) }
+                return@launch
+            }
 
             val sem = Semester(
                 id = s.semester?.id ?: 0,
@@ -121,6 +124,7 @@ class ScheduleConfigViewModel @Inject constructor(
             } else {
                 val newId = semesterRepository.insert(sem)
                 semesterRepository.setCurrentSemester(newId)
+                _state.update { it.copy(semester = sem.copy(id = newId)) }
             }
             WidgetUpdater.refreshAll(context)
         }
@@ -155,47 +159,33 @@ class ScheduleConfigViewModel @Inject constructor(
                     name = "第${nextNumber}节"
                 )
             )
+            WidgetUpdater.refreshAll(context)
         }
     }
 
     fun deleteTimeSlot(timeSlot: TimeSlot) {
         viewModelScope.launch {
             timeSlotRepository.delete(timeSlot)
+            WidgetUpdater.refreshAll(context)
         }
     }
 
-    fun applyPreset(preset: String) {
+    /** 切换作息套别:summer / winter. */
+    fun applyTimeSlotSeason(season: String) {
         viewModelScope.launch {
-            timeSlotRepository.deleteAll()
-            val slots = when (preset) {
-                "45min" -> generate45MinSlots()
-                "40min" -> generate40MinSlots()
-                else -> emptyList()
+            val slots = when (season) {
+                "summer" -> generateSummerSlots()
+                "winter" -> generateWinterSlots()
+                else -> return@launch
             }
-            timeSlotRepository.insertAll(slots)
+            timeSlotRepository.replaceAll(slots)
+            WidgetUpdater.refreshAll(context)
         }
     }
 
-    private fun generate45MinSlots(): List<TimeSlot> {
-        val startTimes = listOf(
-            "08:00", "08:55", "10:00", "10:55",
-            "14:00", "14:55", "16:00", "16:55",
-            "19:00", "19:55"
-        )
-        return startTimes.mapIndexed { i, start ->
-            val endParts = start.split(":")
-            val h = endParts[0].toInt()
-            val m = endParts[1].toInt() + 45
-            val endH = h + m / 60
-            val endM = m % 60
-            TimeSlot(
-                slotNumber = i + 1,
-                startTime = start,
-                endTime = String.format("%02d:%02d", endH, endM),
-                name = "第${i + 1}节"
-            )
-        }
-    }
+    private fun generateSummerSlots(): List<TimeSlot> = buildDefaultSlots(SeasonConfig.SUMMER)
+
+    private fun generateWinterSlots(): List<TimeSlot> = buildDefaultSlots(SeasonConfig.WINTER)
 
     fun importTimeSlotsFromText(text: String) {
         viewModelScope.launch {
@@ -205,8 +195,8 @@ class ScheduleConfigViewModel @Inject constructor(
                     _state.update { it.copy(message = "未能解析出任何节次，请检查格式", isError = true) }
                     return@launch
                 }
-                timeSlotRepository.deleteAll()
-                timeSlotRepository.insertAll(slots)
+                timeSlotRepository.replaceAll(slots)
+                WidgetUpdater.refreshAll(context)
                 _state.update { it.copy(timeSlots = slots, message = "成功导入 ${slots.size} 个节次", isError = false) }
             } catch (e: Exception) {
                 _state.update { it.copy(message = "解析失败: ${e.message}", isError = true) }
@@ -218,45 +208,67 @@ class ScheduleConfigViewModel @Inject constructor(
         _state.update { it.copy(message = "", isError = false) }
     }
 
-    private fun parseTimeSlotText(text: String): List<TimeSlot> {
-        val slots = mutableListOf<TimeSlot>()
-        for (line in text.lines()) {
-            val trimmed = line.trim()
-            if (trimmed.isBlank()) continue
-            // Format: "1 08:00-08:45" or "1 08:00-08:45 第一节课"
-            val parts = trimmed.split("\\s+".toRegex(), limit = 3)
-            if (parts.size < 2) continue
-            val slotNumber = parts[0].toIntOrNull() ?: continue
-            val timeRange = parts[1]
-            val timeParts = timeRange.split("-")
-            if (timeParts.size != 2) continue
-            val startTime = timeParts[0].trim()
-            val endTime = timeParts[1].trim()
-            if (!startTime.matches("\\d{2}:\\d{2}".toRegex()) || !endTime.matches("\\d{2}:\\d{2}".toRegex())) continue
-            val name = if (parts.size >= 3) parts[2].trim() else "第${slotNumber}节"
-            slots.add(TimeSlot(slotNumber = slotNumber, startTime = startTime, endTime = endTime, name = name))
-        }
-        return slots.sortedBy { it.slotNumber }
-    }
+    private fun parseTimeSlotText(text: String): List<TimeSlot> =
+        com.chen.schedule.util.TimeSlotParser.parse(text)
 
-    private fun generate40MinSlots(): List<TimeSlot> {
-        val startTimes = listOf(
-            "08:00", "08:50", "09:50", "10:40",
-            "14:00", "14:50", "15:50", "16:40",
-            "19:00", "19:50"
+}
+
+/**
+ * 两套作息模板。
+ * - 夏季：下午起 14:30，晚上起 19:30（5/1 起执行）
+ * - 冬季：下午起 14:00，晚上起 19:00（10/1 起执行）
+ * 每套 12 节。
+ */
+private fun buildDefaultSlots(config: SeasonConfig): List<TimeSlot> {
+    val startTimes = config.startTimes
+    return startTimes.mapIndexed { i, start ->
+        val parts = start.split(":")
+        val hour = parts[0].toInt()
+        val minute = parts[1].toInt()
+        val durationMinutes = 45
+        val total = minute + durationMinutes
+        val endH = hour + total / 60
+        val endM = total % 60
+        TimeSlot(
+            slotNumber = i + 1,
+            startTime = start,
+            endTime = String.format("%02d:%02d", endH, endM),
+            name = "第${i + 1}节",
+            season = config.seasonValue
         )
-        return startTimes.mapIndexed { i, start ->
-            val endParts = start.split(":")
-            val h = endParts[0].toInt()
-            val m = endParts[1].toInt() + 40
-            val endH = h + m / 60
-            val endM = m % 60
-            TimeSlot(
-                slotNumber = i + 1,
-                startTime = start,
-                endTime = String.format("%02d:%02d", endH, endM),
-                name = "第${i + 1}节"
-            )
-        }
+    }
+}
+
+/**
+ * 作息套别配置。每套对应一组固定的开始时间与节次数量。
+ * seasonalValue: 对应 TimeSlot.season 存储值。
+ */
+private enum class SeasonConfig(
+    val seasonValue: Int,
+    val label: String,
+    val startTimes: List<String>
+) {
+    SUMMER(
+        seasonValue = 1,
+        label = "夏季作息",
+        startTimes = listOf(
+            "08:00", "08:55", "10:00", "10:55",
+            "14:30", "15:20", "16:25", "17:20", "18:10",
+            "19:30", "20:20", "21:10"
+        )
+    ),
+    WINTER(
+        seasonValue = 2,
+        label = "冬季作息",
+        startTimes = listOf(
+            "08:00", "08:55", "10:00", "10:55",
+            "14:00", "14:50", "15:55", "16:50", "17:40",
+            "19:00", "19:50", "20:40"
+        )
+    );
+
+    companion object {
+        fun byValue(value: Int): SeasonConfig =
+            entries.firstOrNull { it.seasonValue == value } ?: SUMMER
     }
 }

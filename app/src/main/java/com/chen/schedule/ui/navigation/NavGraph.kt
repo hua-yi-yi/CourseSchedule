@@ -24,6 +24,7 @@ sealed class Screen(val route: String) {
             "course_edit?courseId=${courseId ?: -1}&semesterId=$semesterId"
     }
     object ScheduleConfig : Screen("schedule_config")
+    object HaustImport : Screen("haust_import")
     object ScraperLogin : Screen("scraper_login")
 }
 
@@ -96,8 +97,13 @@ fun AppNavHost() {
             )
         }
 
+        composable(Screen.HaustImport.route) {
+            com.chen.schedule.ui.import_.HaustImportScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
         composable(Screen.ScraperLogin.route) {
             ScraperLoginScreen(
+                onHaustImport = { navController.navigate(Screen.HaustImport.route) },
                 onNavigateBack = { navController.popBackStack() }
             )
         }

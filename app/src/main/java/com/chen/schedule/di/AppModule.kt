@@ -25,7 +25,7 @@ object AppModule {
             context,
             AppDatabase::class.java,
             "course_schedule.db"
-        ).build()
+        ).addMigrations(AppDatabase.MIGRATION_1_2).build()
 
     @Provides
     fun provideCourseDao(db: AppDatabase): CourseDao = db.courseDao()

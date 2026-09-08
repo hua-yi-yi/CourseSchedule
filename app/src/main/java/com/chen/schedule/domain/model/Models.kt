@@ -1,5 +1,6 @@
 package com.chen.schedule.domain.model
 
+@kotlinx.serialization.Serializable
 data class Course(
     val id: Long = 0,
     val name: String = "",
@@ -32,6 +33,7 @@ enum class WeekType(val label: String) {
     EVEN("双周")
 }
 
+@kotlinx.serialization.Serializable
 data class Semester(
     val id: Long = 0,
     val name: String = "",
@@ -40,12 +42,15 @@ data class Semester(
     val isCurrent: Boolean = true
 )
 
+@kotlinx.serialization.Serializable
 data class TimeSlot(
     val id: Long = 0,
     val slotNumber: Int = 1,
     val startTime: String = "08:00",
     val endTime: String = "08:45",
-    val name: String = ""
+    val name: String = "",
+    /** 作息套别:0=通用,1=夏季,2=冬季。 */
+    val season: Int = 0
 )
 
 enum class DayOfWeek(val label: String, val index: Int) {
