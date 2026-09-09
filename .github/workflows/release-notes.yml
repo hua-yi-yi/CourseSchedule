@@ -1,0 +1,27 @@
+name: Sync Release Notes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - CHANGELOG.md
+      - .github/scripts/release_notes.py
+      - .github/workflows/release-notes.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-release-notes
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Keep each Release limited to its own version
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/release_notes.py --sync
