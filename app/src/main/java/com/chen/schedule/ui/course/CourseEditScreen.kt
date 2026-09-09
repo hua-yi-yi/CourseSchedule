@@ -54,12 +54,22 @@ fun CourseEditScreen(
     courseId: Long?,
     semesterId: Long,
     onNavigateBack: () -> Unit,
+    /** 空白格点击带来的预填位置(null = FAB 进入或编辑已有课程)。 */
+    prefillDay: Int? = null,
+    prefillSlot: Int? = null,
+    prefillWeek: Int? = null,
+    prefillTotalWeeks: Int = 16,
     viewModel: CourseEditViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
 
-    LaunchedEffect(courseId) {
-        courseId?.let { viewModel.loadCourse(it) }
+    LaunchedEffect(semesterId, courseId) {
+        viewModel.loadConfiguration(semesterId)
+        if (courseId != null) {
+            viewModel.loadCourse(courseId)
+        } else if (prefillDay != null && prefillSlot != null && prefillWeek != null) {
+            viewModel.applyPrefill(prefillDay, prefillSlot, prefillWeek)
+        }
     }
 
     LaunchedEffect(state.saved) {
@@ -181,7 +191,8 @@ fun CourseEditScreen(
                     label = "开始节次",
                     value = state.startSlot,
                     onValueChange = viewModel::updateStartSlot,
-                    range = 1..12,
+                    range = 1..(state.slotNumbers.maxOrNull() ?: 1),
+                    choices = state.slotNumbers,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(12.dp))
@@ -189,7 +200,8 @@ fun CourseEditScreen(
                     label = "结束节次",
                     value = state.endSlot,
                     onValueChange = viewModel::updateEndSlot,
-                    range = 1..12,
+                    range = 1..(state.slotNumbers.maxOrNull() ?: 1),
+                    choices = state.slotNumbers,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -202,7 +214,7 @@ fun CourseEditScreen(
                     label = "起始周",
                     value = state.startWeek,
                     onValueChange = viewModel::updateStartWeek,
-                    range = 1..20,
+                    range = 1..state.totalWeeks,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(12.dp))
@@ -210,7 +222,7 @@ fun CourseEditScreen(
                     label = "结束周",
                     value = state.endWeek,
                     onValueChange = viewModel::updateEndWeek,
-                    range = 1..20,
+                    range = 1..state.totalWeeks,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -308,6 +320,7 @@ fun NumberPicker(
     value: Int,
     onValueChange: (Int) -> Unit,
     range: IntRange,
+    choices: List<Int> = range.toList(),
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -332,7 +345,7 @@ fun NumberPicker(
                     modifier = Modifier.padding(end = 8.dp)
                 )
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    range.forEach { n ->
+                    choices.forEach { n ->
                         DropdownMenuItem(
                             text = { Text("$n") },
                             onClick = {

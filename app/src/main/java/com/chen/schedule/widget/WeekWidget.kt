@@ -72,11 +72,17 @@ class WeekWidget : GlanceAppWidget() {
         val week = WeekCalculator.currentWeek(sem.startDate, sem.totalWeeks)
         val entities = entryPoint.courseDao().getCoursesBySemesterDirect(sem.id)
         val courses = entities.map { it.toDomain() }
+        val configuredSlots = entryPoint.timeSlotDao().getTimeSlotsBySchemeDirect(sem.schemeId)
+        val slotCount = maxOf(
+            WeekGridBuilder.MIN_SLOTS,
+            configuredSlots.maxOfOrNull { it.slotNumber } ?: 0,
+            courses.maxOfOrNull { it.endSlot } ?: 0
+        )
         return WeekWidgetData(
             semesterName = sem.name,
             currentWeek = week,
-            slotCount = WeekGridBuilder.effectiveSlotCount(courses),
-            grid = WeekGridBuilder.build(courses, week, WeekGridBuilder.MAX_SLOTS)
+            slotCount = slotCount,
+            grid = WeekGridBuilder.build(courses, week, slotCount)
         )
     }
 

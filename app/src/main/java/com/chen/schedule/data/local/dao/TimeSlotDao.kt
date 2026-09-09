@@ -14,6 +14,12 @@ interface TimeSlotDao {
     @Query("SELECT * FROM time_slots ORDER BY slotNumber")
     fun getAllTimeSlots(): Flow<List<TimeSlotEntity>>
 
+    @Query("SELECT * FROM time_slots WHERE schemeId = :schemeId ORDER BY slotNumber")
+    fun getTimeSlotsByScheme(schemeId: Long): Flow<List<TimeSlotEntity>>
+
+    @Query("SELECT * FROM time_slots WHERE schemeId = :schemeId ORDER BY slotNumber")
+    suspend fun getTimeSlotsBySchemeDirect(schemeId: Long): List<TimeSlotEntity>
+
     @Query("SELECT * FROM time_slots WHERE slotNumber = :slotNumber LIMIT 1")
     suspend fun getTimeSlotByNumber(slotNumber: Int): TimeSlotEntity?
 
@@ -35,6 +41,20 @@ interface TimeSlotDao {
         insertAll(slots)
     }
 
+    /** 事务内替换单个方案的整套节次:只影响该方案,不触碰其他方案/学期。 */
+    @androidx.room.Transaction
+    suspend fun replaceScheme(schemeId: Long, slots: List<TimeSlotEntity>) {
+        deleteByScheme(schemeId)
+        insertAll(slots)
+    }
+
     @Query("DELETE FROM time_slots")
     suspend fun deleteAll()
+
+    @Query("DELETE FROM time_slots WHERE schemeId = :schemeId")
+    suspend fun deleteByScheme(schemeId: Long)
+
+    /** 统计某方案的节次数量(用于状态判定)。 */
+    @Query("SELECT COUNT(*) FROM time_slots WHERE schemeId = :schemeId")
+    suspend fun countByScheme(schemeId: Long): Int
 }

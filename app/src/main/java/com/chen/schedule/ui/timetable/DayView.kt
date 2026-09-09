@@ -3,6 +3,7 @@ package com.chen.schedule.ui.timetable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -33,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -53,13 +55,10 @@ fun DayView(
     courses: List<Course>,
     timeSlots: List<TimeSlot>,
     isToday: Boolean = true,
-    onCourseClick: (Course) -> Unit
+    onCourseClick: (Course) -> Unit,
+    onBlankCellClick: (slotNumber: Int) -> Unit = {}
 ) {
-    val slots = timeSlots.ifEmpty {
-        (1..12).map { TimeSlot(slotNumber = it, startTime = "", endTime = "", name = "$it") }
-    }
-    val maxSlots = (courses.maxOfOrNull { it.endSlot } ?: 12).coerceAtMost(12)
-    val visibleSlots = slots.filter { it.slotNumber <= maxSlots }
+    val visibleSlots = com.chen.schedule.util.TimetableSlots.rows(timeSlots, courses)
     val scrollState = rememberScrollState()
     val density = LocalDensity.current
 
@@ -84,29 +83,6 @@ fun DayView(
         )
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (courses.isEmpty()) {
-                // 空状态
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.Default.EventAvailable,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(44.dp)
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            "这一天没有课程安排",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else {
-
             if (currentSlot != null) {
                 Row(
                     modifier = Modifier
@@ -152,8 +128,23 @@ fun DayView(
                     slotHPx = DSLOT_H.dp.toPx()
                 }
 
-                // Layer 1: 时间轴 + 网格
-                Column {
+                // 空白格点击:按内容坐标反推节次。课程卡片自带 clickable,会先消费点击。
+                // 该 Box 尺寸等于网格内容高度,offset 已是内容坐标,无需再加滚动偏移。
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .pointerInput(visibleSlots, onBlankCellClick) {
+                            detectTapGestures { offset ->
+                                if (offset.x < timeColPx) return@detectTapGestures
+                                val slotIndex = (offset.y / slotHPx).toInt()
+                                val slot = visibleSlots.getOrNull(slotIndex)
+                                    ?: return@detectTapGestures
+                                onBlankCellClick(slot.slotNumber)
+                            }
+                        }
+                ) {
+                    // Layer 1: 时间轴 + 网格
+                    Column {
                     visibleSlots.forEach { slot ->
                         val isCurrent = currentSlot?.slotNumber == slot.slotNumber
                         Row(modifier = Modifier.fillMaxWidth().height(DSLOT_H.dp)) {
@@ -223,12 +214,12 @@ fun DayView(
 
                 // Layer 2: 课程卡片
                 courses.forEach { course ->
-                    val slotStart = course.startSlot.coerceIn(1, maxSlots)
-                    val slotEnd = course.endSlot.coerceIn(slotStart, maxSlots)
-                    val span = slotEnd - slotStart + 1
-
+                    val firstRow = visibleSlots.indexOfFirst { it.slotNumber >= course.startSlot }
+                    val lastRow = visibleSlots.indexOfLast { it.slotNumber <= course.endSlot }
+                    if (firstRow < 0 || lastRow < firstRow) return@forEach
+                    val span = lastRow - firstRow + 1
                     val xPx = timeColPx.toInt()
-                    val yPx = ((slotStart - 1) * slotHPx).toInt()
+                    val yPx = (firstRow * slotHPx).toInt()
 
                     val accent = Color(course.color)
                     Box(
@@ -287,7 +278,7 @@ fun DayView(
                         }
                     }
                 }
-            }
+                }
             }
         }
     }

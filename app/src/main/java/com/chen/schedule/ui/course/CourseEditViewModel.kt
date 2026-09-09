@@ -29,12 +29,16 @@ data class CourseEditState(
     val isEditing: Boolean = false,
     val isSaving: Boolean = false,
     val error: String? = null,
+    val slotNumbers: List<Int> = (1..12).toList(),
+    val totalWeeks: Int = 16,
     val saved: Boolean = false
 )
 
 @HiltViewModel
 class CourseEditViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
+    private val semesterRepository: com.chen.schedule.data.repository.SemesterRepository,
+    private val timeSlotRepository: com.chen.schedule.data.repository.TimeSlotRepository,
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
 
@@ -43,6 +47,19 @@ class CourseEditViewModel @Inject constructor(
 
     init {
         _state.update { it.copy(color = courseColors.random()) }
+    }
+
+    suspend fun loadConfiguration(semesterId: Long) {
+        val semester = semesterRepository.getSemesterById(semesterId) ?: return
+        val slots = timeSlotRepository.getTimeSlotsBySchemeDirect(semester.schemeId)
+            .map { it.slotNumber }.distinct().sorted()
+        _state.update { it.copy(
+            slotNumbers = slots,
+            totalWeeks = semester.totalWeeks,
+            startSlot = slots.firstOrNull() ?: 1,
+            endSlot = slots.getOrNull(1) ?: slots.firstOrNull() ?: 1,
+            endWeek = semester.totalWeeks
+        ) }
     }
 
     fun loadCourse(courseId: Long) {
@@ -68,6 +85,29 @@ class CourseEditViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 空白格点击后用点击位置预填:星期、开始节次、当前查看周。
+     * 仅在新增(非编辑)时生效;结束节次默认取相邻的已配置节次,
+     * 周次范围默认以当前周为起点,其余沿用现有默认规则。
+     */
+    fun applyPrefill(dayOfWeek: Int, startSlot: Int, week: Int) {
+        if (_state.value.isEditing) return
+        val slots = _state.value.slotNumbers
+        val start = startSlot.takeIf { it in slots } ?: slots.firstOrNull() ?: 1
+        val end = (start + 1).takeIf { it in slots } ?: start
+        val maxWeek = _state.value.totalWeeks.coerceAtLeast(1)
+        val startWeek = week.coerceIn(1, maxWeek)
+        _state.update {
+            it.copy(
+                dayOfWeek = dayOfWeek.coerceIn(1, 7),
+                startSlot = start,
+                endSlot = end,
+                startWeek = startWeek,
+                endWeek = maxWeek
+            )
+        }
+    }
+
     fun updateName(name: String) = _state.update { it.copy(name = name) }
     fun updateTeacher(teacher: String) = _state.update { it.copy(teacher = teacher) }
     fun updateClassroom(classroom: String) = _state.update { it.copy(classroom = classroom) }
@@ -84,7 +124,8 @@ class CourseEditViewModel @Inject constructor(
         val s = _state.value
         if (s.isSaving || s.saved) return
         if (s.name.isBlank() || s.startSlot < 1 || s.endSlot < s.startSlot ||
-            s.startWeek < 1 || s.endWeek < s.startWeek || s.dayOfWeek !in 1..7) {
+            s.startWeek < 1 || s.endWeek < s.startWeek || s.endWeek > s.totalWeeks ||
+            (s.startSlot..s.endSlot).any { it !in s.slotNumbers } || s.dayOfWeek !in 1..7) {
             _state.update { it.copy(error = "请填写课程名称，并检查节次和周次范围") }
             return
         }

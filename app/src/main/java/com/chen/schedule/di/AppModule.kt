@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.chen.schedule.data.local.AppDatabase
 import com.chen.schedule.data.local.dao.CourseDao
 import com.chen.schedule.data.local.dao.SemesterDao
+import com.chen.schedule.data.local.dao.TimeSchemeDao
 import com.chen.schedule.data.local.dao.TimeSlotDao
 import dagger.Module
 import dagger.Provides
@@ -25,7 +26,7 @@ object AppModule {
             context,
             AppDatabase::class.java,
             "course_schedule.db"
-        ).addMigrations(AppDatabase.MIGRATION_1_2).build()
+        ).addMigrations(*AppDatabase.ALL_MIGRATIONS).build()
 
     @Provides
     fun provideCourseDao(db: AppDatabase): CourseDao = db.courseDao()
@@ -35,6 +36,9 @@ object AppModule {
 
     @Provides
     fun provideTimeSlotDao(db: AppDatabase): TimeSlotDao = db.timeSlotDao()
+
+    @Provides
+    fun provideTimeSchemeDao(db: AppDatabase): TimeSchemeDao = db.timeSchemeDao()
 }
 
 /**
@@ -47,4 +51,5 @@ interface DatabaseEntryPoint {
     fun courseDao(): CourseDao
     fun semesterDao(): SemesterDao
     fun timeSlotDao(): TimeSlotDao
+    fun timeSchemeDao(): TimeSchemeDao
 }

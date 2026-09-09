@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.chen.schedule.util.ScheduleBackup
+import com.chen.schedule.util.SchemeSlots
 import android.content.Context
 import android.net.Uri
 import android.widget.Toast
@@ -86,6 +87,7 @@ class SettingsViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
     private val semesterRepository: SemesterRepository,
     private val timeSlotRepository: TimeSlotRepository,
+    private val timeSchemeRepository: com.chen.schedule.data.repository.TimeSchemeRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -95,11 +97,28 @@ class SettingsViewModel @Inject constructor(
                 withContext(Dispatchers.IO) {
                     val data = database.withTransaction {
                         val sem = semesterRepository.getCurrentSemester() ?: error("没有当前学期")
-                        ScheduleBackup(semester = sem,
+                        val allSlots = timeSlotRepository.getAllTimeSlots().first()
+                        val schemes = timeSchemeRepository.getAllSchemesDirect()
+                            .filter { !it.isLegacy }
+                        ScheduleBackup(
+                            backupVersion = ScheduleBackup.CURRENT_VERSION,
+                            semester = sem,
                             courses = courseRepository.getCoursesBySemester(sem.id).first(),
-                            timeSlots = timeSlotRepository.getAllTimeSlots().first())
+                            // v1 兼容字段:只放「原有作息」(schemeId = 0)的节次,避免多套作息
+                            // 合并后出现重复编号;其他方案各自放在 schemeSlots 中。
+                            timeSlots = allSlots.filter { it.schemeId == 0L },
+                            schemes = schemes,
+                            schemeSlots = allSlots
+                                .groupBy { it.schemeId }
+                                .map { (schemeId, slots) -> SchemeSlots(schemeId, slots) },
+                            semesters = semesterRepository.getAllSemesters().first(),
+                            allCourses = courseRepository.getAllCourses().first()
+                        )
                     }
-                    val json = Json { prettyPrint = true }.encodeToString(ScheduleBackup.serializer(), data)
+                    // encodeDefaults = true 才能写入 backupVersion=2 / 空列等,
+                    // 否则 v2 与 v1 无法区分。
+                    val json = Json { prettyPrint = true; encodeDefaults = true }
+                        .encodeToString(ScheduleBackup.serializer(), data)
                     requireNotNull(context.contentResolver.openOutputStream(uri)).use {
                         it.write(json.toByteArray(Charsets.UTF_8))
                     }
@@ -127,36 +146,121 @@ class SettingsViewModel @Inject constructor(
     fun importData(uri: Uri) {
         viewModelScope.launch {
             try {
-                val count = withContext(Dispatchers.IO) {
+                // Pair(实际写入课程数, 是否完整恢复);仅课程 JSON 只替换当前学期
+                val result = withContext(Dispatchers.IO) {
                     val jsonString = requireNotNull(context.contentResolver.openInputStream(uri)).bufferedReader().use { it.readText() }
                     val format = Json { ignoreUnknownKeys = true }
                     val element = format.parseToJsonElement(jsonString)
                     val backup = if (element is kotlinx.serialization.json.JsonObject && "backupVersion" in element)
                         format.decodeFromString(ScheduleBackup.serializer(), jsonString) else null
-                    require(backup == null || backup.backupVersion == 1) { "不支持此备份版本" }
+                    require(backup == null || backup.backupVersion in
+                        ScheduleBackup.LEGACY_VERSION..ScheduleBackup.CURRENT_VERSION) { "不支持此备份版本" }
                     val courses = backup?.courses ?: JsonImporter.parse(jsonString).getOrThrow()
                     require(backup != null || courses.isNotEmpty()) { "未找到课程，未修改现有数据" }
-                    require(courses.all { it.name.isNotBlank() && it.dayOfWeek in 1..7 && it.startSlot > 0 && it.endSlot >= it.startSlot && it.startWeek > 0 && it.endWeek >= it.startWeek }) { "课程数据无效" }
-                    backup?.let {
-                        require(it.semester.totalWeeks in 1..53) { "学期周数无效" }
-                        if (it.timeSlots.isNotEmpty()) com.chen.schedule.util.TimeSlotParser.parse(
-                            it.timeSlots.joinToString("\n") { slot -> "${slot.slotNumber} ${slot.startTime}-${slot.endTime}" })
+                    // 完整备份要校验备份中的全部课程(跨学期),而不仅是当前学期
+                    val coursesToValidate = backup?.let {
+                        if (it.allCourses.isNotEmpty()) it.allCourses else it.courses
+                    } ?: courses
+                    require(coursesToValidate.all { it.name.isNotBlank() && it.dayOfWeek in 1..7 && it.startSlot > 0 && it.endSlot >= it.startSlot && it.startWeek > 0 && it.endWeek >= it.startWeek }) { "课程数据无效" }
+                    backup?.let { data ->
+                        require(data.semester.totalWeeks in 1..53) { "学期周数无效" }
+                        val semestersInBackup = if (data.semesters.isNotEmpty()) data.semesters else listOf(data.semester)
+                        require(semestersInBackup.all { it.totalWeeks in 1..53 }) { "学期周数无效" }
+                        require(semestersInBackup.all { it.name.isNotBlank() }) { "学期名称无效" }
+                        val isNewFormat = data.backupVersion >= 2
+                        if (isNewFormat) {
+                            // 新版:各方案各自校验(不同方案可以都有「第1节」,合在一起会误报重复)。
+                            data.schemeSlots.forEach { entry ->
+                                if (entry.slots.isNotEmpty()) {
+                                    require(com.chen.schedule.util.ScheduleStatus.isSlotsValid(entry.slots)) {
+                                        "作息方案(编号 ${entry.schemeId})节次无效"
+                                    }
+                                }
+                            }
+                            // 「原有作息」桶同样按单套校验
+                            val legacy = data.schemeSlots.firstOrNull { it.schemeId == 0L }?.slots
+                                ?: data.timeSlots.filter { it.schemeId == 0L }
+                            if (legacy.isNotEmpty()) {
+                                require(com.chen.schedule.util.ScheduleStatus.isSlotsValid(legacy)) {
+                                    "原有作息节次无效"
+                                }
+                            }
+                        } else {
+                            // 旧备份:只有单套作息,走原有解析器校验
+                            if (data.timeSlots.isNotEmpty()) com.chen.schedule.util.TimeSlotParser.parse(
+                                data.timeSlots.joinToString("\n") { slot -> "${slot.slotNumber} ${slot.startTime}-${slot.endTime}" })
+                        }
                     }
                     database.withTransaction {
-                        val current = semesterRepository.getCurrentSemester()
-                        val id = current?.id ?: semesterRepository.insert(
-                            backup?.semester?.copy(id = 0, isCurrent = true) ?: error("请先创建学期"))
-                        backup?.let {
-                            semesterRepository.update(it.semester.copy(id = id, isCurrent = true))
-                            timeSlotRepository.replaceAll(it.timeSlots.map { slot -> slot.copy(id = 0) })
+                        val data = backup
+                        if (data == null) {
+                            // 仅课程 JSON(旧格式):替换当前学期课程,行为不变
+                            val current = semesterRepository.getCurrentSemester() ?: error("请先创建学期")
+                            courseRepository.deleteAllBySemester(current.id)
+                            courseRepository.insertAll(courses.map { it.copy(id = 0, semesterId = current.id) })
+                            courses.size to false
+                        } else {
+                            // ===== 完整恢复:学期 / 课程 / 作息方案全部按备份重建 =====
+
+                            // 1) 先清空旧的自定义方案(避免重复恢复累积同名方案),再补齐内置模板
+                            timeSchemeRepository.deleteAllCustomSchemes()
+                            runCatching { timeSchemeRepository.ensureBuiltInSchemes() }
+                            val builtInsByName = timeSchemeRepository.getAllSchemesDirect()
+                                .filter { it.isBuiltIn }
+                                .associateBy { it.name }
+                            val schemeMap = mutableMapOf<Long, Long>()
+                            val actions = com.chen.schedule.util.BackupRestorePlanner
+                                .schemeActions(data, builtInsByName.keys)
+                            actions.forEach { (oldSchemeId, action) ->
+                                val newId = when (action) {
+                                    is com.chen.schedule.util.BackupRestorePlanner.SchemeAction.ReuseBuiltIn ->
+                                        builtInsByName.getValue(action.builtInName).id
+                                    is com.chen.schedule.util.BackupRestorePlanner.SchemeAction.CreateCustom ->
+                                        timeSchemeRepository.createCustomScheme(
+                                            action.name, action.slots, setCurrent = false
+                                        )
+                                }
+                                schemeMap[oldSchemeId] = newId
+                            }
+
+                            // 2) 用纯逻辑计划器算出「要建哪些学期、课程归哪个学期」
+                            val plan = com.chen.schedule.util.BackupRestorePlanner.plan(data) { old ->
+                                if (old == 0L) 0L else schemeMap[old] ?: 0L
+                            }
+
+                            // 3) 清空本地学期与课程,按备份完整重建
+                            courseRepository.deleteAll()
+                            semesterRepository.deleteAll()
+
+                            val insertedIds = plan.semesters.map { semesterRepository.insert(it) }
+                            val currentId = insertedIds.getOrNull(plan.currentSemesterIndex)
+                                ?: error("备份中没有学期")
+                            semesterRepository.setCurrentSemester(currentId)
+
+                            // 4) 课程:按学期下标换成新插入的学期 id
+                            val toInsert = plan.courses.mapNotNull { (index, course) ->
+                                insertedIds.getOrNull(index)?.let { newSemesterId ->
+                                    course.copy(semesterId = newSemesterId)
+                                }
+                            }
+                            if (toInsert.isNotEmpty()) courseRepository.insertAll(toInsert)
+
+                            // 5) 「原有作息」桶(空则清空,避免残留旧数据)
+                            timeSlotRepository.replaceScheme(0L, plan.legacySlots)
+
+                            // 6) 返回实际写入的课程数(全部学期)与「完整恢复」标记
+                            toInsert.size to true
                         }
-                        courseRepository.deleteAllBySemester(id)
-                        courseRepository.insertAll(courses.map { it.copy(id = 0, semesterId = id) })
                     }
-                    courses.size
                 }
                 WidgetUpdater.refreshAll(context)
-                Toast.makeText(context, "成功恢复 $count 门课程", Toast.LENGTH_SHORT).show()
+                val (count, fullRestore) = result
+                val message = if (fullRestore) {
+                    "成功恢复 $count 门课程(含全部学期)"
+                } else {
+                    "成功恢复 $count 门课程(当前学期)"
+                }
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
 
             } catch (e: Exception) {
                 android.widget.Toast.makeText(context, "导入失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
@@ -194,7 +298,7 @@ fun SettingsScreen(
     pendingRestore?.let { uri ->
         AlertDialog(onDismissRequest = { pendingRestore = null },
             title = { Text("恢复备份") },
-            text = { Text("将替换当前学期的课程；完整备份还会恢复学期信息与作息时间。建议先备份现有数据。") },
+            text = { Text("完整备份会替换本机全部学期、课程与作息方案(含其他学期);仅课程 JSON 只替换当前学期课程。建议先备份现有数据。") },
             confirmButton = { TextButton(onClick = { viewModel.importData(uri); pendingRestore = null }) { Text("恢复") } },
             dismissButton = { TextButton(onClick = { pendingRestore = null }) { Text("取消") } })
     }
@@ -224,8 +328,8 @@ fun SettingsScreen(
             SettingsGroup(title = "学期与作息") {
                 SettingsItem(
                     icon = Icons.Default.Schedule,
-                    title = "作息时间配置",
-                    subtitle = "设置学期信息与节次时间",
+                    title = "学期与作息",
+                    subtitle = "管理学期、作息方案与节次时间",
                     showChevron = true,
                     onClick = onNavigateToScheduleConfig
                 )

@@ -60,10 +60,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.chen.schedule.domain.model.Course
 import com.chen.schedule.domain.model.DayOfWeek
 import com.chen.schedule.domain.model.TimeSlot
 import com.chen.schedule.util.WeekCalculator
+import com.chen.schedule.ui.schedule.StatusAmber
+import com.chen.schedule.ui.schedule.StatusBadge
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -71,9 +75,12 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimetableScreen(
-    onAddCourse: (Long) -> Unit,
+    /** (semesterId, 预填位置) —— 位置为 null 表示从 FAB 进入的空白新增。 */
+    onAddCourse: (Long, BlankClickTarget?) -> Unit,
     onEditCourse: (Long, Long) -> Unit,
     onNavigateToScheduleConfig: () -> Unit,
+    onNavigateToSemesterSettings: () -> Unit,
+    onNavigateToSchemeSettings: () -> Unit,
     onNavigateToImport: () -> Unit,
     onNavigateToSettings: () -> Unit,
     viewModel: TimetableViewModel = hiltViewModel()
@@ -82,11 +89,20 @@ fun TimetableScreen(
     var selectedCourse by remember { mutableStateOf<Course?>(null) }
     var pendingDelete by remember { mutableStateOf<Course?>(null) }
 
+    /** 统一的「点击空白格」入口:返回非 null 表示配置完整,可直接进入新增课程。 */
+    val handleBlankClick: (dayOfWeek: Int, slotNumber: Int) -> Unit = { day, slot ->
+        val target = viewModel.onBlankCellClick(day, slot)
+        val semester = viewModel.state.value.currentSemester
+        if (target != null && semester != null) {
+            onAddCourse(semester.id, target)
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             if (state.currentSemester != null) ExtendedFloatingActionButton(
-                onClick = { state.currentSemester?.let { onAddCourse(it.id) } },
+                onClick = { state.currentSemester?.let { onAddCourse(it.id, null) } },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("添加课程") }
             )
@@ -144,7 +160,10 @@ fun TimetableScreen(
                         isToday = state.currentWeek == actualWeek && state.selectedDay == LocalDate.now().dayOfWeek.value,
                         courses = viewModel.getFilteredCourses(),
                         timeSlots = state.timeSlots,
-                        onCourseClick = { selectedCourse = it }
+                        onCourseClick = { selectedCourse = it },
+                        onBlankCellClick = { slotNumber ->
+                            handleBlankClick(state.selectedDay, slotNumber)
+                        }
                     )
                 } else {
                     // 今日摘要卡:仅当正在查看的是「本周」时展示
@@ -161,11 +180,43 @@ fun TimetableScreen(
                         showWeekend = state.showWeekend,
                         semesterStartDate = semester.startDate,
                         currentWeek = state.currentWeek,
-                        onCourseClick = { selectedCourse = it }
+                        onCourseClick = { selectedCourse = it },
+                        onBlankCellClick = { dayOfWeek, slotNumber ->
+                            handleBlankClick(dayOfWeek, slotNumber)
+                        }
                     )
                 }
             }
         }
+    }
+
+    // ===== 「先完成课表设置」引导面板 =====
+    // 从设置页返回(ON_RESUME)时重新核对状态并让面板重新出现,target 保持不变。
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshGuide() }
+
+    state.guide?.takeIf { !it.hidden }?.let { guide ->
+        ScheduleGuideDialog(
+            guide = guide,
+            onDismiss = viewModel::dismissGuide,
+            onOpenSemesterSettings = {
+                // 只隐藏,保留原点击位置,返回后仍可「继续添加课程」
+                viewModel.hideGuidePreservingTarget()
+                onNavigateToSemesterSettings()
+            },
+            onOpenSchemeSettings = {
+                viewModel.hideGuidePreservingTarget()
+                onNavigateToSchemeSettings()
+            },
+            onContinueAddCourse = {
+                val target = viewModel.consumeGuideTarget()
+                val semester = state.currentSemester
+                if (semester != null) {
+                    onAddCourse(semester.id, target)
+                } else {
+                    onNavigateToScheduleConfig()
+                }
+            }
+        )
     }
 
     pendingDelete?.let { course ->
@@ -690,6 +741,106 @@ private fun DetailRow(
                 value,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+/* ===================== 引导设置面板 ===================== */
+
+/**
+ * 学期/作息未配置时点击空白格弹出的「先完成课表设置」面板。
+ * 已完成项显示绿色对号与「已完成」,未完成项显示黄色感叹号与「待设置」;
+ * 每项可直接进入对应设置;配置完成后由用户点击「继续添加课程」。
+ */
+@Composable
+private fun ScheduleGuideDialog(
+    guide: ScheduleGuide,
+    onDismiss: () -> Unit,
+    onOpenSemesterSettings: () -> Unit,
+    onOpenSchemeSettings: () -> Unit,
+    onContinueAddCourse: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = MaterialTheme.shapes.extraLarge,
+        title = {
+            Text("先完成课表设置", fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column {
+                Text(
+                    "点击的位置已为你保留,完成设置后即可继续添加课程。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                GuideItem(
+                    title = "学期",
+                    done = guide.semesterDone,
+                    onClick = onOpenSemesterSettings
+                )
+                Spacer(Modifier.height(8.dp))
+                GuideItem(
+                    title = "作息时间",
+                    done = guide.schemeDone,
+                    onClick = onOpenSchemeSettings
+                )
+                if (!guide.schemeDone && guide.missingSlots.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "缺少节次:${guide.missingSlots.joinToString("、") { "第${it}节" }}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = StatusAmber
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onContinueAddCourse,
+                enabled = guide.allDone
+            ) { Text("继续添加课程") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("稍后再说") }
+        }
+    )
+}
+
+@Composable
+private fun GuideItem(
+    title: String,
+    done: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+            StatusBadge(done = done, compact = true)
+            Spacer(Modifier.width(6.dp))
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = "进入$title 设置",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
             )
         }
     }

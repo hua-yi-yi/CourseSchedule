@@ -3,6 +3,7 @@ package com.chen.schedule.ui.timetable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,14 +51,11 @@ fun WeekView(
     showWeekend: Boolean,
     semesterStartDate: Long?,
     currentWeek: Int,
-    onCourseClick: (Course) -> Unit
+    onCourseClick: (Course) -> Unit,
+    onBlankCellClick: (dayOfWeek: Int, slotNumber: Int) -> Unit = { _, _ -> }
 ) {
     val days = DayOfWeek.entries.filter { showWeekend || it.index <= 5 }
-    val slots = timeSlots.ifEmpty {
-        (1..12).map { TimeSlot(slotNumber = it, startTime = "", endTime = "", name = "$it") }
-    }
-    val maxSlots = (courses.maxOfOrNull { it.endSlot } ?: 12).coerceAtMost(12)
-    val visibleSlots = slots.filter { it.slotNumber <= maxSlots }
+    val visibleSlots = com.chen.schedule.util.TimetableSlots.rows(timeSlots, courses)
     val scrollState = rememberScrollState()
     val density = LocalDensity.current
 
@@ -146,89 +145,109 @@ fun WeekView(
                     slotHPx = SLOT_H.dp.toPx()
                 }
 
-                // Layer 1: 背景网格
-                Column {
-                    visibleSlots.forEach { slot ->
-                        Row(modifier = Modifier.fillMaxWidth().height(SLOT_H.dp)) {
-                            // 时间列
-                            Box(
-                                modifier = Modifier
-                                    .width(TIME_COL.dp)
-                                    .fillMaxHeight()
-                                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                                    .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        "${slot.slotNumber}",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    if (slot.startTime.isNotBlank()) {
-                                        Text(
-                                            slot.startTime,
-                                            fontSize = 9.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Text(
-                                            slot.endTime,
-                                            fontSize = 9.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
+                // 空白格点击:按内容坐标反推星期与节次。
+                // 课程卡片自带 clickable,会先消费点击,因此不会误触。
+                // 该 Box 尺寸等于网格内容高度,offset 已是内容坐标,无需再加滚动偏移。
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .pointerInput(days, visibleSlots, onBlankCellClick) {
+                            detectTapGestures { offset ->
+                                val relativeX = offset.x - timeColPx
+                                if (relativeX < 0f) return@detectTapGestures
+                                val dayIndex = (relativeX / cellWidthPx).toInt()
+                                    .coerceIn(0, days.size - 1)
+                                val slotIndex = (offset.y / slotHPx).toInt()
+                                val slot = visibleSlots.getOrNull(slotIndex)
+                                    ?: return@detectTapGestures
+                                onBlankCellClick(days[dayIndex].index, slot.slotNumber)
                             }
-                            // 星期格
-                            days.forEach { day ->
-                                val isToday = dateOf(day.index) == today
+                        }
+                ) {
+                    // Layer 1: 背景网格
+                    Column {
+                        visibleSlots.forEach { slot ->
+                            Row(modifier = Modifier.fillMaxWidth().height(SLOT_H.dp)) {
+                                // 时间列
                                 Box(
                                     modifier = Modifier
-                                        .weight(1f)
+                                        .width(TIME_COL.dp)
                                         .fillMaxHeight()
-                                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
-                                        .then(
-                                            if (isToday) Modifier.background(
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
-                                            ) else Modifier
+                                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            "${slot.slotNumber}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
-                                )
+                                        if (slot.startTime.isNotBlank()) {
+                                            Text(
+                                                slot.startTime,
+                                                fontSize = 9.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                slot.endTime,
+                                                fontSize = 9.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                                // 星期格
+                                days.forEach { day ->
+                                    val isToday = dateOf(day.index) == today
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                                            .then(
+                                                if (isToday) Modifier.background(
+                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
+                                                ) else Modifier
+                                            )
+                                    )
+                                }
                             }
                         }
                     }
-                }
 
-                // Layer 2: 课程卡片
-                courses.forEach { course ->
-                    val dayIndex = days.indexOfFirst { it.index == course.dayOfWeek }
-                    if (dayIndex < 0) return@forEach
+                    // Layer 2: 课程卡片
+                    courses.forEach { course ->
+                        val dayIndex = days.indexOfFirst { it.index == course.dayOfWeek }
+                        if (dayIndex < 0) return@forEach
 
-                    val slotStart = course.startSlot.coerceIn(1, maxSlots)
-                    val slotEnd = course.endSlot.coerceIn(slotStart, maxSlots)
-                    val span = slotEnd - slotStart + 1
+                        val firstRow = visibleSlots.indexOfFirst { it.slotNumber >= course.startSlot }
+                        val lastRow = visibleSlots.indexOfLast { it.slotNumber <= course.endSlot }
+                        if (firstRow < 0 || lastRow < firstRow) return@forEach
+                        val span = lastRow - firstRow + 1
+                        val xPx = (timeColPx + dayIndex * cellWidthPx).toInt()
+                        val yPx = (firstRow * slotHPx).toInt()
 
-                    val xPx = (timeColPx + dayIndex * cellWidthPx).toInt()
-                    val yPx = ((slotStart - 1) * slotHPx).toInt()
-
-                    val accent = Color(course.color)
-                    CourseBlock(
-                        course = course,
-                        span = span,
-                        accent = accent,
-                        modifier = Modifier
-                            .offset { IntOffset(xPx, yPx) }
-                            .width(cellWidthDp)
-                            .height((SLOT_H * span).dp)
-                            .padding(2.5.dp)
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(accent.copy(alpha = 0.16f))
-                            .border(1.dp, accent.copy(alpha = 0.38f), RoundedCornerShape(9.dp))
-                            .clickable { onCourseClick(course) }
-                            .padding(horizontal = if (cellWidthDp < 60.dp) 3.dp else 7.dp, vertical = 5.dp),
-                        compact = span == 1,
-                        narrow = cellWidthDp < 60.dp
-                    )
+                        val accent = Color(course.color)
+                        CourseBlock(
+                            course = course,
+                            span = span,
+                            accent = accent,
+                            modifier = Modifier
+                                .offset { IntOffset(xPx, yPx) }
+                                .width(cellWidthDp)
+                                .height((SLOT_H * span).dp)
+                                .padding(2.5.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(accent.copy(alpha = 0.16f))
+                                .border(1.dp, accent.copy(alpha = 0.38f), RoundedCornerShape(9.dp))
+                                .clickable { onCourseClick(course) }
+                                .padding(horizontal = if (cellWidthDp < 60.dp) 3.dp else 7.dp, vertical = 5.dp),
+                            compact = span == 1,
+                            narrow = cellWidthDp < 60.dp
+                        )
+                    }
                 }
             }
         }
