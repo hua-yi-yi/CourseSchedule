@@ -9,7 +9,6 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceError
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -43,6 +42,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.concurrent.Executor
 import javax.inject.Inject
+
+private const val HAUST_VPN_LOGIN = "https://cas.haust.edu.cn/cas/login?service=https%3A%2F%2Fvpn.haust.edu.cn%3A443%2Fpassport%2Fv1%2Fauth%2Fcas%3FsfDomain%3Dxkp"
 
 private fun adaptHaustPage(view: WebView, url: String) {
     val host = Uri.parse(url).host.orEmpty()
@@ -195,15 +196,15 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
         Column(Modifier.fillMaxSize().padding(padding)) {
             Text("先登录学校 VPN。登录后可点“我的课表”直达，选择全部教学周，再读取。",
                 modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall)
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TextButton(enabled = ready && !reading && !viewModel.busy, onClick = { browser?.loadUrl("https://vpn.haust.edu.cn/portal/") }) { Text("学校 VPN") }
-                TextButton(enabled = ready && !reading && !viewModel.busy, onClick = { browser?.loadUrl("https://jwgl-haust-edu-cn-s.haust.edu.cn/eams/homeExt.action") }) { Text("VPN 教务") }
-                TextButton(enabled = ready && !reading && !viewModel.busy, onClick = { browser?.loadUrl("https://jwgl-haust-edu-cn-s.haust.edu.cn/eams/courseTableForStd.action") }) { Text("我的课表") }
-                TextButton(enabled = ready && !reading && !viewModel.busy, onClick = { browser?.loadUrl("https://jwgl.haust.edu.cn/eams/homeExt.action") }) { Text("校内直连") }
-                Button(enabled = ready && !viewModel.busy && !reading, onClick = {
+            val controlsEnabled = ready && !reading && !viewModel.busy
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                TextButton(modifier = Modifier.weight(1f), enabled = controlsEnabled, onClick = { browser?.loadUrl(HAUST_VPN_LOGIN) }) { Text("登录 VPN") }
+                TextButton(modifier = Modifier.weight(1f), enabled = controlsEnabled, onClick = { browser?.loadUrl("https://jwgl-haust-edu-cn-s.haust.edu.cn/eams/homeExt.action") }) { Text("VPN 教务") }
+                TextButton(modifier = Modifier.weight(1f), enabled = controlsEnabled, onClick = { browser?.loadUrl("https://jwgl-haust-edu-cn-s.haust.edu.cn/eams/courseTableForStd.action") }) { Text("我的课表") }
+            }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(modifier = Modifier.weight(1f), enabled = controlsEnabled, onClick = { browser?.loadUrl("https://jwgl.haust.edu.cn/eams/homeExt.action") }) { Text("校内直连") }
+                Button(modifier = Modifier.weight(1f), enabled = ready && !viewModel.busy && !reading, onClick = {
                     val host = Uri.parse(browser?.url).host.orEmpty()
                     if (!host.endsWith(".haust.edu.cn")) viewModel.report("请先打开学校教务页面")
                     else {
@@ -248,7 +249,7 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
                         ProxyController.getInstance().setProxyOverride(ProxyConfig.Builder().addDirect().build(), executor) {
                             if (browser === web) {
                                 ready = true
-                                web.loadUrl("https://vpn.haust.edu.cn/portal/")
+                                web.loadUrl(HAUST_VPN_LOGIN)
                             }
                         }
                     } else viewModel.report("请更新 Android System WebView 后重试：当前版本无法确保绕过系统代理")
