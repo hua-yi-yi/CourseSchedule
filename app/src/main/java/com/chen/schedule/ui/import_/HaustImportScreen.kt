@@ -6,8 +6,10 @@ import android.net.Uri
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceError
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -31,6 +33,7 @@ import com.chen.schedule.domain.model.Course
 import com.chen.schedule.domain.model.CoursePalette
 import com.chen.schedule.domain.model.Semester
 import com.chen.schedule.widget.WidgetUpdater
+import com.chen.schedule.BuildConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +43,66 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.concurrent.Executor
 import javax.inject.Inject
+
+private fun adaptHaustPage(view: WebView, url: String) {
+    val host = Uri.parse(url).host.orEmpty()
+    val css = when {
+        host == "cas.haust.edu.cn" -> """
+            html,body{max-width:100%!important;overflow-x:hidden!important}
+            input,button,select{font-size:16px!important}
+            img{max-width:100%!important;height:auto!important}
+        """.trimIndent()
+        host.startsWith("jwgl-") || host == "jwgl.haust.edu.cn" -> """
+            html,body{max-width:100%!important;min-width:0!important}
+            iframe{max-width:100%!important}
+            #manualArrangeCourseTable{min-width:900px!important}
+            .gridtable,.grid{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important}
+        """.trimIndent()
+        else -> ""
+    }
+    val escaped = JSONObject.quote(css)
+    view.evaluateJavascript(
+        """
+        (function(){
+          if(location.hostname.indexOf('jwgl-')===0){
+            document.querySelectorAll('a[href]').forEach(function(a){
+              var href=a.getAttribute('href')||'';
+              if(href.indexOf('https://jwgl.haust.edu.cn/')===0){
+                a.setAttribute('href',href.replace('https://jwgl.haust.edu.cn/','https://jwgl-haust-edu-cn-s.haust.edu.cn/'));
+              }
+            });
+            if(location.pathname.endsWith('/courseTableForStd.action') && !window.__courseScheduleTableSubmitted){
+              window.__courseScheduleTableSubmitted=true;
+              var source=Array.from(document.scripts).map(function(s){return s.text||'';}).join('\n');
+              var semester=source.match(/semesterCalendar\(\{[^}]*value:\s*"(\d+)"/);
+              var student=source.match(/addInput\(form,\s*"ids",\s*"(\d+)"\)/);
+              if(semester && student){
+                var form=document.createElement('form');
+                form.method='post';
+                form.action='/eams/courseTableForStd!courseTable.action';
+                [['setting.kind','std'],['startWeek',''],['semester.id',semester[1]],['ids',student[1]],['ignoreHead','1']].forEach(function(pair){
+                  var input=document.createElement('input');input.name=pair[0];input.value=pair[1];form.appendChild(input);
+                });
+                document.body.appendChild(form);
+                setTimeout(function(){form.submit();},100);
+              }
+            }
+          }
+          document.querySelectorAll('a[target]').forEach(function(a){a.removeAttribute('target');});
+          if(!window.__courseScheduleOpenPatched){
+            window.__courseScheduleOpenPatched=true;
+            window.open=function(url){if(url){window.location.href=url;}return window;};
+          }
+          var meta=document.querySelector('meta[name="viewport"]');
+          if(!meta){meta=document.createElement('meta');meta.name='viewport';document.head.appendChild(meta);}
+          meta.content='width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes';
+          var style=document.getElementById('course-schedule-mobile-style');
+          if(!style){style=document.createElement('style');style.id='course-schedule-mobile-style';document.head.appendChild(style);}
+          style.textContent=$escaped;
+        })()
+        """.trimIndent(), null
+    )
+}
 
 @HiltViewModel
 class HaustImportViewModel @Inject constructor(
@@ -130,10 +193,15 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
         })
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            Text("登录学校 VPN 后，进入教学信息 → 我的课表，选择全部教学周，再读取。仅导入已排定星期和节次的课程。",
+            Text("先登录学校 VPN。登录后可点“我的课表”直达，选择全部教学周，再读取。",
                 modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 TextButton(enabled = ready && !reading && !viewModel.busy, onClick = { browser?.loadUrl("https://vpn.haust.edu.cn/portal/") }) { Text("学校 VPN") }
+                TextButton(enabled = ready && !reading && !viewModel.busy, onClick = { browser?.loadUrl("https://jwgl-haust-edu-cn-s.haust.edu.cn/eams/homeExt.action") }) { Text("VPN 教务") }
+                TextButton(enabled = ready && !reading && !viewModel.busy, onClick = { browser?.loadUrl("https://jwgl-haust-edu-cn-s.haust.edu.cn/eams/courseTableForStd.action") }) { Text("我的课表") }
                 TextButton(enabled = ready && !reading && !viewModel.busy, onClick = { browser?.loadUrl("https://jwgl.haust.edu.cn/eams/homeExt.action") }) { Text("校内直连") }
                 Button(enabled = ready && !viewModel.busy && !reading, onClick = {
                     val host = Uri.parse(browser?.url).host.orEmpty()
@@ -148,6 +216,7 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
             if (viewModel.message.isNotBlank()) Text(viewModel.message, Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
             AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = { ctx ->
                 WebView(ctx).apply {
+                    WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
                     browser = this
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
@@ -166,7 +235,13 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
                             if (!allowed && request.isForMainFrame) viewModel.report("已阻止离开学校 HTTPS 网站的跳转")
                             return !allowed
                         }
-                        override fun onPageFinished(view: WebView, url: String) { address = Uri.parse(url).host.orEmpty() }
+                        override fun onPageFinished(view: WebView, url: String) {
+                            address = Uri.parse(url).host.orEmpty()
+                            adaptHaustPage(view, url)
+                        }
+                        override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                            if (request.isForMainFrame) viewModel.report("页面加载失败：${error.description}")
+                        }
                     }
                     if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
                         val web = this
