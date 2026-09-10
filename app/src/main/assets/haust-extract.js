@@ -7,7 +7,7 @@
       if (week && week.selectedIndex >= 0 && week.options[week.selectedIndex].text.trim() !== '全部')
         return {error:'请将「选择教学周」改为「全部」再读取课表'};
       var semester = doc.querySelector('input[id$="Semester"]');
-      return {html:table.outerHTML, semester:semester ? semester.value : ''};
+      return {html:doc.documentElement.outerHTML, semester:semester ? semester.value : ''};
     }
     var frames = doc.querySelectorAll('iframe');
     for (var i=0;i<frames.length;i++) {
