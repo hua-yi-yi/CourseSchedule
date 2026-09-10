@@ -44,6 +44,7 @@ import java.util.concurrent.Executor
 import javax.inject.Inject
 
 private const val HAUST_VPN_LOGIN = "https://cas.haust.edu.cn/cas/login?service=https%3A%2F%2Fvpn.haust.edu.cn%3A443%2Fpassport%2Fv1%2Fauth%2Fcas%3FsfDomain%3Dxkp"
+private const val HAUST_VPN_EAMS_HOME = "https://jwgl-haust-edu-cn-s.haust.edu.cn/eams/homeExt.action"
 
 private fun adaptHaustPage(view: WebView, url: String) {
     val host = Uri.parse(url).host.orEmpty()
@@ -194,12 +195,12 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
         })
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            Text("先登录学校 VPN。登录后可点“我的课表”直达，选择全部教学周，再读取。",
+            Text("登录后会自动进入 VPN 教务。再点“我的课表”直达，选择全部教学周后读取。",
                 modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall)
             val controlsEnabled = ready && !reading && !viewModel.busy
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 TextButton(modifier = Modifier.weight(1f), enabled = controlsEnabled, onClick = { browser?.loadUrl(HAUST_VPN_LOGIN) }) { Text("登录 VPN") }
-                TextButton(modifier = Modifier.weight(1f), enabled = controlsEnabled, onClick = { browser?.loadUrl("https://jwgl-haust-edu-cn-s.haust.edu.cn/eams/homeExt.action") }) { Text("VPN 教务") }
+                TextButton(modifier = Modifier.weight(1f), enabled = controlsEnabled, onClick = { browser?.loadUrl(HAUST_VPN_EAMS_HOME) }) { Text("VPN 教务") }
                 TextButton(modifier = Modifier.weight(1f), enabled = controlsEnabled, onClick = { browser?.loadUrl("https://jwgl-haust-edu-cn-s.haust.edu.cn/eams/courseTableForStd.action") }) { Text("我的课表") }
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -237,8 +238,16 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
                             return !allowed
                         }
                         override fun onPageFinished(view: WebView, url: String) {
-                            address = Uri.parse(url).host.orEmpty()
+                            val uri = Uri.parse(url)
+                            address = uri.host.orEmpty()
                             adaptHaustPage(view, url)
+                            if (uri.host == "vpn.haust.edu.cn" && uri.path.orEmpty().startsWith("/portal")) {
+                                view.postDelayed({
+                                    if (view.url?.startsWith("https://vpn.haust.edu.cn/portal") == true) {
+                                        view.loadUrl(HAUST_VPN_EAMS_HOME)
+                                    }
+                                }, 500)
+                            }
                         }
                         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
                             if (request.isForMainFrame) viewModel.report("页面加载失败：${error.description}")
@@ -249,7 +258,7 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
                         ProxyController.getInstance().setProxyOverride(ProxyConfig.Builder().addDirect().build(), executor) {
                             if (browser === web) {
                                 ready = true
-                                web.loadUrl(HAUST_VPN_LOGIN)
+                                web.loadUrl(HAUST_VPN_EAMS_HOME)
                             }
                         }
                     } else viewModel.report("请更新 Android System WebView 后重试：当前版本无法确保绕过系统代理")
