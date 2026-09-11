@@ -58,7 +58,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.chen.schedule.domain.model.Semester
-import com.chen.schedule.util.ScheduleStatus
 
 /**
  * 选择已有学期。
@@ -208,8 +207,8 @@ private fun SemesterPickRow(
 
 /**
  * 新建 / 编辑学期。
- * 以点选为主:学期名称给推荐 chips、总周数给预设 chips、开学日期给快捷周 chips + 日期选择器;
- * 名称与周数仍保留自定义输入,「根据当前周推算开学日期」改为点选周数。
+ * 以点选为主:学期名称给推荐 chips、开学日期给快捷周 chips + 日期选择器;
+ * 总周数不做选择,新建默认取上限(53 周);「根据当前周推算开学日期」改为点选周数。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -223,9 +222,7 @@ fun SemesterEditScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var showHelper by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
-    var showCustomWeeks by remember { mutableStateOf(false) }
     val nameSuggestions = remember { viewModel.semesterNameSuggestions() }
-    val presetWeeks = remember { listOf(16, 18, 20, 24) }
 
     LaunchedEffect(semesterId) { viewModel.startSemesterForm(semesterId) }
     LaunchedEffect(form.saved) { if (form.saved) onDone() }
@@ -383,45 +380,6 @@ fun SemesterEditScreen(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            // 总周数:预设 chips + 可选自定义输入
-            Text("总周数", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(6.dp))
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                presetWeeks.forEach { weeks ->
-                    FilterChip(
-                        selected = form.totalWeeks == weeks.toString(),
-                        onClick = {
-                            viewModel.applyWeeksPreset(weeks)
-                            showCustomWeeks = false
-                        },
-                        label = { Text("$weeks 周") }
-                    )
-                }
-                FilterChip(
-                    selected = showCustomWeeks,
-                    onClick = { showCustomWeeks = !showCustomWeeks },
-                    label = { Text("自定义") }
-                )
-            }
-            if (showCustomWeeks || form.totalWeeks.toIntOrNull() !in presetWeeks) {
-                Spacer(Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = form.totalWeeks,
-                    onValueChange = viewModel::updateSemesterWeeks,
-                    label = { Text("自定义总周数") },
-                    singleLine = true,
-                    supportingText = {
-                        Text("有效范围 ${ScheduleStatus.MIN_WEEKS}–${ScheduleStatus.MAX_WEEKS}")
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
 
             Spacer(Modifier.height(12.dp))

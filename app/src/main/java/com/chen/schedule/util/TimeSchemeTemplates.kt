@@ -35,13 +35,20 @@ object TimeSchemeTemplates {
     const val SUMMER_NAME = "夏季作息"
     const val WINTER_NAME = "冬季作息"
 
-    /** 全部内置模板的 (名称, 季节) 定义,顺序即展示顺序。 */
+    /** 全部内置模板的 (名称, 季节, 执行日期) 定义,顺序即展示顺序。 */
     val builtIns: List<BuiltIn> = listOf(
-        BuiltIn(SUMMER_NAME, SEASON_SUMMER, SUMMER_START_TIMES),
-        BuiltIn(WINTER_NAME, SEASON_WINTER, WINTER_START_TIMES)
+        BuiltIn(SUMMER_NAME, SEASON_SUMMER, SUMMER_START_TIMES, "5月1日起执行"),
+        BuiltIn(WINTER_NAME, SEASON_WINTER, WINTER_START_TIMES, "10月1日起执行")
     )
 
-    data class BuiltIn(val name: String, val season: Int, val startTimes: List<String>)
+    data class BuiltIn(val name: String, val season: Int, val startTimes: List<String>, val note: String)
+
+    /** 内置模板的执行日期说明(按季节;自定义/通用作息返回 null)。 */
+    fun noteFor(season: Int): String? = when (season) {
+        SEASON_SUMMER -> "5月1日起执行"
+        SEASON_WINTER -> "10月1日起执行"
+        else -> null
+    }
 
     /** 由开始时间列表生成整套节次(schemeId 由调用方补齐)。 */
     fun slotsOf(startTimes: List<String>, schemeId: Long = TimeScheme.LEGACY_ID): List<TimeSlot> =

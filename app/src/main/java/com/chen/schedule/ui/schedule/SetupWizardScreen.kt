@@ -1,7 +1,11 @@
 package com.chen.schedule.ui.schedule
 
+import android.content.Context
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -11,8 +15,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -39,11 +45,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -60,7 +68,6 @@ import com.chen.schedule.util.TimeSchemeTemplates
 import com.chen.schedule.widget.WidgetUpdater
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -74,12 +81,15 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
 import javax.inject.Inject
 
-/** 首启「初始设置」向导状态:全部点选即可完成。 */
+/**
+ * 首启「初始设置」向导状态:分页式,每页一项任务。
+ * 总周数不做选择,固定取上限([ScheduleStatus.MAX_WEEKS])。
+ */
 data class SetupWizardState(
     val name: String = "",
     val suggestions: List<String> = emptyList(),
     val dateMillis: Long? = null,
-    val totalWeeks: Int = 16,
+    val totalWeeks: Int = ScheduleStatus.MAX_WEEKS,
     val schemes: List<TimeScheme> = emptyList(),
     val selectedSchemeId: Long? = null,
     /** 选中方案的节次预览(异步加载)。 */
@@ -107,7 +117,7 @@ class SetupWizardViewModel @Inject constructor(
             runCatching { timeSchemeRepository.ensureBuiltInSchemes() }
             val schemes = runCatching { timeSchemeRepository.getAllSchemesDirect() }.getOrDefault(emptyList())
             val suggestions = SemesterNameSuggestions.generate(LocalDate.now())
-            // 默认选第一个内置模板,用户可直接点「完成设置」
+            // 默认选第一个内置模板,用户可直接一路「下一步」完成
             val first = schemes.firstOrNull { it.isBuiltIn } ?: schemes.firstOrNull()
             _state.update {
                 it.copy(
@@ -134,12 +144,6 @@ class SetupWizardViewModel @Inject constructor(
 
     fun updateDate(millis: Long?) =
         _state.update { it.copy(dateMillis = millis, error = null) }
-
-    fun applyWeeks(weeks: Int) {
-        if (weeks in ScheduleStatus.MIN_WEEKS..ScheduleStatus.MAX_WEEKS) {
-            _state.update { it.copy(totalWeeks = weeks, error = null) }
-        }
-    }
 
     fun selectScheme(schemeId: Long) {
         _state.update {
@@ -169,7 +173,7 @@ class SetupWizardViewModel @Inject constructor(
         Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().format(dateFormat)
     } ?: "未选择"
 
-    /** 完成:校验 → 建学期(带所选作息) → 置为当前 → 刷新小组件。 */
+    /** 完成:校验 → 建学期(带所选作息,总周数取上限) → 置为当前 → 刷新小组件。 */
     fun complete() {
         val s = _state.value
         if (s.saving) return
@@ -177,8 +181,6 @@ class SetupWizardViewModel @Inject constructor(
         val error = when {
             name.isBlank() -> "请选择或填写学期名称"
             s.dateMillis == null || s.dateMillis <= 0L -> "请选择开学日期"
-            s.totalWeeks !in ScheduleStatus.MIN_WEEKS..ScheduleStatus.MAX_WEEKS ->
-                "总周数应为 ${ScheduleStatus.MIN_WEEKS}–${ScheduleStatus.MAX_WEEKS} 的整数"
             else -> null
         }
         if (error != null) {
@@ -220,8 +222,9 @@ class SetupWizardViewModel @Inject constructor(
 }
 
 /**
- * 首启「初始设置」向导:学期名称、开学日期、总周数、作息方案四步全部点选,一键完成。
- * 从主界面空状态进入;完成后返回课表页即可开始添加课程。
+ * 首启「初始设置」向导:分页式,每页一项任务——
+ * 第 1 页选学期名称,第 2 页选开学日期,第 3 页选作息方案,「完成设置」一键建好并返回课表。
+ * 从主界面空状态进入;总周数不在此设置(默认取上限)。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -231,10 +234,16 @@ fun SetupWizardScreen(
     viewModel: SetupWizardViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    var step by remember { mutableIntStateOf(0) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showCustomName by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.saved) { if (state.saved) onDone() }
+
+    val stepTitles = remember { listOf("学期名称", "开学日期", "作息方案") }
+
+    // 第一步按返回退出向导,其余步骤先回上一页
+    BackHandler { if (step > 0) step-- else onCancel() }
 
     if (showDatePicker) {
         val initial = state.dateMillis ?: System.currentTimeMillis()
@@ -255,9 +264,14 @@ fun SetupWizardScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("初始设置", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        "初始设置 ${step + 1}/${stepTitles.size} · ${stepTitles[step]}",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = onCancel) {
+                    IconButton(onClick = { if (step > 0) step-- else onCancel() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                     }
                 }
@@ -271,130 +285,39 @@ fun SetupWizardScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            Text(
-                "全部点选即可完成初始设置,之后随时可在「学期与作息」中修改。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // 步骤圆点指示器
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                stepTitles.indices.forEach { index ->
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (index == step) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                            )
+                    )
+                }
+            }
             Spacer(Modifier.height(16.dp))
 
-            // ① 学期名称
-            Text("① 学期名称", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(6.dp))
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                state.suggestions.forEach { suggestion ->
-                    FilterChip(
-                        selected = state.name == suggestion,
-                        onClick = { viewModel.updateName(suggestion) },
-                        label = { Text(suggestion) }
-                    )
-                }
-            }
-            TextButton(onClick = { showCustomName = !showCustomName }) {
-                Text(if (showCustomName) "收起自定义名称" else "自定义名称")
-            }
-            if (showCustomName) {
-                OutlinedTextField(
-                    value = state.name,
-                    onValueChange = viewModel::updateName,
-                    label = { Text("学期名称") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+            when (step) {
+                0 -> NameStep(
+                    state = state,
+                    showCustomName = showCustomName,
+                    onToggleCustomName = { showCustomName = !showCustomName },
+                    onPickName = viewModel::updateName
                 )
-            }
-            Spacer(Modifier.height(12.dp))
-
-            // ② 开学日期
-            Text("② 开学日期", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(6.dp))
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf("上周一" to -1, "本周一" to 0, "下周一" to 1).forEach { (label, offset) ->
-                    FilterChip(
-                        selected = state.dateMillis != null &&
-                            state.dateMillis == viewModel.quickStartDateMillis(offset),
-                        onClick = { viewModel.applyQuickStartDate(offset) },
-                        label = { Text(label) }
-                    )
-                }
-            }
-            Spacer(Modifier.height(6.dp))
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showDatePicker = true },
-                shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                1 -> DateStep(
+                    state = state,
+                    onQuickPick = viewModel::applyQuickStartDate,
+                    onOpenDatePicker = { showDatePicker = true },
+                    formatDate = viewModel::formatDate,
+                    quickStartMillis = viewModel::quickStartDateMillis
                 )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.DateRange,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        viewModel.formatDate(state.dateMillis),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (state.dateMillis == null) MaterialTheme.colorScheme.onSurfaceVariant
-                        else MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        "选日期",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-
-            // ③ 总周数
-            Text("③ 总周数", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(6.dp))
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf(16, 18, 20, 24).forEach { weeks ->
-                    FilterChip(
-                        selected = state.totalWeeks == weeks,
-                        onClick = { viewModel.applyWeeks(weeks) },
-                        label = { Text("$weeks 周") }
-                    )
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-
-            // ④ 作息方案
-            Text("④ 作息方案", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(6.dp))
-            if (state.schemes.isEmpty()) {
-                Text(
-                    "正在准备作息模板…",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            state.schemes.forEach { scheme ->
-                WizardSchemeRow(
-                    scheme = scheme,
-                    selected = state.selectedSchemeId == scheme.id,
-                    slots = if (state.selectedSchemeId == scheme.id) state.schemeSlots else emptyList(),
-                    slotsLoaded = state.selectedSchemeId == scheme.id && state.schemeSlotsLoaded,
-                    onClick = { viewModel.selectScheme(scheme.id) }
+                else -> SchemeStep(
+                    state = state,
+                    onSelectScheme = viewModel::selectScheme
                 )
             }
 
@@ -404,20 +327,180 @@ fun SetupWizardScreen(
             }
 
             Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = viewModel::complete,
-                enabled = !state.saving,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(if (state.saving) "正在创建…" else "完成设置")
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (step > 0) {
+                    OutlinedButton(
+                        onClick = { step-- },
+                        enabled = !state.saving,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("上一步") }
+                }
+                val pickedDate = state.dateMillis
+                val nextEnabled = when (step) {
+                    0 -> state.name.isNotBlank()
+                    1 -> pickedDate != null && pickedDate > 0L
+                    else -> state.selectedSchemeId != null
+                }
+                Button(
+                    onClick = { if (step < stepTitles.lastIndex) step++ else viewModel.complete() },
+                    enabled = nextEnabled && !state.saving,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        when {
+                            state.saving -> "正在创建…"
+                            step < stepTitles.lastIndex -> "下一步"
+                            else -> "完成设置"
+                        }
+                    )
+                }
             }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onCancel,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("稍后再说") }
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+/** 第 1 页:选学期名称(推荐 chips + 可选自定义)。 */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun NameStep(
+    state: SetupWizardState,
+    showCustomName: Boolean,
+    onToggleCustomName: () -> Unit,
+    onPickName: (String) -> Unit
+) {
+    Text("选择学期名称", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "按当前日期推荐,点选即可;也可以自定义名称。",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Spacer(Modifier.height(12.dp))
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        state.suggestions.forEach { suggestion ->
+            FilterChip(
+                selected = state.name == suggestion,
+                onClick = { onPickName(suggestion) },
+                label = { Text(suggestion) }
+            )
+        }
+    }
+    TextButton(onClick = onToggleCustomName) {
+        Text(if (showCustomName) "收起自定义名称" else "自定义名称")
+    }
+    if (showCustomName) {
+        OutlinedTextField(
+            value = state.name,
+            onValueChange = onPickName,
+            label = { Text("学期名称") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+/** 第 2 页:选开学日期(快捷周 chips + 完整日历)。 */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DateStep(
+    state: SetupWizardState,
+    onQuickPick: (Int) -> Unit,
+    onOpenDatePicker: () -> Unit,
+    formatDate: (Long?) -> String,
+    quickStartMillis: (Int) -> Long
+) {
+    Text("选择开学日期", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "学期从周一开始;不确定就选「本周一」,之后可再调整。",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Spacer(Modifier.height(12.dp))
+    val selectedDate = state.dateMillis
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        listOf("上周一" to -1, "本周一" to 0, "下周一" to 1).forEach { (label, offset) ->
+            FilterChip(
+                selected = selectedDate != null && selectedDate == quickStartMillis(offset),
+                onClick = { onQuickPick(offset) },
+                label = { Text(label) }
+            )
+        }
+    }
+    Spacer(Modifier.height(6.dp))
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenDatePicker),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.DateRange,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                formatDate(state.dateMillis),
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (state.dateMillis == null) MaterialTheme.colorScheme.onSurfaceVariant
+                else MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                "选日期",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+/** 第 3 页:选作息方案(内置两套按执行日期区分 + 已有自定义方案)。 */
+@Composable
+private fun SchemeStep(
+    state: SetupWizardState,
+    onSelectScheme: (Long) -> Unit
+) {
+    Text("选择作息方案", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "两套内置模板按执行日期区分;完成后可在「学期与作息」中修改。",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Spacer(Modifier.height(12.dp))
+    if (state.schemes.isEmpty()) {
+        Text(
+            "正在准备作息模板…",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    state.schemes.forEach { scheme ->
+        WizardSchemeRow(
+            scheme = scheme,
+            selected = state.selectedSchemeId == scheme.id,
+            slots = if (state.selectedSchemeId == scheme.id) state.schemeSlots else emptyList(),
+            slotsLoaded = state.selectedSchemeId == scheme.id && state.schemeSlotsLoaded,
+            onClick = { onSelectScheme(scheme.id) }
+        )
     }
 }
 
@@ -485,6 +568,6 @@ private fun WizardSchemeRow(
 
 private fun wizardSchemeSubtitle(scheme: TimeScheme): String = when {
     scheme.isLegacy -> "升级前保存的作息"
-    scheme.isBuiltIn -> "内置模板 · ${if (scheme.season == TimeSchemeTemplates.SEASON_WINTER) "冬季" else "夏季"}作息"
+    scheme.isBuiltIn -> "内置模板 · ${TimeSchemeTemplates.noteFor(scheme.season) ?: "通用作息"}"
     else -> "自定义方案"
 }

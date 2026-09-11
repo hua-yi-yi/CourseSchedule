@@ -49,12 +49,12 @@ data class SemesterScheduleHubState(
     val schemeDone: Boolean get() = schemeCheck.done
 }
 
-/** 学期编辑页状态。 */
+/** 学期编辑页状态。总周数不做选择,新建默认取上限(53 周)。 */
 data class SemesterFormState(
     val editingId: Long? = null,
     val name: String = "",
     val dateMillis: Long? = null,
-    val totalWeeks: String = "16",
+    val totalWeeks: String = ScheduleStatus.MAX_WEEKS.toString(),
     val saving: Boolean = false,
     val error: String? = null,
     val saved: Boolean = false,
@@ -246,7 +246,7 @@ class ScheduleConfigViewModel @Inject constructor(
                 editingId = sem?.id,
                 name = sem?.name.orEmpty(),
                 dateMillis = sem?.startDate,
-                totalWeeks = (sem?.totalWeeks ?: 16).toString(),
+                totalWeeks = (sem?.totalWeeks ?: ScheduleStatus.MAX_WEEKS).toString(),
                 started = true
             )
         }
@@ -266,13 +266,6 @@ class ScheduleConfigViewModel @Inject constructor(
             dirty = true,
             error = null
         )
-    }
-
-    /** 总周数预设点选。 */
-    fun applyWeeksPreset(weeks: Int) {
-        if (weeks in ScheduleStatus.MIN_WEEKS..ScheduleStatus.MAX_WEEKS) {
-            updateSemesterWeeks(weeks.toString())
-        }
     }
 
     /** 快捷日期 chips(上周一/本周一/下周一)对应的目标时刻,供界面判断选中态。 */

@@ -374,7 +374,9 @@ private fun SchemePickRow(
 
 private fun schemeSubtitle(scheme: TimeScheme, slots: List<TimeSlot>): String {
     if (scheme.isLegacy) return "升级前保存的作息,可继续使用或另存为新方案"
-    if (scheme.isBuiltIn) return "内置模板 · ${if (scheme.season == 2) "冬季" else "夏季"}作息"
+    if (scheme.isBuiltIn) {
+        return "内置模板 · ${TimeSchemeTemplates.noteFor(scheme.season) ?: "通用作息"}"
+    }
     return if (slots.isEmpty()) "自定义方案" else "自定义方案 · 共 ${slots.size} 节"
 }
 
@@ -447,11 +449,20 @@ fun SchemeEditScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(Modifier.height(8.dp))
-                    listOf("夏季作息", "冬季作息").forEach { name ->
+                    TimeSchemeTemplates.builtIns.forEach { builtIn ->
                         TextButton(onClick = {
-                            viewModel.startSchemeFromTemplate(name)
+                            viewModel.startSchemeFromTemplate(builtIn.name)
                             showTemplatePicker = false
-                        }) { Text(name) }
+                        }) {
+                            Column {
+                                Text(builtIn.name)
+                                Text(
+                                    builtIn.note,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
             },

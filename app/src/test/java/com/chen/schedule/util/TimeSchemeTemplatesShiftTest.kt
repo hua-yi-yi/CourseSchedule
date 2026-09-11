@@ -63,4 +63,15 @@ class TimeSchemeTemplatesShiftTest {
         assertNull(TimeSchemeTemplates.toMinutes("08:60"))
         assertNull(TimeSchemeTemplates.toMinutes(""))
     }
+
+    @Test
+    fun `内置模板标注执行日期`() {
+        assertEquals("5月1日起执行", TimeSchemeTemplates.noteFor(TimeSchemeTemplates.SEASON_SUMMER))
+        assertEquals("10月1日起执行", TimeSchemeTemplates.noteFor(TimeSchemeTemplates.SEASON_WINTER))
+        assertNull(TimeSchemeTemplates.noteFor(TimeSchemeTemplates.SEASON_NONE))
+        // 每个内置模板的 note 与其季节一致
+        TimeSchemeTemplates.builtIns.forEach { builtIn ->
+            assertEquals(TimeSchemeTemplates.noteFor(builtIn.season), builtIn.note)
+        }
+    }
 }
