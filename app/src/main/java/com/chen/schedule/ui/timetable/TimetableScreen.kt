@@ -79,6 +79,7 @@ fun TimetableScreen(
     onAddCourse: (Long, BlankClickTarget?) -> Unit,
     onEditCourse: (Long, Long) -> Unit,
     onNavigateToScheduleConfig: () -> Unit,
+    onNavigateToSetupWizard: () -> Unit,
     onNavigateToSemesterSettings: () -> Unit,
     onNavigateToSchemeSettings: () -> Unit,
     onNavigateToImport: () -> Unit,
@@ -122,6 +123,7 @@ fun TimetableScreen(
                 )
                 EmptySemesterState(
                     modifier = Modifier.fillMaxSize(),
+                    onNavigateToSetupWizard = onNavigateToSetupWizard,
                     onNavigateToScheduleConfig = onNavigateToScheduleConfig
                 )
             } else {
@@ -606,6 +608,7 @@ private fun TodaySummaryCard(
 @Composable
 private fun EmptySemesterState(
     modifier: Modifier = Modifier,
+    onNavigateToSetupWizard: () -> Unit,
     onNavigateToScheduleConfig: () -> Unit
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
@@ -632,13 +635,17 @@ private fun EmptySemesterState(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "先设置学期名称与开学日期,就能创建课程表了",
+                "点选几步就能完成初始设置,开始使用课程表",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onNavigateToScheduleConfig) {
-                Text("去设置学期和作息时间")
+            Button(onClick = onNavigateToSetupWizard) {
+                Text("开始初始设置")
+            }
+            Spacer(Modifier.height(4.dp))
+            TextButton(onClick = onNavigateToScheduleConfig) {
+                Text("手动设置学期和作息时间", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

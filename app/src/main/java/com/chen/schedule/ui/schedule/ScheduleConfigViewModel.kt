@@ -12,6 +12,8 @@ import com.chen.schedule.domain.model.Semester
 import com.chen.schedule.domain.model.TimeScheme
 import com.chen.schedule.domain.model.TimeSlot
 import com.chen.schedule.util.ScheduleStatus
+import com.chen.schedule.util.SemesterNameSuggestions
+import com.chen.schedule.util.TimeSchemeTemplates
 import com.chen.schedule.util.TimeSlotParser
 import com.chen.schedule.util.WeekCalculator
 import com.chen.schedule.widget.WidgetUpdater
@@ -23,10 +25,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.TemporalAdjusters
 import javax.inject.Inject
 
 /** 「学期与作息」总览:两张菜单卡片的摘要与完成状态。 */
@@ -51,7 +55,6 @@ data class SemesterFormState(
     val name: String = "",
     val dateMillis: Long? = null,
     val totalWeeks: String = "16",
-    val weekHint: String = "",
     val saving: Boolean = false,
     val error: String? = null,
     val saved: Boolean = false,
@@ -224,10 +227,18 @@ class ScheduleConfigViewModel @Inject constructor(
 
     // ==================== 学期 ====================
 
+    /** 学期名称推荐项(按当前日期推算,供点选)。 */
+    fun semesterNameSuggestions(): List<String> =
+        SemesterNameSuggestions.generate(LocalDate.now())
+
     fun startSemesterForm(editingId: Long?) {
         viewModelScope.launch {
             if (editingId == null) {
-                _semesterForm.value = SemesterFormState(started = true)
+                // 新建学期时预选推荐名称,做到零输入即可保存
+                _semesterForm.value = SemesterFormState(
+                    name = semesterNameSuggestions().firstOrNull().orEmpty(),
+                    started = true
+                )
                 return@launch
             }
             val sem = semesterRepository.getSemesterById(editingId)
@@ -257,24 +268,38 @@ class ScheduleConfigViewModel @Inject constructor(
         )
     }
 
-    fun updateWeekHint(value: String) = _semesterForm.update {
-        it.copy(weekHint = value.filter { c -> c.isDigit() }.take(2))
+    /** 总周数预设点选。 */
+    fun applyWeeksPreset(weeks: Int) {
+        if (weeks in ScheduleStatus.MIN_WEEKS..ScheduleStatus.MAX_WEEKS) {
+            updateSemesterWeeks(weeks.toString())
+        }
     }
 
-    /** 「根据当前周推算开学日期」——折叠辅助区域,结果写入同一个日期字段。 */
-    fun computeStartDateFromWeek() {
-        val form = _semesterForm.value
-        val week = form.weekHint.toIntOrNull()
-        val total = form.totalWeeksValue
-        if (week == null || week < 1) {
-            _semesterForm.update { it.copy(error = "请输入有效的当前周") }
-            return
-        }
+    /** 快捷日期 chips(上周一/本周一/下周一)对应的目标时刻,供界面判断选中态。 */
+    fun quickStartDateMillis(offsetWeeks: Int): Long {
+        val monday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val date = monday.plusWeeks(offsetWeeks.toLong())
+        return date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    }
+
+    fun applyQuickStartDate(offsetWeeks: Int) = updateSemesterDate(quickStartDateMillis(offsetWeeks))
+
+    /** 已选开学日期距今处于第几周(未选日期时为 null),供「当前是第几周」chips 判断选中态。 */
+    fun currentWeekFromFormDate(): Int? {
+        val dateMillis = _semesterForm.value.dateMillis ?: return null
+        if (dateMillis <= 0L) return null
+        return WeekCalculator.currentWeek(dateMillis, ScheduleStatus.MAX_WEEKS)
+    }
+
+    /** 「当前是第几周」chips 点选:按所选周推算开学日期并写入日期字段。 */
+    fun applyWeekChip(week: Int) {
+        val total = _semesterForm.value.totalWeeksValue
+        if (week < 1) return
         if (total != null && week > total) {
             _semesterForm.update { it.copy(error = "当前周不能超过总周数") }
             return
         }
-        val start = LocalDate.now().minusWeeks((week - 1).toLong()).with(java.time.DayOfWeek.MONDAY)
+        val start = LocalDate.now().minusWeeks((week - 1).toLong()).with(DayOfWeek.MONDAY)
         val millis = start.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         _semesterForm.update { it.copy(dateMillis = millis, error = null, dirty = true) }
     }
@@ -343,7 +368,7 @@ class ScheduleConfigViewModel @Inject constructor(
     // ==================== 作息方案 ====================
 
     fun startNewSchemeForm() {
-        _schemeForm.value = SchemeFormState(started = true)
+        _schemeForm.value = SchemeFormState(name = "我的作息", started = true)
     }
 
     fun startSchemeFromTemplate(builtInName: String) {
@@ -416,6 +441,22 @@ class ScheduleConfigViewModel @Inject constructor(
         }
         _schemeForm.update {
             it.copy(slots = preview, importPreview = emptyList(), importText = "", dirty = true)
+        }
+    }
+
+    /**
+     * 快速生成整套节次:以 [firstStart] 作为第一节开始时间,按内置夏/冬季节奏平移生成。
+     * 只替换表单内的节次,保存前不落库,可反复点选重生成。
+     */
+    fun generateSlots(firstStart: String, season: Int) {
+        val base = if (season == TimeSchemeTemplates.SEASON_WINTER) {
+            TimeSchemeTemplates.WINTER_START_TIMES
+        } else {
+            TimeSchemeTemplates.SUMMER_START_TIMES
+        }
+        val startTimes = TimeSchemeTemplates.shiftedStartTimes(base, firstStart)
+        _schemeForm.update {
+            it.copy(slots = TimeSchemeTemplates.slotsOf(startTimes), dirty = true, error = null)
         }
     }
 

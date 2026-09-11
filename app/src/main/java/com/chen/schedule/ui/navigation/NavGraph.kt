@@ -18,6 +18,7 @@ import com.chen.schedule.ui.schedule.SchemeMenuScreen
 import com.chen.schedule.ui.schedule.SemesterEditScreen
 import com.chen.schedule.ui.schedule.SemesterListScreen
 import com.chen.schedule.ui.schedule.SemesterMenuScreen
+import com.chen.schedule.ui.schedule.SetupWizardScreen
 import com.chen.schedule.ui.settings.SettingsScreen
 import com.chen.schedule.ui.timetable.BlankClickTarget
 import com.chen.schedule.ui.timetable.TimetableScreen
@@ -42,6 +43,7 @@ sealed class Screen(val route: String) {
 
     /** 学期与作息(两张卡片的总览页)。 */
     object ScheduleConfig : Screen("schedule_config")
+    object SetupWizard : Screen("setup_wizard")
     object SemesterMenu : Screen("semester_menu")
     object SemesterList : Screen("semester_list")
     object SemesterEdit : Screen("semester_edit?semesterId={semesterId}") {
@@ -84,6 +86,9 @@ fun AppNavHost() {
                 },
                 onNavigateToScheduleConfig = {
                     navController.navigate(Screen.ScheduleConfig.route)
+                },
+                onNavigateToSetupWizard = {
+                    navController.navigate(Screen.SetupWizard.route)
                 },
                 onNavigateToSemesterSettings = {
                     navController.navigate(Screen.SemesterMenu.route)
@@ -148,6 +153,14 @@ fun AppNavHost() {
                 onNavigateBack = { navController.popBackStack() },
                 onOpenSemesterMenu = { navController.navigate(Screen.SemesterMenu.route) },
                 onOpenSchemeMenu = { navController.navigate(Screen.SchemeMenu.route) }
+            )
+        }
+
+        // ===== 首启「初始设置」向导 =====
+        composable(Screen.SetupWizard.route) {
+            SetupWizardScreen(
+                onDone = { navController.popBackStack() },
+                onCancel = { navController.popBackStack() }
             )
         }
 

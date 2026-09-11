@@ -3,9 +3,12 @@ package com.chen.schedule.ui.schedule
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +32,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -204,9 +208,10 @@ private fun SemesterPickRow(
 
 /**
  * 新建 / 编辑学期。
- * 开学日期使用日期选择器;「根据当前周推算开学日期」放在可折叠辅助区域。
+ * 以点选为主:学期名称给推荐 chips、总周数给预设 chips、开学日期给快捷周 chips + 日期选择器;
+ * 名称与周数仍保留自定义输入,「根据当前周推算开学日期」改为点选周数。
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SemesterEditScreen(
     semesterId: Long?,
@@ -218,6 +223,9 @@ fun SemesterEditScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var showHelper by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
+    var showCustomWeeks by remember { mutableStateOf(false) }
+    val nameSuggestions = remember { viewModel.semesterNameSuggestions() }
+    val presetWeeks = remember { listOf(16, 18, 20, 24) }
 
     LaunchedEffect(semesterId) { viewModel.startSemesterForm(semesterId) }
     LaunchedEffect(form.saved) { if (form.saved) onDone() }
@@ -298,18 +306,48 @@ fun SemesterEditScreen(
                 Spacer(Modifier.height(8.dp))
             }
 
+            // 学期名称:推荐 chips 点选 + 可选自定义输入
+            Text("学期名称", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(6.dp))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                nameSuggestions.forEach { suggestion ->
+                    FilterChip(
+                        selected = form.name == suggestion,
+                        onClick = { viewModel.updateSemesterName(suggestion) },
+                        label = { Text(suggestion) }
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
             OutlinedTextField(
                 value = form.name,
                 onValueChange = viewModel::updateSemesterName,
-                label = { Text("学期名称") },
+                label = { Text("自定义名称") },
                 singleLine = true,
-                placeholder = { Text("例:2026–2027 第一学期") },
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(Modifier.height(12.dp))
 
+            // 开学日期:快捷周 chips + 完整日期选择器
             Text("开学日期", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(6.dp))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("上周一" to -1, "本周一" to 0, "下周一" to 1).forEach { (label, offset) ->
+                    FilterChip(
+                        selected = form.dateMillis != null &&
+                            form.dateMillis == viewModel.quickStartDateMillis(offset),
+                        onClick = { viewModel.applyQuickStartDate(offset) },
+                        label = { Text(label) }
+                    )
+                }
+            }
             Spacer(Modifier.height(6.dp))
             Card(
                 modifier = Modifier
@@ -340,7 +378,7 @@ fun SemesterEditScreen(
                     )
                     Spacer(Modifier.weight(1f))
                     Text(
-                        "选择",
+                        "选日期",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -349,20 +387,46 @@ fun SemesterEditScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            OutlinedTextField(
-                value = form.totalWeeks,
-                onValueChange = viewModel::updateSemesterWeeks,
-                label = { Text("总周数") },
-                singleLine = true,
-                supportingText = {
-                    Text("有效范围 ${ScheduleStatus.MIN_WEEKS}–${ScheduleStatus.MAX_WEEKS}")
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
+            // 总周数:预设 chips + 可选自定义输入
+            Text("总周数", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(6.dp))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                presetWeeks.forEach { weeks ->
+                    FilterChip(
+                        selected = form.totalWeeks == weeks.toString(),
+                        onClick = {
+                            viewModel.applyWeeksPreset(weeks)
+                            showCustomWeeks = false
+                        },
+                        label = { Text("$weeks 周") }
+                    )
+                }
+                FilterChip(
+                    selected = showCustomWeeks,
+                    onClick = { showCustomWeeks = !showCustomWeeks },
+                    label = { Text("自定义") }
+                )
+            }
+            if (showCustomWeeks || form.totalWeeks.toIntOrNull() !in presetWeeks) {
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = form.totalWeeks,
+                    onValueChange = viewModel::updateSemesterWeeks,
+                    label = { Text("自定义总周数") },
+                    singleLine = true,
+                    supportingText = {
+                        Text("有效范围 ${ScheduleStatus.MIN_WEEKS}–${ScheduleStatus.MAX_WEEKS}")
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             Spacer(Modifier.height(12.dp))
 
-            // 折叠辅助区域:根据当前周推算开学日期
+            // 折叠辅助区域:点选当前所处的周,自动推算开学日期
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -383,25 +447,29 @@ fun SemesterEditScreen(
             AnimatedVisibility(visible = showHelper) {
                 Column {
                     Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        OutlinedTextField(
-                            value = form.weekHint,
-                            onValueChange = viewModel::updateWeekHint,
-                            label = { Text("当前是第几周") },
-                            singleLine = true,
-                            placeholder = { Text("如 12") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Button(
-                            onClick = viewModel::computeStartDateFromWeek,
-                            enabled = form.weekHint.isNotBlank(),
-                            modifier = Modifier.height(56.dp)
-                        ) { Text("推算") }
+                    Text(
+                        "点击你当前所处的周,将自动推算开学日期",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        (1..24).forEach { week ->
+                            FilterChip(
+                                selected = viewModel.currentWeekFromFormDate() == week,
+                                onClick = { viewModel.applyWeekChip(week) },
+                                label = { Text("第$week 周") }
+                            )
+                        }
                     }
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "推算结果会写入上方开学日期,可再手动调整",
+                        "推算结果会写入上方开学日期,可再调整",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

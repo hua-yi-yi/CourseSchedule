@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,7 +44,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -60,6 +65,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.chen.schedule.domain.model.Semester
 import com.chen.schedule.domain.model.TimeScheme
 import com.chen.schedule.domain.model.TimeSlot
+import com.chen.schedule.util.TimeSchemeTemplates
 import kotlinx.coroutines.launch
 
 /**
@@ -374,9 +380,10 @@ private fun schemeSubtitle(scheme: TimeScheme, slots: List<TimeSlot>): String {
 
 /**
  * 新建 / 编辑作息方案。
- * 创建方式:从模板复制、手动填写、文本导入。保存方案与「设为当前使用」分开表达。
+ * 创建方式:从模板复制、快速生成(点选第一节开始时间)、文本导入;节次时间用时间选择器点选。
+ * 保存方案与「设为当前使用」分开表达。
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SchemeEditScreen(
     schemeId: Long?,
@@ -393,6 +400,12 @@ fun SchemeEditScreen(
     var pendingRemoveSlot by remember { mutableStateOf<TimeSlot?>(null) }
     var removeImpact by remember { mutableStateOf(0) }
     var sharedWith by remember { mutableStateOf<List<Semester>>(emptyList()) }
+    // 快速生成:第一节开始时间 + 作息节奏
+    var genStart by remember { mutableStateOf<String?>(null) }
+    var genCustom by remember { mutableStateOf(false) }
+    var genSeason by remember { mutableStateOf(TimeSchemeTemplates.SEASON_SUMMER) }
+    var showCustomStartPicker by remember { mutableStateOf(false) }
+    val presetStarts = remember { listOf("08:00", "08:10", "08:30") }
 
     LaunchedEffect(schemeId) {
         if (schemeId == null) viewModel.startNewSchemeForm() else viewModel.startSchemeEditForm(schemeId)
@@ -444,6 +457,19 @@ fun SchemeEditScreen(
             },
             confirmButton = {},
             dismissButton = { TextButton(onClick = { showTemplatePicker = false }) { Text("取消") } }
+        )
+    }
+
+    if (showCustomStartPicker) {
+        TimePickerDialog24(
+            title = "第一节开始时间",
+            initial = genStart ?: "08:00",
+            onConfirm = { picked ->
+                genStart = picked
+                genCustom = true
+                viewModel.generateSlots(picked, genSeason)
+            },
+            onDismiss = { showCustomStartPicker = false }
         )
     }
 
@@ -634,6 +660,56 @@ fun SchemeEditScreen(
                 }
             }
 
+            SectionLabel("快速生成节次")
+            Text(
+                "选择第一节开始时间,按内置节奏生成整套节次(每节 45 分钟),之后可逐节调整",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(6.dp))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                presetStarts.forEach { start ->
+                    FilterChip(
+                        selected = genStart == start && !genCustom,
+                        onClick = {
+                            genStart = start
+                            genCustom = false
+                            viewModel.generateSlots(start, genSeason)
+                        },
+                        label = { Text(start) }
+                    )
+                }
+                FilterChip(
+                    selected = genCustom,
+                    onClick = { showCustomStartPicker = true },
+                    label = { Text("自定义") }
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = genSeason == TimeSchemeTemplates.SEASON_SUMMER,
+                    onClick = {
+                        genSeason = TimeSchemeTemplates.SEASON_SUMMER
+                        genStart?.let { viewModel.generateSlots(it, genSeason) }
+                    },
+                    label = { Text("夏季节奏") }
+                )
+                FilterChip(
+                    selected = genSeason == TimeSchemeTemplates.SEASON_WINTER,
+                    onClick = {
+                        genSeason = TimeSchemeTemplates.SEASON_WINTER
+                        genStart?.let { viewModel.generateSlots(it, genSeason) }
+                    },
+                    label = { Text("冬季节奏") }
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
             SectionLabel("节次(${form.slots.size})")
             form.slots.sortedBy { it.slotNumber }.forEach { slot ->
                 SlotEditRow(
@@ -692,13 +768,16 @@ fun SchemeEditScreen(
     }
 }
 
-/** 单个节次行:编号 + 起止时间输入 + 名称。 */
+/** 单个节次行:编号 + 名称 + 起止时间(点开时间选择器)。 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SlotEditRow(
     slot: TimeSlot,
     onSlotChange: (TimeSlot) -> Unit,
     onRemove: () -> Unit
 ) {
+    /** null = 未打开;true = 编辑开始时间,false = 编辑结束时间。 */
+    var editingStart by remember { mutableStateOf<Boolean?>(null) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -741,22 +820,89 @@ private fun SlotEditRow(
             }
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
+                TimeFieldBox(
+                    label = "开始",
                     value = slot.startTime,
-                    onValueChange = { onSlotChange(slot.copy(startTime = it)) },
-                    label = { Text("开始") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = { editingStart = true }
                 )
                 Spacer(Modifier.width(8.dp))
-                OutlinedTextField(
+                TimeFieldBox(
+                    label = "结束",
                     value = slot.endTime,
-                    onValueChange = { onSlotChange(slot.copy(endTime = it)) },
-                    label = { Text("结束") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = { editingStart = false }
                 )
             }
         }
     }
+    editingStart?.let { isStart ->
+        TimePickerDialog24(
+            title = "第${slot.slotNumber}节${if (isStart) "开始" else "结束"}时间",
+            initial = if (isStart) slot.startTime else slot.endTime,
+            onConfirm = { picked ->
+                onSlotChange(if (isStart) slot.copy(startTime = picked) else slot.copy(endTime = picked))
+                editingStart = null
+            },
+            onDismiss = { editingStart = null }
+        )
+    }
+}
+
+/** 只读时间字段卡片,点开时间选择器。 */
+@Composable
+private fun TimeFieldBox(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = MaterialTheme.shapes.small,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(value, style = MaterialTheme.typography.bodyLarge)
+        }
+    }
+}
+
+/** 24 小时制时间选择对话框,确认后回调 "HH:mm"。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimePickerDialog24(
+    title: String,
+    initial: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val parts = initial.split(":")
+    val state = rememberTimePickerState(
+        initialHour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: 8,
+        initialMinute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0,
+        is24Hour = true
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { TimePicker(state = state) },
+        confirmButton = {
+            TextButton(onClick = {
+                onConfirm(String.format("%02d:%02d", state.hour, state.minute))
+            }) { Text("确定") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    )
 }

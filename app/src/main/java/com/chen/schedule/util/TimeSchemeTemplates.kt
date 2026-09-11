@@ -56,6 +56,27 @@ object TimeSchemeTemplates {
             )
         }
 
+    /** 把 "HH:mm" 转成当日分钟数,非法时间返回 null。 */
+    fun toMinutes(time: String): Int? {
+        val parts = time.split(":")
+        val hour = parts.getOrNull(0)?.toIntOrNull() ?: return null
+        val minute = parts.getOrNull(1)?.toIntOrNull() ?: return null
+        if (hour !in 0..23 || minute !in 0..59) return null
+        return hour * 60 + minute
+    }
+
+    /**
+     * 以 [firstStart] 作为第一节开始时间,把基准节奏 [base] 整体平移后生成开始时间序列。
+     * 平移超出 24:00 的节次按 23:59 截断(与模板生成规则一致),早于 00:00 按 00:00 截断。
+     */
+    fun shiftedStartTimes(base: List<String>, firstStart: String): List<String> {
+        val anchor = toMinutes(base.first()) ?: return base
+        val target = toMinutes(firstStart) ?: return base
+        val delta = target - anchor
+        if (delta == 0) return base
+        return base.map { addMinutes(it, delta) }
+    }
+
     /** "HH:mm" + 分钟,支持跨小时,不跨天回绕(超过 24:00 时按 23:59 截断)。 */
     private fun addMinutes(time: String, minutes: Int): String {
         val parts = time.split(":")
