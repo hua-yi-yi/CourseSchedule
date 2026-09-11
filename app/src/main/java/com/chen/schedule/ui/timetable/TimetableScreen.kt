@@ -305,7 +305,7 @@ private fun HeaderSection(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // 左上角菜单栏
@@ -318,7 +318,7 @@ private fun HeaderSection(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     semesterName,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -336,10 +336,9 @@ private fun HeaderSection(
                     )
                 }
             }
-            Spacer(Modifier.height(2.dp))
             Text(
                 "第 $currentWeek 周 / 共 $totalWeeks 周",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -351,7 +350,7 @@ private fun HeaderSection(
                 shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                 icon = {}
             ) {
-                Text("周视图", fontSize = 13.sp)
+                Text("周视图", fontSize = 12.sp)
             }
             SegmentedButton(
                 selected = isDayView,
@@ -359,7 +358,7 @@ private fun HeaderSection(
                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                 icon = {}
             ) {
-                Text("日视图", fontSize = 13.sp)
+                Text("日视图", fontSize = 12.sp)
             }
         }
     }
@@ -391,7 +390,7 @@ private fun WeekSelector(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onPrevWeek, enabled = currentWeek > 1) {
@@ -401,32 +400,26 @@ private fun WeekSelector(
                     )
                 }
 
-                Column(
+                Row(
                     modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "第",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            "$currentWeek",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            "周",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                     Text(
-                        "共 $totalWeeks 周",
+                        "第",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.width(3.dp))
+                    Text(
+                        "$currentWeek",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(3.dp))
+                    Text(
+                        "周 / 共 $totalWeeks 周",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -444,26 +437,26 @@ private fun WeekSelector(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
-                    .padding(bottom = 8.dp),
+                    .padding(bottom = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (!isCurrentWeek) {
                     Button(
                         onClick = onGoToday,
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.height(32.dp)
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(30.dp)
                     ) {
-                        Icon(Icons.Default.Today, null, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.Today, null, modifier = Modifier.size(12.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("回到本周", fontSize = 12.sp)
+                        Text("回到本周", fontSize = 11.sp)
                     }
                 } else {
                     Spacer(Modifier.weight(1f))
                 }
                 TextButton(
                     onClick = onToggleWeekend,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                     Text(
                         if (showWeekend) "隐藏周末" else "显示周末",

@@ -160,6 +160,10 @@ fun AppNavHost() {
         composable(Screen.SetupWizard.route) {
             SetupWizardScreen(
                 onDone = { navController.popBackStack() },
+                onGoImport = {
+                    navController.popBackStack()
+                    navController.navigate(Screen.Import.route)
+                },
                 onCancel = { navController.popBackStack() }
             )
         }
