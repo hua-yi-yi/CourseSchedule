@@ -107,6 +107,7 @@ fun AppNavHost() {
 
         composable(Screen.Import.route) {
             ImportScreen(
+                onHaustImport = { navController.navigate(Screen.HaustImport.route) },
                 onScraperLogin = { navController.navigate(Screen.ScraperLogin.route) },
                 onNavigateBack = { navController.popBackStack() }
             )

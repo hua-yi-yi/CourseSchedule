@@ -9,7 +9,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -30,16 +29,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -132,6 +131,7 @@ name,teacher,classroom,dayOfWeek,startSlot,endSlot,startWeek,endWeek,weekType,no
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ImportScreen(
+    onHaustImport: () -> Unit,
     onScraperLogin: () -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: ImportViewModel = hiltViewModel()
@@ -184,151 +184,242 @@ fun ImportScreen(
                 .padding(16.dp)
         ) {
 
-            // ===== AI 截图识别导入 =====
+            // ===== 主入口:河南科技大学教务系统导入 =====
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.School,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    "河南科技大学教务系统导入",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "VPN 登录后自动读取课表,无需手动整理",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = onHaustImport,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.CloudDownload, "导入", modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("进入教务系统导入")
+                        }
+                    }
+                }
+            }
+
+            // ===== 预览区域 =====
+            if (state.previewCourses.isNotEmpty()) {
+                item {
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("预览 (${state.previewCourses.size} 门课程)", style = MaterialTheme.typography.titleMedium)
+                        Button(onClick = viewModel::confirmImport) {
+                            Text("确认导入")
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                items(state.previewCourses) { course ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(course.name, fontWeight = FontWeight.Bold)
+                            Row {
+                                if (course.teacher.isNotBlank()) {
+                                    Text(course.teacher, style = MaterialTheme.typography.bodySmall)
+                                    Text(" · ", style = MaterialTheme.typography.bodySmall)
+                                }
+                                Text(
+                                    "${DayOfWeek.entries.find { it.index == course.dayOfWeek }?.label ?: ""} ${course.startSlot}-${course.endSlot}节",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Text(
+                                "${course.startWeek}-${course.endWeek}周 ${course.weekType.label}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                item { Spacer(Modifier.height(8.dp)) }
+            }
+
+            // ===== 其它导入方式(小字) =====
+            item {
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    "其它导入方式",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "其他学校或已有整理好的课表数据时使用",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+
+            // AI 截图识别(折叠,小字)
+            item {
+                OtherMethodCard(
+                    title = "AI 截图识别",
+                    subtitle = "复制格式说明发给 AI,再把返回内容导入"
+                ) {
+                    StepRow("1", "对课程表截图(教务系统、Excel 课表、纸质课表都可以)")
+                    StepRow("2", "点击下方按钮复制「格式说明」,发给任意 AI(ChatGPT / Kimi / 豆包 等)")
+                    StepRow("3", "把截图也一起发给 AI,AI 会生成对应内容")
+                    StepRow("4", "把返回内容粘贴到「粘贴文本导入」,或保存为 .json/.csv 文件导入")
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                clipboard.setPrimaryClip(ClipData.newPlainText("json_prompt", buildJsonPrompt()))
+                                Toast.makeText(context, "JSON格式说明已复制！去粘贴给AI，同时发送截图", Toast.LENGTH_LONG).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, "复制", modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("复制 JSON 格式", fontSize = 12.sp)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                clipboard.setPrimaryClip(ClipData.newPlainText("csv_prompt", buildCsvPrompt()))
+                                Toast.makeText(context, "CSV格式说明已复制！去粘贴给AI，同时发送截图", Toast.LENGTH_LONG).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, "复制", modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("复制 CSV 格式", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            // 粘贴文本导入(默认折叠)
+            item {
+                PasteImportCard(viewModel = viewModel, clipboard = clipboard, context = context)
+            }
+
+            // 文件导入(小按钮)
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { jsonLauncher.launch(arrayOf("application/json", "*/*")) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Description, "JSON", modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("导入 JSON 文件", fontSize = 12.sp)
+                    }
+                    OutlinedButton(
+                        onClick = { csvLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "*/*")) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Default.TableChart, "CSV", modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("导入 CSV 文件", fontSize = 12.sp)
+                    }
+                }
+            }
+
+            // 正方教务系统(其他学校,小字行)
             item {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(
-                            1.5.dp,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                            MaterialTheme.shapes.large
-                        ),
+                        .padding(vertical = 4.dp)
+                        .clickable(onClick = onScraperLogin),
+                    shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                    ),
-                    shape = MaterialTheme.shapes.large
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        // Title row
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.CloudDownload,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("正方教务系统(其他学校)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             Text(
-                                "AI 截图识别导入",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                                "填写教务地址 + 学号密码登录抓取",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-
-                        Spacer(Modifier.height(8.dp))
-
-                        Text(
-                            "截图课程表 → 发给 AI → 生成文件 → 导入",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
-                        Spacer(Modifier.height(8.dp))
-
-                        // Step by step
-                        StepRow("1", "对课程表截图（教务系统、Excel课表、纸质课表都可以）")
-                        StepRow("2", "点击下面按钮复制「格式说明」，发给任意 AI（ChatGPT / Claude / Kimi / 豆包 等）")
-                        StepRow("3", "把截图也一起发给 AI，AI 会生成对应的文件内容")
-                        StepRow("4", "把 AI 返回的内容保存为 .json 或 .csv 文件，再用下方按钮导入")
-
-                        Spacer(Modifier.height(12.dp))
-
-                        // Buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("json_prompt", buildJsonPrompt()))
-                                    Toast.makeText(context, "JSON格式说明已复制！去粘贴给AI，同时发送截图", Toast.LENGTH_LONG).show()
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary
-                                )
-                            ) {
-                                Icon(Icons.Default.ContentCopy, "复制", modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("复制 JSON 格式", fontSize = 13.sp)
-                            }
-
-                            OutlinedButton(
-                                onClick = {
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("csv_prompt", buildCsvPrompt()))
-                                    Toast.makeText(context, "CSV格式说明已复制！去粘贴给AI，同时发送截图", Toast.LENGTH_LONG).show()
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.ContentCopy, "复制", modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("复制 CSV 格式", fontSize = 13.sp)
-                            }
-                        }
-
-                        Spacer(Modifier.height(4.dp))
-
-                        Text(
-                            "提示：点击按钮后打开 ChatGPT/Claude/Kimi 等 AI 工具，粘贴 + 发送截图即可",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = "进入",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
             }
 
-            // ===== 粘贴文本导入（优先） =====
+            // ===== JSON 格式说明(折叠) =====
             item {
-                Spacer(Modifier.height(20.dp))
-                Text("粘贴文本导入", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "把 AI 返回的 JSON 或 CSV 文本直接粘贴到下方，自动识别格式导入",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
                 Spacer(Modifier.height(8.dp))
-                PasteImportCard(viewModel = viewModel, clipboard = clipboard, context = context)
-            }
-
-            // ===== 手动导入文件 =====
-            item {
-                Spacer(Modifier.height(20.dp))
-                Text("手动导入文件", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "选择已准备好的 JSON 或 CSV 文件导入课程表",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
-
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(
-                        onClick = { jsonLauncher.launch(arrayOf("application/json", "*/*")) },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Description, "JSON")
-                        Spacer(Modifier.width(8.dp))
-                        Text("导入 JSON")
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedButton(
-                        onClick = { csvLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "*/*")) },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.TableChart, "CSV")
-                        Spacer(Modifier.width(8.dp))
-                        Text("导入 CSV")
-                    }
-                }
-            }
-
-            // ===== JSON 格式说明 =====
-            item {
-                Spacer(Modifier.height(12.dp))
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -392,7 +483,7 @@ fun ImportScreen(
                 }
             }
 
-            // ===== CSV 格式说明 =====
+            // ===== CSV 格式说明(折叠) =====
             item {
                 Spacer(Modifier.height(8.dp))
 
@@ -457,112 +548,52 @@ fun ImportScreen(
                     }
                 }
             }
+        }
+    }
+}
 
-            // ===== 预览区域 =====
-            if (state.previewCourses.isNotEmpty()) {
-                item {
-                    Spacer(Modifier.height(24.dp))
-                    HorizontalDivider()
-                    Spacer(Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("预览 (${state.previewCourses.size} 门课程)", style = MaterialTheme.typography.titleMedium)
-                        Button(onClick = viewModel::confirmImport) {
-                            Text("确认导入")
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-
-                items(state.previewCourses) { course ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(course.name, fontWeight = FontWeight.Bold)
-                            Row {
-                                if (course.teacher.isNotBlank()) {
-                                    Text(course.teacher, style = MaterialTheme.typography.bodySmall)
-                                    Text(" · ", style = MaterialTheme.typography.bodySmall)
-                                }
-                                Text(
-                                    "${DayOfWeek.entries.find { it.index == course.dayOfWeek }?.label ?: ""} ${course.startSlot}-${course.endSlot}节",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            Text(
-                                "${course.startWeek}-${course.endWeek}周 ${course.weekType.label}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-
-                item { Spacer(Modifier.height(16.dp)) }
-            }
-
-            // ===== 教务系统导入 =====
-            item {
-                HorizontalDivider()
-                Spacer(Modifier.height(24.dp))
-
-                Text("教务系统自动导入", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "通过适配器自动从学校教务系统抓取课程表，首次使用需填写教务地址并登录",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large,
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+/** 「其它导入方式」的紧凑折叠卡:小标题 + 小字副标题,点整行展开详情。 */
+@Composable
+private fun OtherMethodCard(
+    title: String,
+    subtitle: String,
+    content: @Composable () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable { expanded = !expanded },
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.CloudDownload,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(end = 12.dp)
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("正方教务系统", fontWeight = FontWeight.Bold)
-                            Text(
-                                "适用于使用正方教务系统的高校",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
                 }
-
-                Spacer(Modifier.height(12.dp))
-
-                Button(
-                    onClick = onScraperLogin,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.UploadFile, "导入")
-                    Spacer(Modifier.width(8.dp))
-                    Text("教务系统登录导入")
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = "展开",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Column {
+                    Spacer(Modifier.height(6.dp))
+                    content()
                 }
             }
         }
@@ -606,15 +637,18 @@ private fun PasteImportCard(
     context: Context
 ) {
     var pasteText by remember { mutableStateOf("") }
-    var showPasteArea by remember { mutableStateOf(true) }
+    var showPasteArea by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         )
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -623,13 +657,27 @@ private fun PasteImportCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.ContentCopy, "粘贴", tint = MaterialTheme.colorScheme.primary)
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        "粘贴",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
                     Spacer(Modifier.width(8.dp))
-                    Text("粘贴文本导入", fontWeight = FontWeight.Bold)
+                    Column {
+                        Text("粘贴文本导入", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "粘贴 AI 返回的 JSON 或 CSV 文本,自动识别格式",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 Icon(
                     if (showPasteArea) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    "展开"
+                    "展开",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
