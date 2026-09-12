@@ -136,21 +136,36 @@ fun TimetableScreen(
                     isCurrentWeek = state.currentWeek == actualWeek,
                     isDayView = state.isDayView,
                     onToggleView = viewModel::toggleView,
+                    onBackToToday = { viewModel.setWeek(actualWeek) },
                     onNavigateToImport = onNavigateToImport,
                     onNavigateToSettings = onNavigateToSettings
                 )
 
-                // ===== 周切换 =====
+                // ===== 周切换(单行紧凑) + 周末显示开关(独立一行) =====
                 WeekSelector(
                     currentWeek = state.currentWeek,
                     totalWeeks = semester.totalWeeks,
-                    showWeekend = state.showWeekend,
-                    isCurrentWeek = state.currentWeek == actualWeek,
                     onPrevWeek = viewModel::prevWeek,
-                    onNextWeek = viewModel::nextWeek,
-                    onToggleWeekend = viewModel::toggleWeekend,
-                    onGoToday = { viewModel.setWeek(actualWeek) }
+                    onNextWeek = viewModel::nextWeek
                 )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = viewModel::toggleWeekend,
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Text(
+                            if (state.showWeekend) "隐藏周末" else "显示周末",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
 
                 if (state.isDayView) {
                     DaySelector(
@@ -299,6 +314,7 @@ private fun HeaderSection(
     isCurrentWeek: Boolean,
     isDayView: Boolean,
     onToggleView: () -> Unit,
+    onBackToToday: () -> Unit,
     onNavigateToImport: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
@@ -341,6 +357,17 @@ private fun HeaderSection(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (!isCurrentWeek) {
+                Text(
+                    "回到本周",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(top = 1.dp)
+                        .clickable(onClick = onBackToToday)
+                )
+            }
         }
 
         SingleChoiceSegmentedButtonRow(modifier = Modifier) {
@@ -366,16 +393,13 @@ private fun HeaderSection(
 
 /* ===================== 周切换 ===================== */
 
+/** 单行紧凑周切换:左右箭头 + 「第 N 周 / 共 M 周」;周末开关与「回到本周」不在此卡内。 */
 @Composable
 private fun WeekSelector(
     currentWeek: Int,
     totalWeeks: Int,
-    showWeekend: Boolean,
-    isCurrentWeek: Boolean,
     onPrevWeek: () -> Unit,
-    onNextWeek: () -> Unit,
-    onToggleWeekend: () -> Unit,
-    onGoToday: () -> Unit
+    onNextWeek: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -386,84 +410,57 @@ private fun WeekSelector(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onPrevWeek,
+                enabled = currentWeek > 1,
+                modifier = Modifier.size(40.dp)
             ) {
-                IconButton(onClick = onPrevWeek, enabled = currentWeek > 1) {
-                    Icon(
-                        Icons.Default.ChevronLeft, "上一周",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek > 1) 1f else 0.3f)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "第",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(3.dp))
-                    Text(
-                        "$currentWeek",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.width(3.dp))
-                    Text(
-                        "周 / 共 $totalWeeks 周",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                IconButton(onClick = onNextWeek, enabled = currentWeek < totalWeeks) {
-                    Icon(
-                        Icons.Default.ChevronRight, "下一周",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek < totalWeeks) 1f else 0.3f)
-                    )
-                }
+                Icon(
+                    Icons.Default.ChevronLeft, "上一周",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek > 1) 1f else 0.3f)
+                )
             }
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-                    .padding(bottom = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (!isCurrentWeek) {
-                    Button(
-                        onClick = onGoToday,
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(30.dp)
-                    ) {
-                        Icon(Icons.Default.Today, null, modifier = Modifier.size(12.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("回到本周", fontSize = 11.sp)
-                    }
-                } else {
-                    Spacer(Modifier.weight(1f))
-                }
-                TextButton(
-                    onClick = onToggleWeekend,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        if (showWeekend) "隐藏周末" else "显示周末",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    "第",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    "$currentWeek",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    "周 / 共 $totalWeeks 周",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            IconButton(
+                onClick = onNextWeek,
+                enabled = currentWeek < totalWeeks,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    Icons.Default.ChevronRight, "下一周",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek < totalWeeks) 1f else 0.3f)
+                )
             }
         }
     }
@@ -541,11 +538,15 @@ private fun TodaySummaryCard(
     }
     val summary = com.chen.schedule.util.TodaySummary.describe(todayCourses, timeSlots, now)
 
+    // 今日无课时卡片不可点击(无内容可跳转),隐藏右侧箭头
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clickable { onOpenToday() },
+            .then(
+                if (todayCourses.isEmpty()) Modifier
+                else Modifier.clickable { onOpenToday() }
+            ),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
@@ -587,11 +588,13 @@ private fun TodaySummaryCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = "查看今日课程",
-                tint = MaterialTheme.colorScheme.primary
-            )
+            if (todayCourses.isNotEmpty()) {
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = "查看今日课程",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }

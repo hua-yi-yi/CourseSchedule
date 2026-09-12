@@ -117,10 +117,13 @@ class HaustImportViewModel @Inject constructor(
     var destination by mutableStateOf<Semester?>(null); private set
     var sourceSemester by mutableStateOf(""); private set
     var message by mutableStateOf(""); private set
+    /** 导入成功后的提示;非空时弹出「导入成功」对话框,确定后返回主页。 */
+    var successMessage by mutableStateOf<String?>(null); private set
     var busy by mutableStateOf(false); private set
 
     fun clearPreview() { if (!busy) preview = emptyList() }
     fun report(text: String) { message = text }
+    fun dismissSuccess() { successMessage = null }
     fun parse(raw: String) {
         if (busy) return
         busy = true
@@ -155,7 +158,12 @@ class HaustImportViewModel @Inject constructor(
                     fresh.size
                 }
                 preview = emptyList()
-                message = "已导入 $added 条安排，跳过 ${incoming.size - added} 条重复安排"
+                val skipped = incoming.size - added
+                successMessage = when {
+                    added > 0 && skipped > 0 -> "已导入 $added 条课程安排，跳过 $skipped 条重复安排"
+                    added > 0 -> "已导入 $added 条课程安排"
+                    else -> "没有新增课程安排，$skipped 条重复安排已跳过"
+                }
                 WidgetUpdater.refreshAll(context)
             } catch (e: Exception) { message = e.message ?: "导入失败" }
             finally { busy = false }
@@ -188,7 +196,10 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
             }
         }
     }
-    BackHandler(enabled = browser?.canGoBack() == true && viewModel.preview.isEmpty()) { browser?.goBack() }
+    BackHandler(
+        enabled = browser?.canGoBack() == true &&
+            viewModel.preview.isEmpty() && viewModel.successMessage == null
+    ) { browser?.goBack() }
     Scaffold(topBar = {
         TopAppBar(title = { Text("河南科技大学课表") }, navigationIcon = {
             TextButton(onClick = onNavigateBack) { Text("关闭") }
@@ -265,6 +276,17 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
                 }
             })
         }
+    }
+    // 导入成功:弹「导入成功」,确定后返回主页
+    viewModel.successMessage?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissSuccess(); onNavigateBack() },
+            title = { Text("导入成功") },
+            text = { Text(msg) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissSuccess(); onNavigateBack() }) { Text("确定") }
+            }
+        )
     }
     if (viewModel.preview.isNotEmpty()) AlertDialog(
         onDismissRequest = viewModel::clearPreview,
