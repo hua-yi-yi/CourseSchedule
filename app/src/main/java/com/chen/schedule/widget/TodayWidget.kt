@@ -22,9 +22,12 @@ import androidx.glance.layout.padding
 import androidx.glance.layout.width
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.glance.action.actionStartActivity
+import androidx.glance.action.clickable
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import com.chen.schedule.MainActivity
 import com.chen.schedule.di.DatabaseEntryPoint
 import com.chen.schedule.util.WeekCalculator
 import dagger.hilt.android.EntryPointAccessors
@@ -114,9 +117,12 @@ private fun TodayWidgetContent(data: WidgetData) {
             .fillMaxWidth()
             .background(GlanceTheme.colors.surface)
             .padding(12.dp)
+            .clickable(actionStartActivity<MainActivity>())
     ) {
         Text(
-            text = "${data.semesterName} · 第${data.currentWeek}周 · ${data.dayOfWeekLabel}",
+            // 无学期时避免出现「未设置学期 · 第0周 · 」这类悬挂分隔符
+            text = if (data.currentWeek <= 0) data.semesterName
+            else "${data.semesterName} · 第${data.currentWeek}周 · ${data.dayOfWeekLabel}",
             style = TextStyle(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,

@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Build
 import com.chen.schedule.MainActivity
 import com.chen.schedule.R
+import com.chen.schedule.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +32,9 @@ class ClassReminderReceiver : BroadcastReceiver() {
                 CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                     try {
                         ClassReminderManager.rescheduleNow(appContext)
+                        // 跨天(零点)与开机时顺带强制刷新小组件:
+                        // 部分桌面会拖延 30 分钟周期刷新,导致「今天」组件显示昨天的课
+                        WidgetUpdater.refreshAll(appContext)
                     } finally {
                         pending.finish()
                     }

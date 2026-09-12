@@ -10,6 +10,8 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.updateAll
+import androidx.glance.action.actionStartActivity
+import androidx.glance.action.clickable
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -29,6 +31,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.chen.schedule.data.local.entity.CourseEntity
+import com.chen.schedule.MainActivity
 import com.chen.schedule.di.DatabaseEntryPoint
 import com.chen.schedule.domain.model.Course
 import com.chen.schedule.domain.model.WeekType
@@ -73,11 +76,12 @@ class WeekWidget : GlanceAppWidget() {
         val entities = entryPoint.courseDao().getCoursesBySemesterDirect(sem.id)
         val courses = entities.map { it.toDomain() }
         val configuredSlots = entryPoint.timeSlotDao().getTimeSlotsBySchemeDirect(sem.schemeId)
+        // 行数必须有上限:异常数据(如导入的节次号过大)曾把 4×4 组件撑成几十行碎格子
         val slotCount = maxOf(
             WeekGridBuilder.MIN_SLOTS,
             configuredSlots.maxOfOrNull { it.slotNumber } ?: 0,
             courses.maxOfOrNull { it.endSlot } ?: 0
-        )
+        ).coerceAtMost(WeekGridBuilder.MAX_SLOTS)
         return WeekWidgetData(
             semesterName = sem.name,
             currentWeek = week,
@@ -110,6 +114,7 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
             .fillMaxWidth()
             .background(GlanceTheme.colors.surface)
             .padding(10.dp)
+            .clickable(actionStartActivity<MainActivity>())
     ) {
         // 标题:学期 · 第 N 周
         Text(
@@ -172,7 +177,8 @@ private fun RowScope.WeekCell(cell: WeekGridBuilder.Cell?) {
                 style = TextStyle(
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    color = ColorProvider(Color(0xFFFFFFFF))
+                    // 浅色底用深字,深色底用白字(原固定白色在浅色课程上不可读)
+                    color = ColorProvider(Color(WeekGridBuilder.textColorFor(cell.color)))
                 ),
                 modifier = GlanceModifier.padding(2.dp),
                 maxLines = 1

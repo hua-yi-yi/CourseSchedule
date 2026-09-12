@@ -93,4 +93,16 @@ class WeekGridBuilderTest {
         assertEquals(12, WeekGridBuilder.effectiveSlotCount(listOf(course(end = 16))))
         assertEquals(9, WeekGridBuilder.effectiveSlotCount(listOf(course(end = 9))))
     }
+
+    @Test
+    fun `浅色底用深色文字`() {
+        assertEquals(WeekGridBuilder.TEXT_DARK, WeekGridBuilder.textColorFor(0xFFFFF176L)) // 浅黄
+        assertEquals(WeekGridBuilder.TEXT_DARK, WeekGridBuilder.textColorFor(0xFFC8E6C9L)) // 浅绿
+    }
+
+    @Test
+    fun `深色底用白色文字`() {
+        assertEquals(WeekGridBuilder.TEXT_LIGHT, WeekGridBuilder.textColorFor(0xFF1E6BE0L)) // 品牌蓝
+        assertEquals(WeekGridBuilder.TEXT_LIGHT, WeekGridBuilder.textColorFor(0xFF2E7D32L)) // 深绿
+    }
 }

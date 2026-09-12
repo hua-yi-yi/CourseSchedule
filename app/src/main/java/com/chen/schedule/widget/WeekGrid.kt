@@ -52,4 +52,19 @@ object WeekGridBuilder {
         val maxEnd = courses.maxOfOrNull { it.endSlot } ?: MIN_SLOTS
         return maxEnd.coerceIn(MIN_SLOTS, maxSlots)
     }
+
+    /**
+     * 小组件格子上的文字颜色:按课程背景色的相对亮度选深字或白字。
+     * 浅色底(如浅黄/浅绿)配白字几乎不可读,是小组件的已知问题。
+     */
+    fun textColorFor(color: Long): Long {
+        val r = (color shr 16 and 0xFF) / 255.0
+        val g = (color shr 8 and 0xFF) / 255.0
+        val b = (color and 0xFF) / 255.0
+        val luminance = 0.299 * r + 0.587 * g + 0.114 * b
+        return if (luminance > 0.6) TEXT_DARK else TEXT_LIGHT
+    }
+
+    const val TEXT_DARK = 0xFF1B1B1B
+    const val TEXT_LIGHT = 0xFFFFFFFF
 }
