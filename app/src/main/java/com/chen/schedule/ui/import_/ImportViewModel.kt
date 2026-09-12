@@ -27,6 +27,8 @@ data class ImportState(
     val message: String = "",
     val isError: Boolean = false,
     val isImporting: Boolean = false,
+    /** 确认导入成功后置位,界面据此直接返回主页。 */
+    val importDone: Boolean = false,
     val sampleJson: String = "",
     val sampleCsv: String = ""
 )
@@ -116,7 +118,14 @@ class ImportViewModel @Inject constructor(
                 val currentSemester = semesterRepository.getCurrentSemester() ?: error("请先在设置中创建学期")
                 val courses = CoursePalette.assignColors(preview).map { it.copy(semesterId = currentSemester.id) }
                 courseRepository.insertAll(courses)
-                _state.update { it.copy(previewCourses = emptyList(), message = "成功导入 ${courses.size} 门课程", isError = false) }
+                _state.update {
+                    it.copy(
+                        previewCourses = emptyList(),
+                        message = "成功导入 ${courses.size} 门课程",
+                        isError = false,
+                        importDone = true
+                    )
+                }
                 WidgetUpdater.refreshAll(context)
             } catch (e: Exception) {
                 _state.update { it.copy(message = "导入失败: ${e.message}", isError = true) }

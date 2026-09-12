@@ -141,27 +141,29 @@ fun TimetableScreen(
                     onNavigateToSettings = onNavigateToSettings
                 )
 
-                // ===== 周切换(单行紧凑) + 周末显示开关(独立一行) =====
-                WeekSelector(
-                    currentWeek = state.currentWeek,
-                    totalWeeks = semester.totalWeeks,
-                    onPrevWeek = viewModel::prevWeek,
-                    onNextWeek = viewModel::nextWeek
-                )
+                // ===== 周切换(单行紧凑) + 周末开关并排 =====
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    WeekSelector(
+                        currentWeek = state.currentWeek,
+                        totalWeeks = semester.totalWeeks,
+                        onPrevWeek = viewModel::prevWeek,
+                        onNextWeek = viewModel::nextWeek,
+                        modifier = Modifier.weight(1f)
+                    )
                     TextButton(
                         onClick = viewModel::toggleWeekend,
-                        modifier = Modifier.height(32.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
+                        modifier = Modifier.height(40.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp)
                     ) {
                         Text(
                             if (state.showWeekend) "隐藏周末" else "显示周末",
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -321,7 +323,7 @@ private fun HeaderSection(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // 左上角菜单栏
@@ -393,18 +395,17 @@ private fun HeaderSection(
 
 /* ===================== 周切换 ===================== */
 
-/** 单行紧凑周切换:左右箭头 + 「第 N 周 / 共 M 周」;周末开关与「回到本周」不在此卡内。 */
+/** 单行紧凑周切换:左右箭头 + 「第 N 周 / 共 M 周」;周末开关在卡片右侧并排。 */
 @Composable
 private fun WeekSelector(
     currentWeek: Int,
     totalWeeks: Int,
     onPrevWeek: () -> Unit,
-    onNextWeek: () -> Unit
+    onNextWeek: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+        modifier = modifier,
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -413,13 +414,13 @@ private fun WeekSelector(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp),
+                .padding(horizontal = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
                 onClick = onPrevWeek,
                 enabled = currentWeek > 1,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(36.dp)
             ) {
                 Icon(
                     Icons.Default.ChevronLeft, "上一周",
@@ -455,7 +456,7 @@ private fun WeekSelector(
             IconButton(
                 onClick = onNextWeek,
                 enabled = currentWeek < totalWeeks,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(36.dp)
             ) {
                 Icon(
                     Icons.Default.ChevronRight, "下一周",

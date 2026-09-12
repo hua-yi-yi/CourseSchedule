@@ -48,10 +48,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -140,6 +144,13 @@ fun ImportScreen(
     val context = LocalContext.current
     var showJsonGuide by remember { mutableStateOf(false) }
     var showCsvGuide by remember { mutableStateOf(false) }
+    // 导入方式二选一:0 = 河南科技大学教务导入,1 = 其他方式
+    var importMode by remember { mutableStateOf(0) }
+
+    // 确认导入成功后直接返回主页
+    LaunchedEffect(state.importDone) {
+        if (state.importDone) onNavigateBack()
+    }
 
     val jsonLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -184,7 +195,26 @@ fun ImportScreen(
                 .padding(16.dp)
         ) {
 
-            // ===== 主入口:河南科技大学教务系统导入 =====
+            // ===== 导入方式二选一 =====
+            item {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = importMode == 0,
+                        onClick = { importMode = 0 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) { Text("河南科技大学导入", fontSize = 13.sp) }
+                    SegmentedButton(
+                        selected = importMode == 1,
+                        onClick = { importMode = 1 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) { Text("其他方式", fontSize = 13.sp) }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
+            if (importMode == 0) {
+
+            // ===== 河南科技大学教务系统导入 =====
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -228,76 +258,7 @@ fun ImportScreen(
                 }
             }
 
-            // ===== 预览区域 =====
-            if (state.previewCourses.isNotEmpty()) {
-                item {
-                    Spacer(Modifier.height(16.dp))
-                    HorizontalDivider()
-                    Spacer(Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("预览 (${state.previewCourses.size} 门课程)", style = MaterialTheme.typography.titleMedium)
-                        Button(onClick = viewModel::confirmImport) {
-                            Text("确认导入")
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-
-                items(state.previewCourses) { course ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(course.name, fontWeight = FontWeight.Bold)
-                            Row {
-                                if (course.teacher.isNotBlank()) {
-                                    Text(course.teacher, style = MaterialTheme.typography.bodySmall)
-                                    Text(" · ", style = MaterialTheme.typography.bodySmall)
-                                }
-                                Text(
-                                    "${DayOfWeek.entries.find { it.index == course.dayOfWeek }?.label ?: ""} ${course.startSlot}-${course.endSlot}节",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            Text(
-                                "${course.startWeek}-${course.endWeek}周 ${course.weekType.label}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-
-                item { Spacer(Modifier.height(8.dp)) }
-            }
-
-            // ===== 其它导入方式(小字) =====
-            item {
-                Spacer(Modifier.height(20.dp))
-                Text(
-                    "其它导入方式",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    "其他学校或已有整理好的课表数据时使用",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-                Spacer(Modifier.height(6.dp))
-            }
+            } else {
 
             // AI 截图识别(折叠,小字)
             item {
@@ -548,6 +509,62 @@ fun ImportScreen(
                     }
                 }
             }
+
+            // ===== 预览区域(其他方式导入后) =====
+            if (state.previewCourses.isNotEmpty()) {
+                item {
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("预览 (${state.previewCourses.size} 门课程)", style = MaterialTheme.typography.titleMedium)
+                        Button(onClick = viewModel::confirmImport) {
+                            Text("确认导入")
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                items(state.previewCourses) { course ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(course.name, fontWeight = FontWeight.Bold)
+                            Row {
+                                if (course.teacher.isNotBlank()) {
+                                    Text(course.teacher, style = MaterialTheme.typography.bodySmall)
+                                    Text(" · ", style = MaterialTheme.typography.bodySmall)
+                                }
+                                Text(
+                                    "${DayOfWeek.entries.find { it.index == course.dayOfWeek }?.label ?: ""} ${course.startSlot}-${course.endSlot}节",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Text(
+                                "${course.startWeek}-${course.endWeek}周 ${course.weekType.label}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                item { Spacer(Modifier.height(8.dp)) }
+            }
+            }
+
         }
     }
 }
