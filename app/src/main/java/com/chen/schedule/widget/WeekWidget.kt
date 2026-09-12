@@ -193,5 +193,7 @@ object WidgetUpdater {
             TodayWidget().updateAll(context)
             WeekWidget().updateAll(context)
         }
+        // 课表数据变化后同步重排上课提醒(设置页/导入/编辑等所有写路径都会走到这里)
+        com.chen.schedule.reminders.ClassReminderManager.rescheduleAsync(context)
     }
 }

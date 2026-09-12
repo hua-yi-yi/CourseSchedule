@@ -42,8 +42,8 @@ object AppModule {
 }
 
 /**
- * 供非 Hilt 组件(如 Glance 小组件)访问数据库单例的入口。
- * 小组件不参与 Activity/ViewModel 的注入链,通过 EntryPoint 复用同一数据库实例。
+ * 供非 Hilt 组件(如 Glance 小组件、提醒调度器)访问数据层的入口。
+ * 这些组件不参与 Activity/ViewModel 的注入链,通过 EntryPoint 复用同一批单例。
  */
 @EntryPoint
 @InstallIn(SingletonComponent::class)
@@ -52,4 +52,7 @@ interface DatabaseEntryPoint {
     fun semesterDao(): SemesterDao
     fun timeSlotDao(): TimeSlotDao
     fun timeSchemeDao(): TimeSchemeDao
+    fun courseRepository(): com.chen.schedule.data.repository.CourseRepository
+    fun semesterRepository(): com.chen.schedule.data.repository.SemesterRepository
+    fun timeSlotRepository(): com.chen.schedule.data.repository.TimeSlotRepository
 }

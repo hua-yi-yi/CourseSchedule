@@ -6,11 +6,15 @@ import kotlinx.coroutines.withContext
 import com.chen.schedule.util.ScheduleBackup
 import com.chen.schedule.util.SchemeSlots
 import android.content.Context
+import android.Manifest
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,6 +31,7 @@ import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Widgets
@@ -40,7 +45,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -79,6 +86,8 @@ import com.chen.schedule.widget.TodayWidgetReceiver
 import com.chen.schedule.widget.WeekWidget
 import com.chen.schedule.widget.WeekWidgetReceiver
 import com.chen.schedule.widget.WidgetUpdater
+import com.chen.schedule.reminders.ClassReminderManager
+import com.chen.schedule.reminders.ReminderPrefs
 import dagger.hilt.android.qualifiers.ApplicationContext
 
 @HiltViewModel
@@ -90,6 +99,30 @@ class SettingsViewModel @Inject constructor(
     private val timeSchemeRepository: com.chen.schedule.data.repository.TimeSchemeRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
+
+    private val reminderPrefs by lazy { ReminderPrefs(context) }
+
+    var reminderEnabled by androidx.compose.runtime.mutableStateOf(false); private set
+    var reminderLead by androidx.compose.runtime.mutableStateOf(ReminderPrefs.DEFAULT_LEAD_MINUTES); private set
+
+    init {
+        reminderEnabled = reminderPrefs.enabled
+        reminderLead = reminderPrefs.leadMinutes
+    }
+
+    /** 开关上课提醒:立即重排/取消今天的提醒闹钟。 */
+    fun updateReminderEnabled(enabled: Boolean) {
+        reminderPrefs.enabled = enabled
+        reminderEnabled = enabled
+        ClassReminderManager.rescheduleAsync(context)
+    }
+
+    /** 修改提前量:立即按新提前量重排今天的提醒。 */
+    fun updateReminderLead(minutes: Int) {
+        reminderPrefs.leadMinutes = minutes
+        reminderLead = minutes
+        ClassReminderManager.rescheduleAsync(context)
+    }
 
     fun exportToUri(uri: Uri) {
         viewModelScope.launch {
@@ -295,6 +328,15 @@ fun SettingsScreen(
         pendingRestore = uri
     }
 
+    // 通知权限(Android 13+):开启上课提醒时申请
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) {
+            Toast.makeText(context, "未授予通知权限,将收不到上课提醒", Toast.LENGTH_LONG).show()
+        }
+    }
+
     pendingRestore?.let { uri ->
         AlertDialog(onDismissRequest = { pendingRestore = null },
             title = { Text("恢复备份") },
@@ -363,6 +405,63 @@ fun SettingsScreen(
                     dangerIcon = true,
                     onClick = { showClearDialog = true }
                 )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // ===== 上课提醒 =====
+            SettingsGroup(title = "上课提醒") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Notifications,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("上课前提醒我", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            if (viewModel.reminderEnabled) {
+                                "提前 ${viewModel.reminderLead} 分钟通知今天剩余的课程"
+                            } else {
+                                "关闭状态,不会发送任何通知"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = viewModel.reminderEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled && Build.VERSION.SDK_INT >= 33) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            viewModel.updateReminderEnabled(enabled)
+                        }
+                    )
+                }
+                GroupDivider()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(5, 10, 15, 20, 30).forEach { minutes ->
+                        FilterChip(
+                            selected = viewModel.reminderLead == minutes,
+                            onClick = { viewModel.updateReminderLead(minutes) },
+                            label = { Text("提前 $minutes 分钟") }
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(16.dp))
