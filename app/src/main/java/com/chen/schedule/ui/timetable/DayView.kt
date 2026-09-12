@@ -59,7 +59,6 @@ fun DayView(
     onBlankCellClick: (slotNumber: Int) -> Unit = {}
 ) {
     val visibleSlots = com.chen.schedule.util.TimetableSlots.rows(timeSlots, courses)
-    val scrollState = rememberScrollState()
     val density = LocalDensity.current
 
     val now = LocalTime.now()
@@ -116,9 +115,8 @@ fun DayView(
             }
 
             BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
+                // 垂直滚动由主页统一接管:上滑时头部与周切换随内容一起滑出屏幕
+                modifier = Modifier.fillMaxSize()
             ) {
                 val contentWidthDp = maxWidth - DTIME_COL.dp
                 val timeColPx: Float

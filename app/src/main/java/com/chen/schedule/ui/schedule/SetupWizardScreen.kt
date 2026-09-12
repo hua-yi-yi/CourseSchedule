@@ -37,6 +37,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -54,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -232,6 +236,7 @@ class SetupWizardViewModel @Inject constructor(
 fun SetupWizardScreen(
     onDone: () -> Unit,
     onGoImport: () -> Unit,
+    onGoHaustImport: () -> Unit,
     onCancel: () -> Unit,
     viewModel: SetupWizardViewModel = hiltViewModel()
 ) {
@@ -239,12 +244,18 @@ fun SetupWizardScreen(
     var step by remember { mutableIntStateOf(0) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showCustomName by remember { mutableStateOf(false) }
-    /** 第 4 页的选择:false = 先不导入,true = 完成后进入导入页。 */
-    var importChoice by remember { mutableStateOf(false) }
+    // 第 4 页的导入方式(与主页导入页一致):0 = 河南科技大学教务导入,1 = 其他方式
+    var importMode by remember { mutableIntStateOf(0) }
+    /** 选择「先不导入」:完成设置后仅返回课表。 */
+    var skipImport by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.saved) {
         if (state.saved) {
-            if (importChoice) onGoImport() else onDone()
+            when {
+                skipImport -> onDone()
+                importMode == 0 -> onGoHaustImport()
+                else -> onGoImport()
+            }
         }
     }
 
@@ -355,8 +366,8 @@ fun SetupWizardScreen(
                         )
                     }
                     else -> ImportStep(
-                        importChoice = importChoice,
-                        onPick = { importChoice = it }
+                        importMode = importMode,
+                        onPickMode = { importMode = it }
                     )
                 }
             }
@@ -392,10 +403,28 @@ fun SetupWizardScreen(
                         when {
                             state.saving -> "正在创建…"
                             step < stepTitles.lastIndex -> "下一步"
-                            else -> "完成设置"
+                            importMode == 0 -> "完成并进入教务导入"
+                            else -> "完成并前往导入页"
                         }
                     )
                 }
+            }
+            if (step == stepTitles.lastIndex) {
+                TextButton(
+                    onClick = {
+                        skipImport = true
+                        viewModel.complete()
+                    },
+                    enabled = !state.saving,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "先不导入,直接完成设置",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
             }
         }
     }
@@ -595,33 +624,61 @@ private fun SchemeStep(
     }
 }
 
-/** 第 4 页:选择是否立即导入课表(可跳过)。 */
+/** 第 4 页:选择导入方式(与主页「导入课表」一致的二选一),完成设置后直达所选方式。 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ImportStep(
-    importChoice: Boolean,
-    onPick: (Boolean) -> Unit
+    importMode: Int,
+    onPickMode: (Int) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("导入课表", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
         Text(
-            "这一步可以跳过;点「完成设置」后按下面的选择继续。",
+            "与主页「导入课表」一致;完成设置后将直接进入所选方式。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(10.dp))
-        OptionCard(
-            title = "先不导入",
-            subtitle = "直接完成设置,稍后从主菜单「导入课表」进入。",
-            selected = !importChoice,
-            onClick = { onPick(false) }
-        )
-        OptionCard(
-            title = "立即导入课表",
-            subtitle = "完成设置后前往导入页:教务系统账号、AI 截图识别、JSON/CSV 文件或粘贴文本均可。",
-            selected = importChoice,
-            onClick = { onPick(true) }
-        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = importMode == 0,
+                onClick = { onPickMode(0) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+            ) { Text("河南科技大学导入", fontSize = 13.sp) }
+            SegmentedButton(
+                selected = importMode == 1,
+                onClick = { onPickMode(1) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+            ) { Text("其他方式", fontSize = 13.sp) }
+        }
+        Spacer(Modifier.height(10.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium,
+            colors = CardDefaults.cardColors(
+                containerColor = if (importMode == 0) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                else MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    if (importMode == 0) "河南科技大学教务系统导入" else "其他方式导入",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (importMode == 0) {
+                        "完成设置后进入 VPN 教务,登录并读取课表,自动导入当前学期。"
+                    } else {
+                        "完成设置后前往导入页:AI 截图识别、粘贴文本、JSON/CSV 文件或正方教务系统。"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 

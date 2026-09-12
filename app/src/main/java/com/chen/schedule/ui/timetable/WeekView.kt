@@ -56,7 +56,6 @@ fun WeekView(
 ) {
     val days = DayOfWeek.entries.filter { showWeekend || it.index <= 5 }
     val visibleSlots = com.chen.schedule.util.TimetableSlots.rows(timeSlots, courses)
-    val scrollState = rememberScrollState()
     val density = LocalDensity.current
 
     val semesterMonday = semesterStartDate?.let {
@@ -130,10 +129,9 @@ fun WeekView(
             }
 
             // ===== Grid + 课程卡片 =====
+            // 垂直滚动由主页统一接管:上滑时头部与周切换随内容一起滑出屏幕
             BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
+                modifier = Modifier.fillMaxSize()
             ) {
                 val cellWidthDp = (maxWidth - TIME_COL.dp) / days.size
                 val cellWidthPx: Float

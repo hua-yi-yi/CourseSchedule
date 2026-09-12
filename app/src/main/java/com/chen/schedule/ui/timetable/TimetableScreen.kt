@@ -3,6 +3,8 @@ package com.chen.schedule.ui.timetable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -127,6 +129,12 @@ fun TimetableScreen(
                     onNavigateToScheduleConfig = onNavigateToScheduleConfig
                 )
             } else {
+                // 整页统一滚动:上滑时头部、周切换随内容一起向上滑出屏幕
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                ) {
                 // ===== 头部:学期信息 + 视图切换 =====
                 val actualWeek = WeekCalculator.currentWeek(semester.startDate, semester.totalWeeks)
                 HeaderSection(
@@ -205,6 +213,7 @@ fun TimetableScreen(
                         }
                     )
                 }
+                } // 整页滚动结束
             }
         }
     }

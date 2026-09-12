@@ -4,10 +4,39 @@ import com.chen.schedule.domain.model.Course
 import com.chen.schedule.domain.model.WeekType
 import org.jsoup.Jsoup
 
-/** Parses the rendered HAUST EAMS grid, including merged rows and changing rooms. */
+/**
+ * Parses the rendered HAUST EAMS page, including the course grid, merged rows and changing rooms.
+ *
+ * 遗漏修复:课表页的「网格表」与「理论课程安排」明细表可能各含对方没有的安排
+ * (例如实验课/体育课只在明细表中出现)。因此两路解析始终都执行并做并集,
+ * 而不是仅在网格为空时才回落到明细表。
+ */
 object HaustPageParser {
     fun parse(html: String): List<Course> {
         val document = Jsoup.parse(html)
+        // 网格解析保持严格:畸形单元格会抛错,但只要明细表能解析出课程,就优先返回数据
+        val gridResult = runCatching { parseGrid(document) }
+        val grid = gridResult.getOrDefault(emptyList())
+        val details = runCatching { parseArrangementDetails(document) }.getOrDefault(emptyList())
+        val merged = union(grid, details)
+        when {
+            merged.isNotEmpty() -> return merged
+            gridResult.isFailure -> throw gridResult.exceptionOrNull()
+                ?: ScraperException("课程格式不完整，请选择全部教学周后重试")
+            else -> throw ScraperException("当前页面没有可识别的课程安排，请检查所选学期")
+        }
+    }
+
+    /** 并集去重:同一门课(课名/星期/节次/周次/类型/教室相同)在两路都出现时只保留网格版本。 */
+    private fun union(grid: List<Course>, details: List<Course>): List<Course> =
+        (grid + details).distinctBy {
+            listOf(
+                it.name, it.dayOfWeek, it.startSlot, it.endSlot,
+                it.startWeek, it.endWeek, it.weekType, it.classroom
+            )
+        }
+
+    private fun parseGrid(document: org.jsoup.nodes.Document): List<Course> {
         val table = document.getElementById("manualArrangeCourseTable")
         val occupied = mutableMapOf<Pair<Int, Int>, Boolean>()
         val courses = mutableListOf<Course>()
@@ -50,8 +79,6 @@ object HaustPageParser {
                 column += width
             }
         }
-        if (courses.isEmpty()) courses += parseArrangementDetails(document)
-        if (courses.isEmpty()) throw ScraperException("当前页面没有可识别的课程安排，请检查所选学期")
         return courses.distinct()
     }
 
@@ -78,12 +105,15 @@ object HaustPageParser {
             val slotIndex = texts.indexOfFirst { slotPattern.containsMatchIn(it) }
             if (slotIndex < 0 || currentName.isBlank()) return@forEach
             val slot = slotPattern.find(texts[slotIndex]) ?: return@forEach
-            val weekIndex = (slotIndex - 1 downTo 0).firstOrNull { weekPattern.matches(texts[it]) } ?: return@forEach
-            val week = weekPattern.matchEntire(texts[weekIndex]) ?: return@forEach
+            // 容错:周次格可能带额外文字,用「包含匹配」而非整行匹配
+            val weekIndex = (slotIndex - 1 downTo 0).firstOrNull { weekPattern.containsMatchIn(texts[it]) }
+                ?: return@forEach
+            val week = weekPattern.find(texts[weekIndex]) ?: return@forEach
             val day = dayNumbers[slot.groupValues[1].first()] ?: return@forEach
             val startSlot = slot.groupValues[2].toInt()
             val endSlot = slot.groupValues[3].toInt()
-            val room = texts.getOrNull(slotIndex + 1).orEmpty()
+            // 教室列可能缺失,不因此丢课
+            val room = texts.getOrNull(slotIndex + 1).orEmpty().trim()
             val weekType = when (week.groupValues[1]) { "单" -> WeekType.ODD; "双" -> WeekType.EVEN; else -> WeekType.ALL }
             week.groupValues[2].split(Regex("[,，、]")).forEach { part ->
                 val bounds = part.trim().split(Regex("[-–—~～至]")).mapNotNull { it.trim().toIntOrNull() }

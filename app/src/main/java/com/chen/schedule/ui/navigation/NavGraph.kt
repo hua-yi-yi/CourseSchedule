@@ -165,6 +165,10 @@ fun AppNavHost() {
                     navController.popBackStack()
                     navController.navigate(Screen.Import.route)
                 },
+                onGoHaustImport = {
+                    navController.popBackStack()
+                    navController.navigate(Screen.HaustImport.route)
+                },
                 onCancel = { navController.popBackStack() }
             )
         }
