@@ -20,7 +20,8 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        continue-on-error: true
 
       # 预装 Gradle 8.9,避免 wrapper 首次下载分发版失败
       - uses: gradle/actions/setup-gradle@v3
