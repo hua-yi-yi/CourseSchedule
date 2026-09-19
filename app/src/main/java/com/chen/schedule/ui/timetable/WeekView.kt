@@ -97,32 +97,42 @@ fun WeekView(
                 }
                 days.forEach { day ->
                     val isToday = dateOf(day.index) == today
-                    Column(
+                    Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .then(
-                                if (isToday) Modifier.background(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                                ) else Modifier
-                            ),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+                            .padding(vertical = 4.dp, horizontal = 2.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            day.label,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isToday) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurface
-                        )
-                        dateOf(day.index)?.let { d ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(8.dp))
+                                .then(
+                                    if (isToday) Modifier.background(
+                                        MaterialTheme.colorScheme.primary
+                                    ) else Modifier
+                                ),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+                        ) {
                             Text(
-                                "${d.monthValue}/${d.dayOfMonth}",
-                                fontSize = 10.sp,
-                                color = if (isToday) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
+                                day.label,
+                                fontSize = 12.sp,
+                                fontWeight = if (isToday) FontWeight.Bold else FontWeight.SemiBold,
+                                color = if (isToday) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onSurface
                             )
+                            dateOf(day.index)?.let { d ->
+                                Text(
+                                    "${d.monthValue}/${d.dayOfMonth}",
+                                    fontSize = 9.5.sp,
+                                    fontWeight = if (isToday) FontWeight.Medium else FontWeight.Normal,
+                                    color = if (isToday) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -237,11 +247,11 @@ fun WeekView(
                                 .width(cellWidthDp)
                                 .height((SLOT_H * span).dp)
                                 .padding(2.5.dp)
-                                .clip(RoundedCornerShape(9.dp))
-                                .background(accent.copy(alpha = 0.16f))
-                                .border(1.dp, accent.copy(alpha = 0.38f), RoundedCornerShape(9.dp))
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(accent.copy(alpha = 0.15f))
+                                .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
                                 .clickable { onCourseClick(course) }
-                                .padding(horizontal = if (cellWidthDp < 60.dp) 3.dp else 7.dp, vertical = 5.dp),
+                                .padding(horizontal = if (cellWidthDp < 60.dp) 3.5.dp else 6.dp, vertical = 5.dp),
                             compact = span == 1,
                             narrow = cellWidthDp < 60.dp
                         )
@@ -265,43 +275,50 @@ internal fun CourseBlock(
     Row(modifier = modifier) {
         if (!narrow) Box(
             modifier = Modifier
-                .width(3.dp)
+                .width(2.5.dp)
                 .fillMaxHeight()
-                .clip(RoundedCornerShape(2.dp))
+                .clip(RoundedCornerShape(1.5.dp))
                 .background(accent)
         )
-        Column(modifier = Modifier.padding(start = if (narrow) 0.dp else 6.dp).fillMaxWidth()) {
+        Column(modifier = Modifier.padding(start = if (narrow) 0.dp else 5.dp).fillMaxWidth()) {
             Text(
                 course.name,
-                fontSize = 12.sp,
+                fontSize = if (narrow) 11.sp else 11.5.sp,
+                lineHeight = 13.5.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = if (narrow && span > 1) 3 else 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (!compact) {
-                if (course.teacher.isNotBlank()) {
+                if (course.classroom.isNotBlank()) {
+                    androidx.compose.foundation.layout.Spacer(Modifier.height(1.dp))
+                    Text(
+                        "@${course.classroom}",
+                        fontSize = 9.sp,
+                        lineHeight = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = accent.copy(alpha = 0.95f)
+                    )
+                }
+                if (course.teacher.isNotBlank() && span >= 2) {
                     Text(
                         course.teacher,
-                        fontSize = 9.5.sp,
+                        fontSize = 8.5.sp,
+                        lineHeight = 10.5.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
                     )
                 }
-                if (course.classroom.isNotBlank()) {
-                    Text(
-                        course.classroom,
-                        fontSize = 9.5.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                if (span > 1) {
+                if (span > 2) {
                     Text(
                         "${course.startSlot}-${course.endSlot}节",
-                        fontSize = 9.5.sp,
+                        fontSize = 8.5.sp,
+                        lineHeight = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = accent

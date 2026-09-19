@@ -1,6 +1,7 @@
 package com.chen.schedule.ui.course
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -303,34 +305,50 @@ fun CourseEditScreen(
             Spacer(Modifier.height(12.dp))
 
             // Color picker
-            Text("课程颜色", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(6.dp))
-            Column {
-                courseColors.chunked(6).forEach { row ->
-                    Row {
-                        row.forEach { color ->
-                            val selected = state.color == color
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .padding(4.dp)
-                                    .clip(CircleShape)
-                                    .border(
-                                        width = if (selected) 2.5.dp else 0.dp,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        shape = CircleShape
-                                    )
-                                    .background(Color(color), CircleShape)
-                                    .clickable { viewModel.updateColor(color) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (selected) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = "已选中",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
+            Text("课程颜色", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    courseColors.chunked(6).forEach { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround
+                        ) {
+                            row.forEach { color ->
+                                val selected = state.color == color
+                                val itemColor = Color(color)
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clip(CircleShape)
+                                        .then(
+                                            if (selected) Modifier
+                                                .border(2.5.dp, itemColor, CircleShape)
+                                                .padding(3.5.dp)
+                                            else Modifier.padding(3.5.dp)
+                                        )
+                                        .clip(CircleShape)
+                                        .background(itemColor)
+                                        .clickable { viewModel.updateColor(color) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (selected) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = "已选中",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
                         }

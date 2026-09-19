@@ -227,15 +227,15 @@ fun DayView(
                             .height((DSLOT_H * span).dp)
                             .padding(3.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(accent.copy(alpha = 0.16f))
-                            .border(1.dp, accent.copy(alpha = 0.38f), RoundedCornerShape(12.dp))
+                            .background(accent.copy(alpha = 0.15f))
+                            .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
                             .clickable { onCourseClick(course) }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .width(4.dp)
+                                    .width(3.5.dp)
                                     .fillMaxHeight()
                                     .clip(RoundedCornerShape(2.dp))
                                     .background(accent)
@@ -249,27 +249,31 @@ fun DayView(
                                     overflow = TextOverflow.Ellipsis,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
+                                if (course.classroom.isNotBlank()) {
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        "@${course.classroom}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = accent.copy(alpha = 0.95f)
+                                    )
+                                }
                                 if (course.teacher.isNotBlank()) {
                                     Text(
                                         course.teacher,
-                                        fontSize = 11.sp,
+                                        fontSize = 11.5.sp,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                                if (course.classroom.isNotBlank()) {
-                                    Text(
-                                        course.classroom,
-                                        fontSize = 11.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                                Spacer(Modifier.height(1.dp))
                                 Text(
                                     "${course.startSlot}-${course.endSlot}节 · ${course.weekType.label}",
-                                    fontSize = 10.sp,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = accent
                                 )
                             }
