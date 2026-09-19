@@ -86,7 +86,7 @@ fun SemesterListScreen(
                 title = { Text("选择学期", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     }
                 }
             )
@@ -198,7 +198,8 @@ private fun SemesterPickRow(
                 Icon(
                     Icons.Default.DateRange,
                     contentDescription = "编辑 ${semester.name}",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -273,7 +274,7 @@ fun SemesterEditScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = requestCancel) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     }
                 },
                 actions = {
@@ -284,7 +285,8 @@ fun SemesterEditScreen(
                         Icon(
                             Icons.Default.Check,
                             contentDescription = "保存",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -364,7 +366,8 @@ fun SemesterEditScreen(
                     Icon(
                         Icons.Default.DateRange,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(17.dp)
                     )
                     Spacer(Modifier.width(12.dp))
                     Text(
@@ -399,7 +402,8 @@ fun SemesterEditScreen(
                 Icon(
                     if (showHelper) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
                 )
             }
             AnimatedVisibility(visible = showHelper) {

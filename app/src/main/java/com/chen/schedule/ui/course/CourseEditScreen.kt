@@ -90,7 +90,7 @@ fun CourseEditScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     }
                 },
                 actions = {
@@ -102,10 +102,14 @@ fun CourseEditScreen(
                         },
                         enabled = state.name.isNotBlank() && !state.isSaving
                     ) {
-                        Icon(Icons.Default.Check, "保存", tint = if (state.name.isNotBlank())
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                        Icon(
+                            Icons.Default.Check, "保存",
+                            tint = if (state.name.isNotBlank())
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             )
@@ -280,7 +284,7 @@ fun CourseEditScreen(
                                 Icons.Default.Warning,
                                 contentDescription = "排课冲突",
                                 tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
@@ -346,7 +350,7 @@ fun CourseEditScreen(
                                             Icons.Default.Check,
                                             contentDescription = "已选中",
                                             tint = Color.White,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.size(13.dp)
                                         )
                                     }
                                 }
@@ -401,7 +405,7 @@ fun NumberPicker(
                     Icons.Default.ArrowDropDown,
                     contentDescription = "选择",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = 8.dp)
+                    modifier = Modifier.size(18.dp).padding(end = 4.dp)
                 )
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     choices.forEach { n ->

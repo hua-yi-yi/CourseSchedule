@@ -109,7 +109,7 @@ fun TimetableScreen(
         floatingActionButton = {
             if (state.currentSemester != null) ExtendedFloatingActionButton(
                 onClick = { state.currentSemester?.let { onAddCourse(it.id, null) } },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                icon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 text = { Text("添加课程") }
             )
         }
@@ -298,7 +298,8 @@ private fun TopMenu(
             Icon(
                 Icons.Default.Menu,
                 contentDescription = "菜单",
-                tint = MaterialTheme.colorScheme.onSurface
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(20.dp)
             )
         }
         DropdownMenu(
@@ -307,12 +308,12 @@ private fun TopMenu(
         ) {
             DropdownMenuItem(
                 text = { Text("导入课表") },
-                leadingIcon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 onClick = { menuOpen = false; onNavigateToImport() }
             )
             DropdownMenuItem(
                 text = { Text("设置") },
-                leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 onClick = { menuOpen = false; onNavigateToSettings() }
             )
         }
@@ -437,7 +438,8 @@ private fun WeekSelector(
             ) {
                 Icon(
                     Icons.Default.ChevronLeft, "上一周",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek > 1) 1f else 0.3f)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek > 1) 1f else 0.3f),
+                    modifier = Modifier.size(18.dp)
                 )
             }
 
@@ -473,7 +475,8 @@ private fun WeekSelector(
             ) {
                 Icon(
                     Icons.Default.ChevronRight, "下一周",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek < totalWeeks) 1f else 0.3f)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek < totalWeeks) 1f else 0.3f),
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -575,8 +578,8 @@ private fun TodaySummaryCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -584,7 +587,7 @@ private fun TodaySummaryCard(
                     Icons.Default.Today,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
             Spacer(Modifier.width(12.dp))
@@ -606,7 +609,7 @@ private fun TodaySummaryCard(
             if (todayCourses.isNotEmpty()) {
                 Box(
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(24.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                     contentAlignment = Alignment.Center
@@ -615,7 +618,7 @@ private fun TodaySummaryCard(
                         Icons.Default.ChevronRight,
                         contentDescription = "查看今日课程",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(14.dp)
                     )
                 }
             }
@@ -635,7 +638,7 @@ private fun EmptySemesterState(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
                 modifier = Modifier
-                    .size(76.dp)
+                    .size(56.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
                 contentAlignment = Alignment.Center
@@ -644,7 +647,7 @@ private fun EmptySemesterState(
                     Icons.Default.DateRange,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(26.dp)
                 )
             }
             Spacer(Modifier.height(16.dp))
@@ -761,7 +764,7 @@ private fun DetailRow(
     ) {
         Box(
             modifier = Modifier
-                .size(30.dp)
+                .size(26.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
             contentAlignment = Alignment.Center
@@ -770,7 +773,7 @@ private fun DetailRow(
                 icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(14.dp)
             )
         }
         Spacer(Modifier.width(10.dp))
@@ -884,7 +887,7 @@ private fun GuideItem(
                 Icons.Default.ChevronRight,
                 contentDescription = "进入$title 设置",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(14.dp)
             )
         }
     }

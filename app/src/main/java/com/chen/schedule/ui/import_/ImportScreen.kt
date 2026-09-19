@@ -169,7 +169,7 @@ fun ImportScreen(
                 title = { Text("导入课表", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     }
                 }
             )
@@ -229,7 +229,7 @@ fun ImportScreen(
                                 Icons.Default.School,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                             Spacer(Modifier.width(10.dp))
                             Column {
@@ -250,7 +250,7 @@ fun ImportScreen(
                             onClick = onHaustImport,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.CloudDownload, "导入", modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.CloudDownload, "导入", modifier = Modifier.size(15.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("进入教务系统导入")
                         }
@@ -283,7 +283,7 @@ fun ImportScreen(
                             modifier = Modifier.weight(1f),
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
                         ) {
-                            Icon(Icons.Default.ContentCopy, "复制", modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.ContentCopy, "复制", modifier = Modifier.size(12.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("复制 JSON 格式", fontSize = 12.sp)
                         }
@@ -295,7 +295,7 @@ fun ImportScreen(
                             modifier = Modifier.weight(1f),
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
                         ) {
-                            Icon(Icons.Default.ContentCopy, "复制", modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.ContentCopy, "复制", modifier = Modifier.size(12.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("复制 CSV 格式", fontSize = 12.sp)
                         }
@@ -321,7 +321,7 @@ fun ImportScreen(
                         modifier = Modifier.weight(1f),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
                     ) {
-                        Icon(Icons.Default.Description, "JSON", modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Description, "JSON", modifier = Modifier.size(13.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("导入 JSON 文件", fontSize = 12.sp)
                     }
@@ -330,7 +330,7 @@ fun ImportScreen(
                         modifier = Modifier.weight(1f),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
                     ) {
-                        Icon(Icons.Default.TableChart, "CSV", modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.TableChart, "CSV", modifier = Modifier.size(13.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("导入 CSV 文件", fontSize = 12.sp)
                     }
@@ -357,7 +357,7 @@ fun ImportScreen(
                             Icons.Default.CloudDownload,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                         Spacer(Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
@@ -372,7 +372,7 @@ fun ImportScreen(
                             Icons.Default.ChevronRight,
                             contentDescription = "进入",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     }
                 }
@@ -398,13 +398,14 @@ fun ImportScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Description, "JSON", tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Default.Description, "JSON", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Text("JSON 格式说明", fontWeight = FontWeight.Bold)
                             }
                             Icon(
                                 if (showJsonGuide) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                "展开"
+                                "展开",
+                                modifier = Modifier.size(18.dp)
                             )
                         }
 
@@ -434,7 +435,7 @@ fun ImportScreen(
                                         Toast.makeText(context, "JSON 示例已复制到剪贴板", Toast.LENGTH_SHORT).show()
                                     }
                                 ) {
-                                    Icon(Icons.Default.ContentCopy, "复制", modifier = Modifier.height(16.dp))
+                                    Icon(Icons.Default.ContentCopy, "复制", modifier = Modifier.size(13.dp))
                                     Spacer(Modifier.width(4.dp))
                                     Text("复制 JSON 示例", fontSize = 13.sp)
                                 }
@@ -464,13 +465,14 @@ fun ImportScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.TableChart, "CSV", tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Default.TableChart, "CSV", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Text("CSV 格式说明", fontWeight = FontWeight.Bold)
                             }
                             Icon(
                                 if (showCsvGuide) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                "展开"
+                                "展开",
+                                modifier = Modifier.size(18.dp)
                             )
                         }
 
@@ -500,7 +502,7 @@ fun ImportScreen(
                                         Toast.makeText(context, "CSV 示例已复制到剪贴板", Toast.LENGTH_SHORT).show()
                                     }
                                 ) {
-                                    Icon(Icons.Default.ContentCopy, "复制", modifier = Modifier.height(16.dp))
+                                    Icon(Icons.Default.ContentCopy, "复制", modifier = Modifier.size(13.dp))
                                     Spacer(Modifier.width(4.dp))
                                     Text("复制 CSV 示例", fontSize = 13.sp)
                                 }
@@ -604,7 +606,7 @@ private fun OtherMethodCard(
                     if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     contentDescription = "展开",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(17.dp)
                 )
             }
             AnimatedVisibility(visible = expanded) {
@@ -678,7 +680,7 @@ private fun PasteImportCard(
                         Icons.Default.ContentCopy,
                         "粘贴",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(15.dp)
                     )
                     Spacer(Modifier.width(8.dp))
                     Column {
@@ -694,7 +696,7 @@ private fun PasteImportCard(
                     if (showPasteArea) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     "展开",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(17.dp)
                 )
             }
 
@@ -746,7 +748,7 @@ private fun PasteImportCard(
                             },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.ContentCopy, "粘贴", modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.ContentCopy, "粘贴", modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("从剪贴板粘贴", fontSize = 13.sp)
                         }
@@ -762,7 +764,7 @@ private fun PasteImportCard(
                                 // Auto-detect format: JSON starts with { or [, CSV has comma-separated headers
                                 when {
                                     trimmed.startsWith("{") || trimmed.startsWith("[") ->
-                                        viewModel.importFromJsonText(trimmed)
+                                         viewModel.importFromJsonText(trimmed)
                                     trimmed.contains(",") && !trimmed.contains("{") ->
                                         viewModel.importFromCsvText(trimmed)
                                     else ->
@@ -773,7 +775,7 @@ private fun PasteImportCard(
                             modifier = Modifier.weight(1f),
                             enabled = pasteText.isNotBlank()
                         ) {
-                            Icon(Icons.Default.UploadFile, "导入", modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.UploadFile, "导入", modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("导入文本", fontSize = 13.sp)
                         }

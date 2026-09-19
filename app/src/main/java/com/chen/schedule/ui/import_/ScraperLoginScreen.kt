@@ -68,7 +68,7 @@ fun ScraperLoginScreen(
                 title = { Text("教务系统导入", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     }
                 }
             )
@@ -135,7 +135,7 @@ fun ScraperLoginScreen(
                     }
                 }
                 IconButton(onClick = viewModel::fetchCaptcha) {
-                    Icon(Icons.Default.Refresh, contentDescription = "刷新验证码")
+                    Icon(Icons.Default.Refresh, contentDescription = "刷新验证码", modifier = Modifier.size(18.dp))
                 }
             }
 
@@ -164,7 +164,8 @@ fun ScraperLoginScreen(
                         Icon(
                             if (passwordVisible) Icons.Default.Visibility
                             else Icons.Default.VisibilityOff,
-                            "密码可见性"
+                            "密码可见性",
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }

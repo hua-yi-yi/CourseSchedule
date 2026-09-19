@@ -57,7 +57,7 @@ fun StatusBadge(
     ) {
         Box(
             modifier = Modifier
-                .size(if (compact) 18.dp else 20.dp)
+                .size(if (compact) 16.dp else 18.dp)
                 .clip(CircleShape)
                 .background(container),
             contentAlignment = Alignment.Center
@@ -66,7 +66,7 @@ fun StatusBadge(
                 imageVector = if (done) Icons.Default.Check else Icons.Default.Warning,
                 contentDescription = null,
                 tint = accent,
-                modifier = Modifier.size(if (compact) 12.dp else 14.dp)
+                modifier = Modifier.size(if (compact) 10.dp else 12.dp)
             )
         }
         Spacer(Modifier.width(6.dp))
@@ -108,7 +108,7 @@ fun ScheduleMenuCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
@@ -135,7 +135,8 @@ fun ScheduleMenuCard(
             Icon(
                 Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
             )
         }
     }
@@ -166,7 +167,7 @@ fun MenuEntryRow(
             if (icon != null) {
                 Box(
                     modifier = Modifier
-                        .size(26.dp)
+                        .size(24.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
                     contentAlignment = Alignment.Center
@@ -187,7 +188,8 @@ fun MenuEntryRow(
             Icon(
                 Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
             )
         }
     }

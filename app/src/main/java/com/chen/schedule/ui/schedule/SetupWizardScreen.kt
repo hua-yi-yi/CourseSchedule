@@ -291,7 +291,7 @@ fun SetupWizardScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = { if (step > 0) step-- else onCancel() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     }
                 }
             )
@@ -566,7 +566,8 @@ private fun DateStep(
                 Icon(
                     Icons.Default.DateRange,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(17.dp)
                 )
                 Spacer(Modifier.width(12.dp))
                 Text(

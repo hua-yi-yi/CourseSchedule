@@ -55,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.chen.schedule.data.repository.CourseRepository
 import com.chen.schedule.data.repository.SemesterRepository
 import com.chen.schedule.data.repository.TimeSlotRepository
@@ -373,21 +374,21 @@ fun SettingsScreen(
 
     pendingRestore?.let { uri ->
         AlertDialog(onDismissRequest = { pendingRestore = null },
-            title = { Text("恢复备份") },
-            text = { Text("完整备份会替换本机全部学期、课程与作息方案(含其他学期);仅课程 JSON 只替换当前学期课程。建议先备份现有数据。") },
-            confirmButton = { TextButton(onClick = { viewModel.importData(uri); pendingRestore = null }) { Text("恢复") } },
-            dismissButton = { TextButton(onClick = { pendingRestore = null }) { Text("取消") } })
+            title = { Text("恢复备份", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+            text = { Text("完整备份会替换本机全部学期、课程与作息方案(含其他学期);仅课程 JSON 只替换当前学期课程。建议先备份现有数据。", fontSize = 13.sp) },
+            confirmButton = { TextButton(onClick = { viewModel.importData(uri); pendingRestore = null }) { Text("恢复", fontSize = 13.sp) } },
+            dismissButton = { TextButton(onClick = { pendingRestore = null }) { Text("取消", fontSize = 13.sp) } })
     }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("设置", fontWeight = FontWeight.Bold) },
+                title = { Text("设置", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     TextButton(onClick = onNavigateBack) {
                         Text(
                             "返回",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -407,13 +408,14 @@ fun SettingsScreen(
             // ===== 外观与背景 =====
             val themeConfig by viewModel.themeConfig.collectAsState()
             SettingsGroup(title = "外观与背景") {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
                     Text(
                         "主题外观",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Medium
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -426,18 +428,19 @@ fun SettingsScreen(
                             FilterChip(
                                 selected = themeConfig.themeMode == mode,
                                 onClick = { viewModel.updateThemeMode(mode) },
-                                label = { Text(label) }
+                                label = { Text(label, fontSize = 12.sp) }
                             )
                         }
                     }
 
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(10.dp))
                     Text(
                         "背景底色",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Medium
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(6.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -448,7 +451,7 @@ fun SettingsScreen(
                             FilterChip(
                                 selected = themeConfig.backgroundPreset == preset,
                                 onClick = { viewModel.updateBackgroundPreset(preset) },
-                                label = { Text(preset.label) }
+                                label = { Text(preset.label, fontSize = 12.sp) }
                             )
                         }
                     }
@@ -507,7 +510,7 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("上课前提醒我", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                        Text("上课前提醒我", style = MaterialTheme.typography.bodyMedium, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         Text(
                             if (viewModel.reminderEnabled) {
                                 "提前 ${viewModel.reminderLead} 分钟通知今天剩余的课程"
@@ -515,6 +518,7 @@ fun SettingsScreen(
                                 "关闭状态，不会发送任何通知"
                             },
                             style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.5.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -540,7 +544,7 @@ fun SettingsScreen(
                         FilterChip(
                             selected = viewModel.reminderLead == minutes,
                             onClick = { viewModel.updateReminderLead(minutes) },
-                            label = { Text("提前 $minutes 分钟") }
+                            label = { Text("提前 $minutes 分钟", fontSize = 12.sp) }
                         )
                     }
                 }
@@ -594,14 +598,19 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("版本 ${com.chen.schedule.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "版本 ${com.chen.schedule.BuildConfig.VERSION_NAME}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 12.5.sp
+                    )
                     Spacer(Modifier.weight(1f))
                     Text(
                         "Android 课程表",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 12.5.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -614,14 +623,15 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("QQ", style = MaterialTheme.typography.bodyLarge)
+                    Text("QQ", style = MaterialTheme.typography.bodyMedium, fontSize = 14.sp)
                     Spacer(Modifier.weight(1f))
                     Text(
                         "3180635398",
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -637,19 +647,19 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
             shape = MaterialTheme.shapes.extraLarge,
-            title = { Text("确认清空", fontWeight = FontWeight.Bold) },
-            text = { Text("确定要删除当前学期的所有课程数据吗？此操作不可撤销。\n\n建议先备份数据。") },
+            title = { Text("确认清空", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+            text = { Text("确定要删除当前学期的所有课程数据吗？此操作不可撤销。\n\n建议先备份数据。", fontSize = 13.sp) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.clearAllData()
                     showClearDialog = false
                 }) {
-                    Text("确认清空", color = MaterialTheme.colorScheme.error)
+                    Text("确认清空", color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) {
-                    Text("取消")
+                    Text("取消", fontSize = 13.sp)
                 }
             }
         )
@@ -671,7 +681,8 @@ private fun SettingsGroup(
         Column {
             Text(
                 title,
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.labelLarge,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 2.dp)
@@ -702,7 +713,8 @@ private fun SettingsItem(
         headlineContent = {
             Text(
                 title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = if (isDanger) MaterialTheme.colorScheme.error
                 else MaterialTheme.colorScheme.onSurface
@@ -712,6 +724,7 @@ private fun SettingsItem(
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,
+                fontSize = 11.5.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }

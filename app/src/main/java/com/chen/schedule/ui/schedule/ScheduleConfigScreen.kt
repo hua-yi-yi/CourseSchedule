@@ -59,7 +59,7 @@ fun ScheduleConfigScreen(
                 title = { Text("学期与作息", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     }
                 }
             )
@@ -83,7 +83,7 @@ fun ScheduleConfigScreen(
                         Icons.Default.CalendarMonth,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(17.dp)
                     )
                 },
                 onClick = onOpenSemesterMenu
@@ -100,7 +100,7 @@ fun ScheduleConfigScreen(
                         Icons.Default.Schedule,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(17.dp)
                     )
                 },
                 onClick = onOpenSchemeMenu
@@ -159,7 +159,7 @@ fun SemesterMenuScreen(
                 title = { Text("当前学期", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     }
                 }
             )
@@ -174,19 +174,19 @@ fun SemesterMenuScreen(
         ) {
             Spacer(Modifier.height(8.dp))
             MenuEntryRow(
-                icon = { Icon(Icons.Default.Checklist, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp)) },
+                icon = { Icon(Icons.Default.Checklist, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp)) },
                 title = "选择已有学期",
                 subtitle = "在已有学期之间切换,每个学期保留独立课程数据",
                 onClick = onSelectExisting
             )
             MenuEntryRow(
-                icon = { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp)) },
+                icon = { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp)) },
                 title = "新建学期",
                 subtitle = "填写名称、开学日期与总周数",
                 onClick = onCreateNew
             )
             MenuEntryRow(
-                icon = { Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp)) },
+                icon = { Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp)) },
                 title = "编辑当前学期",
                 subtitle = if (currentId == null) "请先选择或新建学期" else "修改当前学期的名称、日期与周数",
                 onClick = { currentId?.let(onEditCurrent) }
@@ -217,7 +217,7 @@ fun SchemeMenuScreen(
                 title = { Text("当前作息", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     }
                 }
             )
@@ -232,19 +232,19 @@ fun SchemeMenuScreen(
         ) {
             Spacer(Modifier.height(8.dp))
             MenuEntryRow(
-                icon = { Icon(Icons.Default.SwapHoriz, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp)) },
+                icon = { Icon(Icons.Default.SwapHoriz, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp)) },
                 title = "选择作息方案",
                 subtitle = "内置模板与我的方案,选择后先预览再启用",
                 onClick = onSelectExisting
             )
             MenuEntryRow(
-                icon = { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp)) },
+                icon = { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp)) },
                 title = "新建作息方案",
                 subtitle = "从模板复制、手动填写或文本导入",
                 onClick = onCreateNew
             )
             MenuEntryRow(
-                icon = { Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp)) },
+                icon = { Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp)) },
                 title = "编辑当前方案",
                 subtitle = "内置模板会先复制为自定义方案,不影响其他学期",
                 onClick = { onEditCurrent(currentId) }

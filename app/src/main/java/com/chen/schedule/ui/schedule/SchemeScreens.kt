@@ -166,7 +166,7 @@ fun SchemeListScreen(
                 title = { Text("选择作息方案", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     }
                 }
             )
@@ -356,7 +356,8 @@ private fun SchemePickRow(
                 Icon(
                     Icons.Default.Edit,
                     contentDescription = "编辑 ${scheme.name}",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
                 )
             }
             onDelete?.let {
@@ -364,7 +365,8 @@ private fun SchemePickRow(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "删除 ${scheme.name}",
-                        tint = MaterialTheme.colorScheme.error
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
@@ -521,7 +523,7 @@ fun SchemeEditScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = requestCancel) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     }
                 },
                 actions = {
@@ -529,7 +531,8 @@ fun SchemeEditScreen(
                         Icon(
                             Icons.Default.Check,
                             contentDescription = "保存",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -633,7 +636,7 @@ fun SchemeEditScreen(
                             val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
                             viewModel.updateImportText(text)
                         }) {
-                            Icon(Icons.Default.ContentPaste, contentDescription = "从剪贴板粘贴")
+                            Icon(Icons.Default.ContentPaste, contentDescription = "从剪贴板粘贴", modifier = Modifier.size(17.dp))
                         }
                     }
                     Spacer(Modifier.height(6.dp))
@@ -738,7 +741,7 @@ fun SchemeEditScreen(
                 onClick = { viewModel.addBlankSlot() },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.Add, contentDescription = null)
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("添加节次")
             }
@@ -825,7 +828,8 @@ private fun SlotEditRow(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "删除第${slot.slotNumber}节",
-                        tint = MaterialTheme.colorScheme.error
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
