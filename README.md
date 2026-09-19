@@ -20,12 +20,12 @@
 
 | 类别 | 技术 |
 |---|---|
-| 语言/构建 | Kotlin 1.9.22、AGP 8.3.2、Gradle 8.5、KSP |
-| UI | Jetpack Compose (BOM 2024.02.00)、Material 3、Navigation Compose |
+| 语言/构建 | Kotlin 2.0.21、AGP 8.7.3、Gradle 8.9、KSP |
+| UI | Jetpack Compose (BOM 2024.09.03)、Material 3、Navigation Compose |
 | 架构 | MVVM + 单向数据流(StateFlow)、Hilt 依赖注入 |
 | 数据 | Room 2.6.1、DataStore Preferences |
-| 网络 | OkHttp 4.12、Jsoup 1.17.2 |
-| 其他 | kotlinx.serialization、Glance 1.1.0(桌面小组件) |
+| 网络 | OkHttp 4.12、Jsoup 1.18.3 |
+| 其他 | kotlinx.serialization、Glance 1.1.1(桌面小组件) |
 | 环境 | minSdk 26 / target & compileSdk 34 / JVM 17 |
 
 ## 项目结构
@@ -110,7 +110,7 @@ git push origin v1.0.2
 
 ## 数据升级与恢复
 
-- 数据库版本 2 为作息增加套别字段，从版本 1 升级保留原有记录。
+- 数据库 1 → 2 为作息节次增加季节套别字段（season）；2 → 3 引入作息方案表（time_schemes），并为节次与学期增加方案关联字段（schemeId）。升级仅加列/建表，从任意旧版本升级均保留原有数据。
 - 完整备份支持空课程学期；恢复替换当前学期的课程、学期信息及全局作息，不影响其他学期课程。
 - 旧课程 JSON 恢复仅替换当前学期课程；需要追加导入时使用「导入」页面。
 - 夏冬季按钮为手动模板替换，不会按日期自动切换。套用前请备份自定义作息。

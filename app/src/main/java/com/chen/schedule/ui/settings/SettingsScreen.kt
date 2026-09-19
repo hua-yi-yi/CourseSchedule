@@ -163,6 +163,30 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun exportIcsToUri(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val sem = semesterRepository.getCurrentSemester() ?: error("没有当前学期")
+                    val courses = courseRepository.getCoursesBySemester(sem.id).first()
+                    val slots = timeSlotRepository.getTimeSlotsBySchemeDirect(sem.schemeId)
+                    val icsString = com.chen.schedule.util.IcsExporter.export(
+                        semester = sem,
+                        courses = courses,
+                        slots = slots,
+                        alarmMinutes = reminderLead.takeIf { reminderEnabled } ?: 15
+                    )
+                    requireNotNull(context.contentResolver.openOutputStream(uri)).use {
+                        it.write(icsString.toByteArray(Charsets.UTF_8))
+                    }
+                }
+                android.widget.Toast.makeText(context, "日历文件导出成功", android.widget.Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(context, "导出日历失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     fun clearAllData() {
         viewModelScope.launch {
             try {
@@ -321,6 +345,13 @@ fun SettingsScreen(
         uri?.let { viewModel.exportToUri(it) }
     }
 
+    // Export ICS launcher
+    val exportIcsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/calendar")
+    ) { uri ->
+        uri?.let { viewModel.exportIcsToUri(it) }
+    }
+
     // Import launcher
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -381,6 +412,14 @@ fun SettingsScreen(
 
             // ===== 数据管理 =====
             SettingsGroup(title = "数据管理") {
+                SettingsItem(
+                    icon = Icons.Default.CalendarMonth,
+                    title = "导出为日历 (.ics)",
+                    subtitle = "导出为日历事件，支持导入手机系统日历与手表",
+                    showChevron = true,
+                    onClick = { exportIcsLauncher.launch("课程表.ics") }
+                )
+                GroupDivider()
                 SettingsItem(
                     icon = Icons.Default.Backup,
                     title = "备份数据",

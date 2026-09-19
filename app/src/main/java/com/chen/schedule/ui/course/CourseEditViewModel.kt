@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.chen.schedule.ui.theme.courseColors
+import com.chen.schedule.util.CourseConflictDetector
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 data class CourseEditState(
@@ -31,7 +33,8 @@ data class CourseEditState(
     val error: String? = null,
     val slotNumbers: List<Int> = (1..12).toList(),
     val totalWeeks: Int = 16,
-    val saved: Boolean = false
+    val saved: Boolean = false,
+    val conflicts: List<CourseConflictDetector.CourseConflict> = emptyList()
 )
 
 @HiltViewModel
@@ -45,6 +48,9 @@ class CourseEditViewModel @Inject constructor(
     private val _state = MutableStateFlow(CourseEditState())
     val state: StateFlow<CourseEditState> = _state.asStateFlow()
 
+    private var existingCourses: List<Course> = emptyList()
+    private var currentCourseId: Long? = null
+
     init {
         _state.update { it.copy(color = courseColors.random()) }
     }
@@ -53,6 +59,7 @@ class CourseEditViewModel @Inject constructor(
         val semester = semesterRepository.getSemesterById(semesterId) ?: return
         val slots = timeSlotRepository.getTimeSlotsBySchemeDirect(semester.schemeId)
             .map { it.slotNumber }.distinct().sorted()
+        existingCourses = courseRepository.getCoursesBySemester(semesterId).first()
         _state.update { it.copy(
             slotNumbers = slots,
             totalWeeks = semester.totalWeeks,
@@ -60,9 +67,11 @@ class CourseEditViewModel @Inject constructor(
             endSlot = slots.getOrNull(1) ?: slots.firstOrNull() ?: 1,
             endWeek = semester.totalWeeks
         ) }
+        recomputeConflicts()
     }
 
     fun loadCourse(courseId: Long) {
+        currentCourseId = courseId
         viewModelScope.launch {
             courseRepository.getCourseById(courseId)?.let { course ->
                 _state.update {
@@ -81,6 +90,7 @@ class CourseEditViewModel @Inject constructor(
                         isEditing = true
                     )
                 }
+                recomputeConflicts()
             }
         }
     }
@@ -106,17 +116,52 @@ class CourseEditViewModel @Inject constructor(
                 endWeek = maxWeek
             )
         }
+        recomputeConflicts()
+    }
+
+    private fun recomputeConflicts() {
+        val s = _state.value
+        val dummy = Course(
+            id = currentCourseId ?: 0L,
+            name = s.name,
+            dayOfWeek = s.dayOfWeek,
+            startSlot = s.startSlot,
+            endSlot = s.endSlot,
+            startWeek = s.startWeek,
+            endWeek = s.endWeek,
+            weekType = s.weekType
+        )
+        val conflicts = CourseConflictDetector.findConflicts(dummy, existingCourses)
+        _state.update { it.copy(conflicts = conflicts) }
     }
 
     fun updateName(name: String) = _state.update { it.copy(name = name) }
     fun updateTeacher(teacher: String) = _state.update { it.copy(teacher = teacher) }
     fun updateClassroom(classroom: String) = _state.update { it.copy(classroom = classroom) }
-    fun updateDayOfWeek(day: Int) = _state.update { it.copy(dayOfWeek = day) }
-    fun updateStartSlot(slot: Int) = _state.update { it.copy(startSlot = slot, endSlot = maxOf(slot, it.endSlot)) }
-    fun updateEndSlot(slot: Int) = _state.update { it.copy(endSlot = slot, startSlot = minOf(slot, it.startSlot)) }
-    fun updateStartWeek(week: Int) = _state.update { it.copy(startWeek = week, endWeek = maxOf(week, it.endWeek)) }
-    fun updateEndWeek(week: Int) = _state.update { it.copy(endWeek = week, startWeek = minOf(week, it.startWeek)) }
-    fun updateWeekType(weekType: WeekType) = _state.update { it.copy(weekType = weekType) }
+    fun updateDayOfWeek(day: Int) {
+        _state.update { it.copy(dayOfWeek = day) }
+        recomputeConflicts()
+    }
+    fun updateStartSlot(slot: Int) {
+        _state.update { it.copy(startSlot = slot, endSlot = maxOf(slot, it.endSlot)) }
+        recomputeConflicts()
+    }
+    fun updateEndSlot(slot: Int) {
+        _state.update { it.copy(endSlot = slot, startSlot = minOf(slot, it.startSlot)) }
+        recomputeConflicts()
+    }
+    fun updateStartWeek(week: Int) {
+        _state.update { it.copy(startWeek = week, endWeek = maxOf(week, it.endWeek)) }
+        recomputeConflicts()
+    }
+    fun updateEndWeek(week: Int) {
+        _state.update { it.copy(endWeek = week, startWeek = minOf(week, it.startWeek)) }
+        recomputeConflicts()
+    }
+    fun updateWeekType(weekType: WeekType) {
+        _state.update { it.copy(weekType = weekType) }
+        recomputeConflicts()
+    }
     fun updateColor(color: Long) = _state.update { it.copy(color = color) }
     fun updateNote(note: String) = _state.update { it.copy(note = note) }
 
