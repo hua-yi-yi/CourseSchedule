@@ -28,14 +28,14 @@ object IcsExporter {
      * @param courses 课程列表
      * @param slots 该学期绑定的作息节次 (用于获取各节次起止时间)
      * @param zone 设备时区 (默认系统时区)
-     * @param alarmMinutes 提前提醒分钟数 (默认提前 15 分钟，<= 0 时不生成 VALARM)
+     * @param alarmMinutes 提前提醒分钟数 (默认提前 20 分钟，<= 0 时不生成 VALARM)
      */
     fun export(
         semester: Semester,
         courses: List<Course>,
         slots: List<TimeSlot>,
         zone: ZoneId = ZoneId.systemDefault(),
-        alarmMinutes: Int = 15
+        alarmMinutes: Int = 20
     ): String {
         val slotMap = slots.associateBy { it.slotNumber }
         val semesterMonday = WeekCalculator.semesterMonday(semester.startDate, zone)

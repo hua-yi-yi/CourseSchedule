@@ -174,7 +174,7 @@ class SettingsViewModel @Inject constructor(
                         semester = sem,
                         courses = courses,
                         slots = slots,
-                        alarmMinutes = reminderLead.takeIf { reminderEnabled } ?: 15
+                        alarmMinutes = reminderLead.takeIf { reminderEnabled } ?: 20
                     )
                     requireNotNull(context.contentResolver.openOutputStream(uri)).use {
                         it.write(icsString.toByteArray(Charsets.UTF_8))

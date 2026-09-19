@@ -15,13 +15,13 @@ class ReminderPrefs(context: Context) {
         get() = prefs.getBoolean(KEY_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_ENABLED, value).apply()
 
-    /** 上课前的提前分钟数(默认 10 分钟)。 */
+    /** 上课前的提前分钟数(默认 20 分钟)。 */
     var leadMinutes: Int
         get() = prefs.getInt(KEY_LEAD, DEFAULT_LEAD_MINUTES)
         set(value) = prefs.edit().putInt(KEY_LEAD, value.coerceIn(1, 120)).apply()
 
     companion object {
-        const val DEFAULT_LEAD_MINUTES = 10
+        const val DEFAULT_LEAD_MINUTES = 20
         private const val KEY_ENABLED = "enabled"
         private const val KEY_LEAD = "lead_minutes"
     }
