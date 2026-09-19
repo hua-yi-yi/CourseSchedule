@@ -8,6 +8,7 @@ import dagger.hilt.android.HiltAndroidApp
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
+        com.chen.schedule.ui.theme.ThemePrefs.init(this)
         // 启动时重排上课提醒(开机与日常启动都会走到这里)
         ClassReminderManager.rescheduleAsync(this)
     }

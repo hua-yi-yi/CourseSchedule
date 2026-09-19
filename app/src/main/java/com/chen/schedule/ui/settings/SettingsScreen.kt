@@ -25,23 +25,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Backup
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -52,14 +40,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.StateFlow
+import com.chen.schedule.ui.theme.BackgroundPreset
+import com.chen.schedule.ui.theme.ThemeConfig
+import com.chen.schedule.ui.theme.ThemePrefs
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -101,6 +93,9 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val reminderPrefs by lazy { ReminderPrefs(context) }
+    private val themePrefs by lazy { ThemePrefs(context) }
+
+    val themeConfig: StateFlow<ThemeConfig> = ThemePrefs.state
 
     var reminderEnabled by androidx.compose.runtime.mutableStateOf(false); private set
     var reminderLead by androidx.compose.runtime.mutableStateOf(ReminderPrefs.DEFAULT_LEAD_MINUTES); private set
@@ -108,6 +103,14 @@ class SettingsViewModel @Inject constructor(
     init {
         reminderEnabled = reminderPrefs.enabled
         reminderLead = reminderPrefs.leadMinutes
+    }
+
+    fun updateThemeMode(mode: Int) {
+        themePrefs.themeMode = mode
+    }
+
+    fun updateBackgroundPreset(preset: BackgroundPreset) {
+        themePrefs.backgroundPresetId = preset.id
     }
 
     /** 开关上课提醒:立即重排/取消今天的提醒闹钟。 */
@@ -381,8 +384,12 @@ fun SettingsScreen(
             TopAppBar(
                 title = { Text("设置", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                    TextButton(onClick = onNavigateBack) {
+                        Text(
+                            "返回",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             )
@@ -397,13 +404,64 @@ fun SettingsScreen(
         ) {
             Spacer(Modifier.height(4.dp))
 
+            // ===== 外观与背景 =====
+            val themeConfig by viewModel.themeConfig.collectAsState()
+            SettingsGroup(title = "外观与背景") {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Text(
+                        "主题外观",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            ThemePrefs.THEME_MODE_LIGHT to "浅色模式",
+                            ThemePrefs.THEME_MODE_DARK to "深色模式",
+                            ThemePrefs.THEME_MODE_SYSTEM to "跟随系统"
+                        ).forEach { (mode, label) ->
+                            FilterChip(
+                                selected = themeConfig.themeMode == mode,
+                                onClick = { viewModel.updateThemeMode(mode) },
+                                label = { Text(label) }
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        "背景底色",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        BackgroundPreset.entries.forEach { preset ->
+                            FilterChip(
+                                selected = themeConfig.backgroundPreset == preset,
+                                onClick = { viewModel.updateBackgroundPreset(preset) },
+                                label = { Text(preset.label) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
             // ===== 学期与作息 =====
             SettingsGroup(title = "学期与作息") {
                 SettingsItem(
-                    icon = Icons.Default.Schedule,
                     title = "学期与作息",
                     subtitle = "管理学期、作息方案与节次时间",
-                    showChevron = true,
                     onClick = onNavigateToScheduleConfig
                 )
             }
@@ -413,35 +471,27 @@ fun SettingsScreen(
             // ===== 数据管理 =====
             SettingsGroup(title = "数据管理") {
                 SettingsItem(
-                    icon = Icons.Default.CalendarMonth,
                     title = "导出为日历 (.ics)",
                     subtitle = "导出为日历事件，支持导入手机系统日历与手表",
-                    showChevron = true,
                     onClick = { exportIcsLauncher.launch("课程表.ics") }
                 )
                 GroupDivider()
                 SettingsItem(
-                    icon = Icons.Default.Backup,
                     title = "备份数据",
                     subtitle = "备份当前学期、课程及作息时间",
-                    showChevron = true,
                     onClick = { exportLauncher.launch("course_schedule_backup.json") }
                 )
                 GroupDivider()
                 SettingsItem(
-                    icon = Icons.Default.Restore,
                     title = "恢复数据",
                     subtitle = "从备份替换恢复当前学期",
-                    showChevron = true,
                     onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) }
                 )
                 GroupDivider()
                 SettingsItem(
-                    icon = Icons.Default.DeleteForever,
                     title = "清空数据",
                     subtitle = "删除当前学期的所有课程数据",
-                    showChevron = true,
-                    dangerIcon = true,
+                    isDanger = true,
                     onClick = { showClearDialog = true }
                 )
             }
@@ -456,20 +506,13 @@ fun SettingsScreen(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Default.Notifications,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
-                    Spacer(Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("上课前提醒我", style = MaterialTheme.typography.bodyLarge)
+                        Text("上课前提醒我", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                         Text(
                             if (viewModel.reminderEnabled) {
                                 "提前 ${viewModel.reminderLead} 分钟通知今天剩余的课程"
                             } else {
-                                "关闭状态,不会发送任何通知"
+                                "关闭状态，不会发送任何通知"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -489,7 +532,7 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -508,10 +551,8 @@ fun SettingsScreen(
             // ===== 桌面小组件 =====
             SettingsGroup(title = "桌面小组件") {
                 SettingsItem(
-                    icon = Icons.Default.Widgets,
                     title = "今日课程小组件",
-                    subtitle = "4×1 横条,显示今天的课程",
-                    showChevron = true,
+                    subtitle = "4×1 横条，显示今天的课程",
                     onClick = {
                         scope.launch {
                             val pinned = GlanceAppWidgetManager(context).requestPinGlanceAppWidget(
@@ -528,10 +569,8 @@ fun SettingsScreen(
                 )
                 GroupDivider()
                 SettingsItem(
-                    icon = Icons.Default.CalendarMonth,
                     title = "周课表小组件",
-                    subtitle = "4×4 大组件,展示整周课程网格",
-                    showChevron = true,
+                    subtitle = "4×4 大组件，展示整周课程网格",
                     onClick = {
                         scope.launch {
                             val pinned = GlanceAppWidgetManager(context).requestPinGlanceAppWidget(
@@ -645,37 +684,27 @@ private fun SettingsGroup(
 @Composable
 private fun GroupDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(start = 56.dp, end = 0.dp),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        modifier = Modifier.padding(horizontal = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
     )
 }
 
 @Composable
 private fun SettingsItem(
-    icon: ImageVector,
     title: String,
     subtitle: String,
-    showChevron: Boolean,
-    dangerIcon: Boolean = false,
+    isDanger: Boolean = false,
     onClick: () -> Unit
 ) {
     ListItem(
         modifier = Modifier.clickable { onClick() },
         colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-        leadingContent = {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = if (dangerIcon) MaterialTheme.colorScheme.error
-                else MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 4.dp)
-            )
-        },
         headlineContent = {
             Text(
                 title,
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (dangerIcon) MaterialTheme.colorScheme.error
+                fontWeight = FontWeight.Medium,
+                color = if (isDanger) MaterialTheme.colorScheme.error
                 else MaterialTheme.colorScheme.onSurface
             )
         },
@@ -685,17 +714,6 @@ private fun SettingsItem(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        },
-        trailingContent = if (showChevron) {
-            {
-                Icon(
-                    Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            null
         }
     )
 }

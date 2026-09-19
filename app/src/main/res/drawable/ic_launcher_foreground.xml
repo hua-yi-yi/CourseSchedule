@@ -4,14 +4,101 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Calendar icon -->
+
+    <!-- 课表主体底板投影 -->
     <path
-        android:fillColor="#1565C0"
-        android:pathData="M30,26h48a4,4 0,0 1,4 4v48a4,4 0,0 1,-4 4H30a4,4 0,0 1,-4 -4V30a4,4 0,0 1,4 -4z" />
+        android:fillColor="#22000000"
+        android:pathData="M37,28 h34 a10,10 0 0 1,10 10 v38 a10,10 0 0 1,-10 10 H37 a10,10 0 0 1,-10 -10 V38 a10,10 0 0 1,10 -10 z" />
+
+    <!-- 课表主白卡 -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M34,22v4M74,22v4M30,34h48v44H30z" />
+        android:pathData="M36,26 h36 a10,10 0 0 1,10 10 v36 a10,10 0 0 1,-10 10 H36 a10,10 0 0 1,-10 -10 V36 a10,10 0 0 1,10 -10 z" />
+
+    <!-- 顶部深蓝紫标题横条 -->
     <path
-        android:fillColor="#1565C0"
-        android:pathData="M38,42h8v8h-8zM50,42h8v8h-8zM62,42h8v8h-8zM38,54h8v8h-8zM50,54h8v8h-8zM62,54h8v8h-8zM38,66h8v8h-8z" />
+        android:fillColor="#4338CA"
+        android:pathData="M36,26 h36 a10,10 0 0 1,10 10 v4 H26 v-4 a10,10 0 0 1,10 -10 z" />
+
+    <!-- 活页金属圈 1 -->
+    <path
+        android:fillColor="#E0E7FF"
+        android:pathData="M37,23 h2.5 a1.5,1.5 0 0 1,1.5 1.5 v6 a1.5,1.5 0 0 1,-1.5 1.5 h-2.5 a1.5,1.5 0 0 1,-1.5 -1.5 v-6 a1.5,1.5 0 0 1,1.5 -1.5 z" />
+
+    <!-- 活页金属圈 2 -->
+    <path
+        android:fillColor="#E0E7FF"
+        android:pathData="M52.75,23 h2.5 a1.5,1.5 0 0 1,1.5 1.5 v6 a1.5,1.5 0 0 1,-1.5 1.5 h-2.5 a1.5,1.5 0 0 1,-1.5 -1.5 v-6 a1.5,1.5 0 0 1,1.5 -1.5 z" />
+
+    <!-- 活页金属圈 3 -->
+    <path
+        android:fillColor="#E0E7FF"
+        android:pathData="M68.5,23 h2.5 a1.5,1.5 0 0 1,1.5 1.5 v6 a1.5,1.5 0 0 1,-1.5 1.5 h-2.5 a1.5,1.5 0 0 1,-1.5 -1.5 v-6 a1.5,1.5 0 0 1,1.5 -1.5 z" />
+
+    <!-- 网格中轴虚线/细线 -->
+    <path
+        android:strokeColor="#EEF2F6"
+        android:strokeWidth="1"
+        android:pathData="M54,42 v36" />
+
+    <!-- 课程块 1: 珊瑚粉 -->
+    <path
+        android:fillColor="#F27A7D"
+        android:pathData="M34.5,44 h13 a3.5,3.5 0 0 1,3.5 3.5 v6 a3.5,3.5 0 0 1,-3.5 3.5 h-13 a3.5,3.5 0 0 1,-3.5 -3.5 v-6 a3.5,3.5 0 0 1,3.5 -3.5 z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M35,48.5 h9" />
+    <path
+        android:strokeColor="#CCFFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M35,52 h5" />
+
+    <!-- 课程块 2: 翡翠绿 -->
+    <path
+        android:fillColor="#36C18C"
+        android:pathData="M60,44 h14 a3,3 0 0 1,3 3 v2 a3,3 0 0 1,-3 3 H60 a3,3 0 0 1,-3 -3 v-2 a3,3 0 0 1,3 -3 z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.3"
+        android:strokeLineCap="round"
+        android:pathData="M60,48 h9" />
+
+    <!-- 课程块 3: 暖杏橙 -->
+    <path
+        android:fillColor="#FFA238"
+        android:pathData="M60.5,55 h13 a3.5,3.5 0 0 1,3.5 3.5 v5 a3.5,3.5 0 0 1,-3.5 3.5 h-13 a3.5,3.5 0 0 1,-3.5 -3.5 v-5 a3.5,3.5 0 0 1,3.5 -3.5 z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M61,59.5 h9" />
+    <path
+        android:strokeColor="#CCFFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M61,63 h5" />
+
+    <!-- 课程块 4: 晴空蓝 -->
+    <path
+        android:fillColor="#4F95FF"
+        android:pathData="M34.5,60 h13 a3.5,3.5 0 0 1,3.5 3.5 v7 a3.5,3.5 0 0 1,-3.5 3.5 h-13 a3.5,3.5 0 0 1,-3.5 -3.5 v-7 a3.5,3.5 0 0 1,3.5 -3.5 z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M35,65 h9" />
+    <path
+        android:strokeColor="#CCFFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M35,69 h6" />
+
+    <!-- 课程块 5: 柔紫 -->
+    <path
+        android:fillColor="#9872F5"
+        android:pathData="M59.5,70 h15 a2.5,2.5 0 0 1,2.5 2.5 v0 a2.5,2.5 0 0 1,-2.5 2.5 h-15 a2.5,2.5 0 0 1,-2.5 -2.5 v0 a2.5,2.5 0 0 1,2.5 -2.5 z" />
+
 </vector>

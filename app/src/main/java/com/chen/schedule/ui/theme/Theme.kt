@@ -10,6 +10,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -90,17 +91,38 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun ScheduleTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeConfig: ThemeConfig = ThemeConfig(),
+    darkTheme: Boolean = when (themeConfig.themeMode) {
+        ThemePrefs.THEME_MODE_SYSTEM -> isSystemInDarkTheme()
+        ThemePrefs.THEME_MODE_DARK -> true
+        else -> false
+    },
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
+    val baseScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
+    }
+
+    val colorScheme = remember(baseScheme, darkTheme, themeConfig.backgroundPreset) {
+        val preset = themeConfig.backgroundPreset
+        val customBg = if (darkTheme) preset.darkColor else preset.lightColor
+        val customSurface = if (darkTheme) preset.darkSurface else preset.lightSurface
+        if (customBg != null) {
+            val bg = Color(customBg)
+            val surf = customSurface?.let { Color(it) } ?: bg
+            baseScheme.copy(
+                background = bg,
+                surface = surf
+            )
+        } else {
+            baseScheme
+        }
     }
 
     val view = LocalView.current
