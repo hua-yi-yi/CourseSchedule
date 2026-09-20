@@ -6,6 +6,8 @@ import kotlinx.coroutines.withContext
 import com.chen.schedule.util.ScheduleBackup
 import com.chen.schedule.util.SchemeSlots
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import android.Manifest
 import android.net.Uri
 import android.os.Build
@@ -35,6 +37,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -341,6 +344,25 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     var pendingRestore by remember { mutableStateOf<Uri?>(null) }
     var showClearDialog by remember { mutableStateOf(false) }
+    var showWidgetGuideDialog by remember { mutableStateOf(false) }
+
+    val requestAddWidget: (Boolean) -> Unit = { isWeek ->
+        scope.launch {
+            try {
+                val manager = GlanceAppWidgetManager(context)
+                val receiverClass = if (isWeek) WeekWidgetReceiver::class.java else TodayWidgetReceiver::class.java
+                val widgetInstance = if (isWeek) WeekWidget() else TodayWidget()
+                val pinned = manager.requestPinGlanceAppWidget(receiverClass, widgetInstance)
+                if (pinned) {
+                    Toast.makeText(context, "已发起添加请求，请在桌面弹出窗口中点击确认", Toast.LENGTH_LONG).show()
+                } else {
+                    showWidgetGuideDialog = true
+                }
+            } catch (e: Exception) {
+                showWidgetGuideDialog = true
+            }
+        }
+    }
 
     // Export launcher
     val exportLauncher = rememberLauncherForActivityResult(
@@ -555,39 +577,21 @@ fun SettingsScreen(
             // ===== 桌面小组件 =====
             SettingsGroup(title = "桌面小组件") {
                 SettingsItem(
-                    title = "今日课程小组件",
-                    subtitle = "4×1 横条，显示今天的课程",
-                    onClick = {
-                        scope.launch {
-                            val pinned = GlanceAppWidgetManager(context).requestPinGlanceAppWidget(
-                                TodayWidgetReceiver::class.java,
-                                TodayWidget()
-                            )
-                            Toast.makeText(
-                                context,
-                                if (pinned == true) "请在弹出窗口中确认添加" else "当前桌面不支持固定小组件",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
+                    title = "添加今日课程小组件 (4×1)",
+                    subtitle = "横条布局，显示今日课程 · 点击尝试添加",
+                    onClick = { requestAddWidget(false) }
                 )
                 GroupDivider()
                 SettingsItem(
-                    title = "周课表小组件",
-                    subtitle = "4×4 大组件，展示整周课程网格",
-                    onClick = {
-                        scope.launch {
-                            val pinned = GlanceAppWidgetManager(context).requestPinGlanceAppWidget(
-                                WeekWidgetReceiver::class.java,
-                                WeekWidget()
-                            )
-                            Toast.makeText(
-                                context,
-                                if (pinned == true) "请在弹出窗口中确认添加" else "当前桌面不支持固定小组件",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
+                    title = "添加周课表小组件 (4×4)",
+                    subtitle = "整周网格，概览周一至周日课程 · 点击尝试添加",
+                    onClick = { requestAddWidget(true) }
+                )
+                GroupDivider()
+                SettingsItem(
+                    title = "小组件添加指引与帮助",
+                    subtitle = "若点击无反应或系统拦截，查看手动添加教程与权限设置",
+                    onClick = { showWidgetGuideDialog = true }
                 )
             }
 
@@ -660,6 +664,106 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) {
                     Text("取消", fontSize = 13.sp)
+                }
+            }
+        )
+    }
+
+    // 桌面小组件添加指引弹窗
+    if (showWidgetGuideDialog) {
+        AlertDialog(
+            onDismissRequest = { showWidgetGuideDialog = false },
+            shape = MaterialTheme.shapes.extraLarge,
+            title = {
+                Text(
+                    "桌面小组件添加指引",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "很多手机系统（如小米 HyperOS/MIUI、华为鸿蒙、vivo、OPPO 等）默认禁止第三方应用直接向桌面固定小组件。\n\n您可以通过以下两种方式添加到桌面：",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 12.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
+                    )
+
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                "方法一：手机桌面长按添加（推荐 · 100% 成功）",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 13.sp
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "1. 返回手机主屏幕，长按桌面空白处（或双指在屏幕上向内捏合）；\n2. 点击屏幕下方出现的「添加微件 / 小组件 / 插件」；\n3. 在应用列表中找到「课程表」；\n4. 长按「今日课程」或「周课表」将其拖动至桌面合适位置即可！",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 12.sp,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                "方法二：开启系统权限后一键添加",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "点击下方「去权限设置」按钮，在权限管理中为「课程表」允许【桌面快捷方式】或【桌面微件】权限，返回应用后重新点击添加即可。",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 12.sp,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showWidgetGuideDialog = false
+                        try {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "无法打开系统设置，请手动前往设置 > 应用管理", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) {
+                    Text("去权限设置", fontSize = 13.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWidgetGuideDialog = false }) {
+                    Text("我知道了", fontSize = 13.sp)
                 }
             }
         )

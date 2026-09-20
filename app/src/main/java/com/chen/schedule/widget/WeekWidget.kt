@@ -18,10 +18,13 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.width
+import androidx.glance.appwidget.appWidgetBackground
+import androidx.glance.appwidget.cornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,31 +66,35 @@ class WeekWidget : GlanceAppWidget() {
     }
 
     private suspend fun loadWidgetData(context: Context): WeekWidgetData {
-        val entryPoint = EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            DatabaseEntryPoint::class.java
-        )
-        val sem = entryPoint.semesterDao().getCurrentSemester()
-        if (sem == null) {
-            return WeekWidgetData("未设置学期", 0, WeekGridBuilder.MIN_SLOTS, emptyGrid())
-        }
+        return runCatching {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                DatabaseEntryPoint::class.java
+            )
+            val sem = entryPoint.semesterDao().getCurrentSemester()
+            if (sem == null) {
+                return@runCatching WeekWidgetData("未设置学期", 0, WeekGridBuilder.MIN_SLOTS, emptyGrid())
+            }
 
-        val week = WeekCalculator.currentWeek(sem.startDate, sem.totalWeeks)
-        val entities = entryPoint.courseDao().getCoursesBySemesterDirect(sem.id)
-        val courses = entities.map { it.toDomain() }
-        val configuredSlots = entryPoint.timeSlotDao().getTimeSlotsBySchemeDirect(sem.schemeId)
-        // 行数必须有上限:异常数据(如导入的节次号过大)曾把 4×4 组件撑成几十行碎格子
-        val slotCount = maxOf(
-            WeekGridBuilder.MIN_SLOTS,
-            configuredSlots.maxOfOrNull { it.slotNumber } ?: 0,
-            courses.maxOfOrNull { it.endSlot } ?: 0
-        ).coerceAtMost(WeekGridBuilder.MAX_SLOTS)
-        return WeekWidgetData(
-            semesterName = sem.name,
-            currentWeek = week,
-            slotCount = slotCount,
-            grid = WeekGridBuilder.build(courses, week, slotCount)
-        )
+            val week = WeekCalculator.currentWeek(sem.startDate, sem.totalWeeks)
+            val entities = entryPoint.courseDao().getCoursesBySemesterDirect(sem.id)
+            val courses = entities.map { it.toDomain() }
+            val configuredSlots = entryPoint.timeSlotDao().getTimeSlotsBySchemeDirect(sem.schemeId)
+            // 行数必须有上限:异常数据(如导入的节次号过大)曾把 4×4 组件撑成几十行碎格子
+            val slotCount = maxOf(
+                WeekGridBuilder.MIN_SLOTS,
+                configuredSlots.maxOfOrNull { it.slotNumber } ?: 0,
+                courses.maxOfOrNull { it.endSlot } ?: 0
+            ).coerceAtMost(WeekGridBuilder.MAX_SLOTS)
+            WeekWidgetData(
+                semesterName = sem.name,
+                currentWeek = week,
+                slotCount = slotCount,
+                grid = WeekGridBuilder.build(courses, week, slotCount)
+            )
+        }.getOrElse {
+            WeekWidgetData("周课表", 0, WeekGridBuilder.MIN_SLOTS, emptyGrid())
+        }
     }
 
     private fun emptyGrid(): List<List<WeekGridBuilder.Cell?>> =
@@ -111,8 +118,10 @@ class WeekWidget : GlanceAppWidget() {
 private fun WeekWidgetContent(data: WeekWidgetData) {
     Column(
         modifier = GlanceModifier
-            .fillMaxWidth()
+            .fillMaxSize()
+            .appWidgetBackground()
             .background(GlanceTheme.colors.surface)
+            .cornerRadius(16.dp)
             .padding(10.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {

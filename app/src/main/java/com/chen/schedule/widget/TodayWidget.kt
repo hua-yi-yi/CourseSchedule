@@ -16,10 +16,13 @@ import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.width
+import androidx.glance.appwidget.appWidgetBackground
+import androidx.glance.appwidget.cornerRadius
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.action.actionStartActivity
@@ -59,45 +62,49 @@ class TodayWidget : GlanceAppWidget() {
     }
 
     private suspend fun loadWidgetData(context: Context): WidgetData {
-        // 通过 EntryPoint 复用应用内 Hilt 提供的数据库单例,避免重复打开数据库
-        val entryPoint = EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            DatabaseEntryPoint::class.java
-        )
-        val sem = entryPoint.semesterDao().getCurrentSemester()
-        if (sem == null) {
-            return WidgetData("未设置学期", 0, "", emptyList())
-        }
+        return runCatching {
+            // 通过 EntryPoint 复用应用内 Hilt 提供的数据库单例,避免重复打开数据库
+            val entryPoint = EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                DatabaseEntryPoint::class.java
+            )
+            val sem = entryPoint.semesterDao().getCurrentSemester()
+            if (sem == null) {
+                return@runCatching WidgetData("未设置学期", 0, "", emptyList())
+            }
 
-        val week = WeekCalculator.currentWeek(sem.startDate, sem.totalWeeks)
-        val now = LocalDate.now()
-        val dayIndex = now.dayOfWeek.value
-        val dayLabel = when (dayIndex) {
-            1 -> "周一"; 2 -> "周二"; 3 -> "周三"; 4 -> "周四"
-            5 -> "周五"; 6 -> "周六"; 7 -> "周日"; else -> ""
-        }
+            val week = WeekCalculator.currentWeek(sem.startDate, sem.totalWeeks)
+            val now = LocalDate.now()
+            val dayIndex = now.dayOfWeek.value
+            val dayLabel = when (dayIndex) {
+                1 -> "周一"; 2 -> "周二"; 3 -> "周三"; 4 -> "周四"
+                5 -> "周五"; 6 -> "周六"; 7 -> "周日"; else -> ""
+            }
 
-        val entities = entryPoint.courseDao().getCoursesByDayDirect(sem.id, dayIndex)
-        val courses = entities
-            .filter { course ->
-                val weekMatch = when (course.weekType) {
-                    "odd" -> week % 2 == 1
-                    "even" -> week % 2 == 0
-                    else -> true
+            val entities = entryPoint.courseDao().getCoursesByDayDirect(sem.id, dayIndex)
+            val courses = entities
+                .filter { course ->
+                    val weekMatch = when (course.weekType) {
+                        "odd" -> week % 2 == 1
+                        "even" -> week % 2 == 0
+                        else -> true
+                    }
+                    weekMatch && course.startWeek <= week && course.endWeek >= week
                 }
-                weekMatch && course.startWeek <= week && course.endWeek >= week
-            }
-            .sortedBy { it.startSlot }
-            .map { e ->
-                WidgetCourse(
-                    name = e.name,
-                    classroom = e.classroom,
-                    startSlot = e.startSlot,
-                    endSlot = e.endSlot
-                )
-            }
+                .sortedBy { it.startSlot }
+                .map { e ->
+                    WidgetCourse(
+                        name = e.name,
+                        classroom = e.classroom,
+                        startSlot = e.startSlot,
+                        endSlot = e.endSlot
+                    )
+                }
 
-        return WidgetData(sem.name, week, dayLabel, courses)
+            WidgetData(sem.name, week, dayLabel, courses)
+        }.getOrElse {
+            WidgetData("今日课程", 0, "", emptyList())
+        }
     }
 }
 
@@ -114,8 +121,10 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
 private fun TodayWidgetContent(data: WidgetData) {
     Column(
         modifier = GlanceModifier
-            .fillMaxWidth()
+            .fillMaxSize()
+            .appWidgetBackground()
             .background(GlanceTheme.colors.surface)
+            .cornerRadius(16.dp)
             .padding(12.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
