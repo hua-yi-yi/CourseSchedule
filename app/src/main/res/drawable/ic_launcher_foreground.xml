@@ -5,108 +5,83 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-
     <group
-        android:scaleX="0.88"
-        android:scaleY="0.88"
+        android:scaleX="0.85"
+        android:scaleY="0.85"
         android:pivotX="54"
         android:pivotY="54">
 
-        <!-- 课表主体底板投影 -->
-        <path
-            android:fillColor="#22000000"
-            android:pathData="M37,28 h34 a10,10 0 0 1,10 10 v38 a10,10 0 0 1,-10 10 H37 a10,10 0 0 1,-10 -10 V38 a10,10 0 0 1,10 -10 z" />
-
-        <!-- 课表主白卡 -->
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M36,26 h36 a10,10 0 0 1,10 10 v36 a10,10 0 0 1,-10 10 H36 a10,10 0 0 1,-10 -10 V36 a10,10 0 0 1,10 -10 z" />
-
-        <!-- 顶部深蓝紫标题横条 -->
-        <path
-            android:fillColor="#4338CA"
-            android:pathData="M36,26 h36 a10,10 0 0 1,10 10 v4 H26 v-4 a10,10 0 0 1,10 -10 z" />
-
-        <!-- 活页金属圈 1 -->
-        <path
-            android:fillColor="#E0E7FF"
-            android:pathData="M37,23 h2.5 a1.5,1.5 0 0 1,1.5 1.5 v6 a1.5,1.5 0 0 1,-1.5 1.5 h-2.5 a1.5,1.5 0 0 1,-1.5 -1.5 v-6 a1.5,1.5 0 0 1,1.5 -1.5 z" />
-
-        <!-- 活页金属圈 2 -->
-        <path
-            android:fillColor="#E0E7FF"
-            android:pathData="M52.75,23 h2.5 a1.5,1.5 0 0 1,1.5 1.5 v6 a1.5,1.5 0 0 1,-1.5 1.5 h-2.5 a1.5,1.5 0 0 1,-1.5 -1.5 v-6 a1.5,1.5 0 0 1,1.5 -1.5 z" />
-
-        <!-- 活页金属圈 3 -->
-        <path
-            android:fillColor="#E0E7FF"
-            android:pathData="M68.5,23 h2.5 a1.5,1.5 0 0 1,1.5 1.5 v6 a1.5,1.5 0 0 1,-1.5 1.5 h-2.5 a1.5,1.5 0 0 1,-1.5 -1.5 v-6 a1.5,1.5 0 0 1,1.5 -1.5 z" />
-
-        <!-- 网格中轴虚线/细线 -->
-        <path
-            android:strokeColor="#EEF2F6"
-            android:strokeWidth="1"
-            android:pathData="M54,42 v36" />
-
-        <!-- 课程块 1: 珊瑚粉 -->
-        <path
-            android:fillColor="#F27A7D"
-            android:pathData="M34.5,44 h13 a3.5,3.5 0 0 1,3.5 3.5 v6 a3.5,3.5 0 0 1,-3.5 3.5 h-13 a3.5,3.5 0 0 1,-3.5 -3.5 v-6 a3.5,3.5 0 0 1,3.5 -3.5 z" />
+        <!-- 课表主体圆角外框 (纯线条) -->
         <path
             android:strokeColor="#FFFFFF"
+            android:strokeWidth="2.8"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000"
+            android:pathData="M34,32 h40 a6,6 0 0 1 6,6 v38 a6,6 0 0 1 -6,6 H34 a6,6 0 0 1 -6,-6 V38 a6,6 0 0 1 6,-6 z" />
+
+        <!-- 活页挂耳 1 -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="2.4"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000"
+            android:pathData="M40,28 v8" />
+
+        <!-- 活页挂耳 2 -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="2.4"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000"
+            android:pathData="M54,28 v8" />
+
+        <!-- 活页挂耳 3 -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="2.4"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000"
+            android:pathData="M68,28 v8" />
+
+        <!-- 标题横线 (分隔顶部header与body) -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="2"
+            android:strokeLineCap="round"
+            android:pathData="M28,44 h52" />
+
+        <!-- 网格竖线 -->
+        <path
+            android:strokeColor="#B0FFFFFF"
             android:strokeWidth="1.5"
             android:strokeLineCap="round"
-            android:pathData="M35,48.5 h9" />
-        <path
-            android:strokeColor="#CCFFFFFF"
-            android:strokeWidth="1.2"
-            android:strokeLineCap="round"
-            android:pathData="M35,52 h5" />
+            android:pathData="M54,48 v28" />
 
-        <!-- 课程块 2: 翡翠绿 -->
+        <!-- 网格横线 -->
         <path
-            android:fillColor="#36C18C"
-            android:pathData="M60,44 h14 a3,3 0 0 1,3 3 v2 a3,3 0 0 1,-3 3 H60 a3,3 0 0 1,-3 -3 v-2 a3,3 0 0 1,3 -3 z" />
-        <path
-            android:strokeColor="#FFFFFF"
-            android:strokeWidth="1.3"
-            android:strokeLineCap="round"
-            android:pathData="M60,48 h9" />
-
-        <!-- 课程块 3: 暖杏橙 -->
-        <path
-            android:fillColor="#FFA238"
-            android:pathData="M60.5,55 h13 a3.5,3.5 0 0 1,3.5 3.5 v5 a3.5,3.5 0 0 1,-3.5 3.5 h-13 a3.5,3.5 0 0 1,-3.5 -3.5 v-5 a3.5,3.5 0 0 1,3.5 -3.5 z" />
-        <path
-            android:strokeColor="#FFFFFF"
+            android:strokeColor="#B0FFFFFF"
             android:strokeWidth="1.5"
             android:strokeLineCap="round"
-            android:pathData="M61,59.5 h9" />
-        <path
-            android:strokeColor="#CCFFFFFF"
-            android:strokeWidth="1.2"
-            android:strokeLineCap="round"
-            android:pathData="M61,63 h5" />
+            android:pathData="M32,62 h44" />
 
-        <!-- 课程块 4: 晴空蓝 -->
+        <!-- 左上课程小色块线框 -->
         <path
-            android:fillColor="#4F95FF"
-            android:pathData="M34.5,60 h13 a3.5,3.5 0 0 1,3.5 3.5 v7 a3.5,3.5 0 0 1,-3.5 3.5 h-13 a3.5,3.5 0 0 1,-3.5 -3.5 v-7 a3.5,3.5 0 0 1,3.5 -3.5 z" />
-        <path
-            android:strokeColor="#FFFFFF"
-            android:strokeWidth="1.5"
+            android:strokeColor="#60A5FA"
+            android:strokeWidth="1.8"
             android:strokeLineCap="round"
-            android:pathData="M35,65 h9" />
-        <path
-            android:strokeColor="#CCFFFFFF"
-            android:strokeWidth="1.2"
-            android:strokeLineCap="round"
-            android:pathData="M35,69 h6" />
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000"
+            android:pathData="M34,50 h16 a2,2 0 0 1 2,2 v6 a2,2 0 0 1 -2,2 H34 a2,2 0 0 1 -2,-2 v-6 a2,2 0 0 1 2,-2 z" />
 
-        <!-- 课程块 5: 柔紫 -->
+        <!-- 右下课程小色块线框 -->
         <path
-            android:fillColor="#9872F5"
-            android:pathData="M59.5,70 h15 a2.5,2.5 0 0 1,2.5 2.5 v0 a2.5,2.5 0 0 1,-2.5 2.5 h-15 a2.5,2.5 0 0 1,-2.5 -2.5 v0 a2.5,2.5 0 0 1,2.5 -2.5 z" />
+            android:strokeColor="#34D399"
+            android:strokeWidth="1.8"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000"
+            android:pathData="M58,64 h16 a2,2 0 0 1 2,2 v6 a2,2 0 0 1 -2,2 H58 a2,2 0 0 1 -2,-2 v-6 a2,2 0 0 1 2,-2 z" />
 
     </group>
 </vector>

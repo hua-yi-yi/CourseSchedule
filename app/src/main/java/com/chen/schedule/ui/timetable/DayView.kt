@@ -255,7 +255,7 @@ fun DayView(
                                         "@${course.classroom}",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Medium,
-                                        maxLines = 1,
+                                        maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                         color = accent.copy(alpha = 0.95f)
                                     )

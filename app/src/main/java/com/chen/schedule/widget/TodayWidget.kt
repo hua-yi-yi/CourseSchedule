@@ -195,7 +195,8 @@ private fun CourseRow(course: WidgetCourse) {
                     style = TextStyle(
                         fontSize = 11.sp,
                         color = GlanceTheme.colors.onSurfaceVariant
-                    )
+                    ),
+                    maxLines = 2
                 )
             }
         }

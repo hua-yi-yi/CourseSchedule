@@ -1,6 +1,5 @@
 package com.chen.schedule.ui.timetable
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,13 +38,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -107,11 +102,13 @@ fun TimetableScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            if (state.currentSemester != null) ExtendedFloatingActionButton(
+            if (state.currentSemester != null) androidx.compose.material3.FloatingActionButton(
                 onClick = { state.currentSemester?.let { onAddCourse(it.id, null) } },
-                icon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                text = { Text("添加课程") }
-            )
+                containerColor = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "添加课程", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(22.dp))
+            }
         }
     ) { padding ->
         Column(
@@ -336,79 +333,50 @@ private fun HeaderSection(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .padding(horizontal = 12.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 左上角菜单栏
         TopMenu(
             onNavigateToImport = onNavigateToImport,
             onNavigateToSettings = onNavigateToSettings
         )
 
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    semesterName,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (!isCurrentWeek) {
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        "第 ${currentWeek} 周",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                    )
-                }
-            }
+        Text(
+            semesterName,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+
+        if (!isCurrentWeek) {
             Text(
-                "第 $currentWeek 周 / 共 $totalWeeks 周",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                "回到本周",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable(onClick = onBackToToday)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
             )
-            if (!isCurrentWeek) {
-                Text(
-                    "回到本周",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .padding(top = 1.dp)
-                        .clickable(onClick = onBackToToday)
-                )
-            }
         }
 
-        SingleChoiceSegmentedButtonRow(modifier = Modifier) {
-            SegmentedButton(
-                selected = !isDayView,
-                onClick = { if (isDayView) onToggleView() },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                icon = {}
-            ) {
-                Text("周视图", fontSize = 12.sp)
-            }
-            SegmentedButton(
-                selected = isDayView,
-                onClick = { if (!isDayView) onToggleView() },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                icon = {}
-            ) {
-                Text("日视图", fontSize = 12.sp)
-            }
+        IconButton(onClick = onToggleView, modifier = Modifier.size(36.dp)) {
+            Icon(
+                if (isDayView) Icons.AutoMirrored.Filled.Notes else Icons.Default.DateRange,
+                contentDescription = if (isDayView) "切换周视图" else "切换日视图",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
 
 /* ===================== 周切换 ===================== */
 
-/** 单行紧凑周切换:左右箭头 + 「第 N 周 / 共 M 周」;周末开关在卡片右侧并排。 */
+/** 极简周切换:‹ 第 N 周 › */
 @Composable
 private fun WeekSelector(
     currentWeek: Int,
@@ -417,68 +385,43 @@ private fun WeekSelector(
     onNextWeek: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        )
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
+        IconButton(
+            onClick = onPrevWeek,
+            enabled = currentWeek > 1,
+            modifier = Modifier.size(32.dp)
         ) {
-            IconButton(
-                onClick = onPrevWeek,
-                enabled = currentWeek > 1,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    Icons.Default.ChevronLeft, "上一周",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek > 1) 1f else 0.3f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "第",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    "$currentWeek",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    "周 / 共 $totalWeeks 周",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            IconButton(
-                onClick = onNextWeek,
-                enabled = currentWeek < totalWeeks,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    Icons.Default.ChevronRight, "下一周",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek < totalWeeks) 1f else 0.3f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+            Icon(
+                Icons.Default.ChevronLeft, "上一周",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek > 1) 1f else 0.3f),
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Text(
+            "第 $currentWeek 周",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            " / $totalWeeks",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        IconButton(
+            onClick = onNextWeek,
+            enabled = currentWeek < totalWeeks,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                Icons.Default.ChevronRight, "下一周",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek < totalWeeks) 1f else 0.3f),
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
@@ -546,6 +489,7 @@ private fun TodaySummaryCard(
 ) {
     val todayIndex = LocalDate.now().dayOfWeek.value
     val todayCourses = courses.filter { it.dayOfWeek == todayIndex }.sortedBy { it.startSlot }
+    if (todayCourses.isEmpty()) return  // 无课时不占位
     val nd = LocalDate.now()
     val now by produceState(initialValue = LocalTime.now()) {
         while (true) {
@@ -555,74 +499,34 @@ private fun TodaySummaryCard(
     }
     val summary = com.chen.schedule.util.TodaySummary.describe(todayCourses, timeSlots, now)
 
-    // 今日无课时卡片不可点击(无内容可跳转),隐藏右侧箭头
-    Card(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .then(
-                if (todayCourses.isEmpty()) Modifier
-                else Modifier.clickable { onOpenToday() }
-            ),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
-        )
+            .clickable { onOpenToday() }
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Today,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "今日 ${nd.monthValue}月${nd.dayOfMonth}日 · ${DayOfWeek.entries.first { it.index == todayIndex }.label}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    summary,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            if (todayCourses.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.ChevronRight,
-                        contentDescription = "查看今日课程",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-            }
-        }
+        Text(
+            "今日",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            summary,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.size(16.dp)
+        )
     }
 }
 

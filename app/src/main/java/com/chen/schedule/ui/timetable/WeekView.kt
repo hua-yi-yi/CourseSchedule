@@ -290,19 +290,20 @@ internal fun CourseBlock(
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface
             )
+            // 地点始终完整展示,不受 compact 限制
+            if (course.classroom.isNotBlank()) {
+                androidx.compose.foundation.layout.Spacer(Modifier.height(1.dp))
+                Text(
+                    "@${course.classroom}",
+                    fontSize = 9.sp,
+                    lineHeight = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = accent.copy(alpha = 0.95f)
+                )
+            }
             if (!compact) {
-                if (course.classroom.isNotBlank()) {
-                    androidx.compose.foundation.layout.Spacer(Modifier.height(1.dp))
-                    Text(
-                        "@${course.classroom}",
-                        fontSize = 9.sp,
-                        lineHeight = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = accent.copy(alpha = 0.95f)
-                    )
-                }
                 if (course.teacher.isNotBlank() && span >= 2) {
                     Text(
                         course.teacher,
@@ -311,17 +312,6 @@ internal fun CourseBlock(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
-                    )
-                }
-                if (span > 2) {
-                    Text(
-                        "${course.startSlot}-${course.endSlot}节",
-                        fontSize = 8.5.sp,
-                        lineHeight = 10.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = accent
                     )
                 }
             }
