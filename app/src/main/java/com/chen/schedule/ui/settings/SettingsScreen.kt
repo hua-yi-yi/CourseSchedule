@@ -23,25 +23,36 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import com.chen.schedule.util.update.AppReleaseInfo
+import com.chen.schedule.util.update.AppUpdateChecker
+import com.chen.schedule.util.update.GithubMirror
+import com.chen.schedule.util.update.UpdateCheckResult
+import com.chen.schedule.util.update.UpdatePrefs
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -93,20 +104,115 @@ class SettingsViewModel @Inject constructor(
     private val semesterRepository: SemesterRepository,
     private val timeSlotRepository: TimeSlotRepository,
     private val timeSchemeRepository: com.chen.schedule.data.repository.TimeSchemeRepository,
+    private val updateChecker: AppUpdateChecker,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val reminderPrefs by lazy { ReminderPrefs(context) }
     private val themePrefs by lazy { ThemePrefs(context) }
+    private val updatePrefs by lazy { UpdatePrefs(context) }
 
     val themeConfig: StateFlow<ThemeConfig> = ThemePrefs.state
 
     var reminderEnabled by androidx.compose.runtime.mutableStateOf(false); private set
     var reminderLead by androidx.compose.runtime.mutableStateOf(ReminderPrefs.DEFAULT_LEAD_MINUTES); private set
 
+    var autoCheckUpdate by androidx.compose.runtime.mutableStateOf(true); private set
+    var useMirror by androidx.compose.runtime.mutableStateOf(true); private set
+    var selectedMirror by androidx.compose.runtime.mutableStateOf(GithubMirror.GHFAST); private set
+
+    var isCheckingUpdate by androidx.compose.runtime.mutableStateOf(false); private set
+    var updateResult by androidx.compose.runtime.mutableStateOf<UpdateCheckResult?>(null); private set
+    var lastCheckSummary by androidx.compose.runtime.mutableStateOf("点击检查最新版本"); private set
+
+    var isTestingMirrors by androidx.compose.runtime.mutableStateOf(false); private set
+    var mirrorLatencies by androidx.compose.runtime.mutableStateOf<Map<GithubMirror, Long?>>(emptyMap()); private set
+
     init {
         reminderEnabled = reminderPrefs.enabled
         reminderLead = reminderPrefs.leadMinutes
+
+        autoCheckUpdate = updatePrefs.autoCheckUpdate
+        useMirror = updatePrefs.useMirror
+        selectedMirror = updatePrefs.selectedMirror
+        updateLastCheckSummary()
+
+        if (autoCheckUpdate) {
+            checkUpdate(manual = false)
+        }
+    }
+
+    fun updateAutoCheckUpdate(enabled: Boolean) {
+        updatePrefs.autoCheckUpdate = enabled
+        autoCheckUpdate = enabled
+    }
+
+    fun updateUseMirror(enabled: Boolean) {
+        updatePrefs.useMirror = enabled
+        useMirror = enabled
+    }
+
+    fun updateSelectedMirror(mirror: GithubMirror) {
+        updatePrefs.selectedMirror = mirror
+        selectedMirror = mirror
+    }
+
+    private fun updateLastCheckSummary() {
+        val last = updatePrefs.lastCheckTime
+        lastCheckSummary = if (last > 0L) {
+            val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(last))
+            "上次检查: $dateStr"
+        } else {
+            "点击检查最新版本"
+        }
+    }
+
+    fun checkUpdate(manual: Boolean = true) {
+        if (isCheckingUpdate) return
+        isCheckingUpdate = true
+        viewModelScope.launch {
+            try {
+                val res = updateChecker.checkUpdate()
+                updateResult = res
+                updateLastCheckSummary()
+                if (manual) {
+                    when (res) {
+                        is UpdateCheckResult.UpToDate -> {
+                            Toast.makeText(context, "当前已是最新版本 (${res.currentVersion})", Toast.LENGTH_SHORT).show()
+                        }
+                        is UpdateCheckResult.Error -> {
+                            Toast.makeText(context, "检查更新失败: ${res.message}", Toast.LENGTH_LONG).show()
+                        }
+                        is UpdateCheckResult.HasUpdate -> {
+                            // 保持在 updateResult，UI 弹窗展示
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                if (manual) {
+                    Toast.makeText(context, "检查更新异常: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                isCheckingUpdate = false
+            }
+        }
+    }
+
+    fun dismissUpdateDialog() {
+        updateResult = null
+    }
+
+    fun testAllMirrors() {
+        if (isTestingMirrors) return
+        isTestingMirrors = true
+        viewModelScope.launch {
+            try {
+                mirrorLatencies = updateChecker.testAllMirrors()
+            } catch (_: Exception) {
+            } finally {
+                isTestingMirrors = false
+            }
+        }
     }
 
     fun updateThemeMode(mode: Int) {
@@ -345,6 +451,7 @@ fun SettingsScreen(
     var pendingRestore by remember { mutableStateOf<Uri?>(null) }
     var showClearDialog by remember { mutableStateOf(false) }
     var showWidgetGuideDialog by remember { mutableStateOf(false) }
+    var showMirrorDialog by remember { mutableStateOf(false) }
 
     val requestAddWidget: (Boolean) -> Unit = { isWeek ->
         scope.launch {
@@ -597,26 +704,163 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // ===== 关于 =====
-            SettingsGroup(title = "关于") {
+            // ===== 版本与更新 =====
+            SettingsGroup(title = "版本与更新") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        "版本 ${com.chen.schedule.BuildConfig.VERSION_NAME}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 12.5.sp
-                    )
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "当前版本",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            if (viewModel.updateResult is UpdateCheckResult.HasUpdate) {
+                                Spacer(Modifier.width(8.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = MaterialTheme.shapes.small
+                                ) {
+                                    Text(
+                                        "新版可用",
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                        Text(
+                            "v${com.chen.schedule.BuildConfig.VERSION_NAME}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Spacer(Modifier.weight(1f))
                     Text(
                         "Android 课程表",
                         style = MaterialTheme.typography.bodySmall,
-                        fontSize = 12.5.sp,
+                        fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                GroupDivider()
+
+                // 自动检测更新开关
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "自动检测最新版本",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            "开启后进入设置时自动在后台静默检测",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = viewModel.autoCheckUpdate,
+                        onCheckedChange = { viewModel.updateAutoCheckUpdate(it) }
+                    )
+                }
+
+                GroupDivider()
+
+                // GitHub 镜像加速开关
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "GitHub 镜像加速",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            if (viewModel.useMirror) "当前: ${viewModel.selectedMirror.displayName}" else "使用官方直连 (外网良好/有代理时使用)",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = viewModel.useMirror,
+                        onCheckedChange = { viewModel.updateUseMirror(it) }
+                    )
+                }
+
+                if (viewModel.useMirror) {
+                    GroupDivider()
+                    SettingsItem(
+                        title = "镜像节点测速与选择",
+                        subtitle = "测试 GitHub 加速镜像延迟并选择最优节点",
+                        onClick = {
+                            viewModel.testAllMirrors()
+                            showMirrorDialog = true
+                        }
+                    )
+                }
+
+                GroupDivider()
+
+                // 检查更新触发项
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !viewModel.isCheckingUpdate) { viewModel.checkUpdate(manual = true) }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "检查更新",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            viewModel.lastCheckSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (viewModel.isCheckingUpdate) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Text(
+                            "立即检测",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 12.5.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
 
@@ -764,6 +1008,272 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showWidgetGuideDialog = false }) {
                     Text("我知道了", fontSize = 13.sp)
+                }
+            }
+        )
+    }
+
+    // 新版本更新弹窗
+    val currentUpdate = viewModel.updateResult
+    if (currentUpdate is UpdateCheckResult.HasUpdate) {
+        val release = currentUpdate.release
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissUpdateDialog() },
+            shape = MaterialTheme.shapes.extraLarge,
+            title = {
+                Text(
+                    "发现新版本 ${release.versionName}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        if (release.publishedAt.isNotBlank()) {
+                            Text(
+                                "发布: ${release.publishedAt}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (release.fileSizeBytes != null && release.fileSizeBytes > 0) {
+                            val sizeMb = String.format(java.util.Locale.US, "%.1f MB", release.fileSizeBytes / (1024.0 * 1024.0))
+                            Text(
+                                "安装包: $sizeMb",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    if (currentUpdate.isMirrorUsed && !currentUpdate.mirrorName.isNullOrBlank()) {
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                        ) {
+                            Text(
+                                "经由「${currentUpdate.mirrorName}」检测成功",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Text(
+                        "更新日志：",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp
+                    )
+
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 200.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(10.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            Text(
+                                release.changelog,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 12.sp,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+
+                    Text(
+                        "点击下载将调用系统浏览器或下载管理器下载 APK 安装包并引导安装。",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (viewModel.useMirror) {
+                        Button(
+                            onClick = {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(release.mirrorDownloadUrl)).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "无法打开浏览器: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                                viewModel.dismissUpdateDialog()
+                            }
+                        ) {
+                            Text("高速镜像下载", fontSize = 12.5.sp)
+                        }
+                    }
+
+                    FilledTonalButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(release.officialDownloadUrl)).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "无法打开浏览器: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                            viewModel.dismissUpdateDialog()
+                        }
+                    ) {
+                        Text(if (viewModel.useMirror) "官方直连" else "立即下载", fontSize = 12.5.sp)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissUpdateDialog() }) {
+                    Text("稍后再说", fontSize = 13.sp)
+                }
+            }
+        )
+    }
+
+    // 镜像节点测速与选择弹窗
+    if (showMirrorDialog) {
+        AlertDialog(
+            onDismissRequest = { showMirrorDialog = false },
+            shape = MaterialTheme.shapes.extraLarge,
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "GitHub 镜像测速与选择",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    if (viewModel.isTestingMirrors) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        TextButton(onClick = { viewModel.testAllMirrors() }) {
+                            Text("重新测速", fontSize = 12.sp)
+                        }
+                    }
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        "针对国内网络环境，选择延迟较低的镜像节点可加速检测与安装包下载：",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(4.dp))
+
+                    GithubMirror.ALL_MIRRORS.forEach { mirror ->
+                        val isSelected = viewModel.selectedMirror == mirror
+                        val latency = viewModel.mirrorLatencies[mirror]
+
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.updateSelectedMirror(mirror)
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = { viewModel.updateSelectedMirror(mirror) }
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        mirror.displayName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    val desc = if (mirror == GithubMirror.DIRECT) "官方直连，需外网良好环境"
+                                    else mirror.prefix ?: mirror.replaceDomain
+                                    Text(
+                                        desc,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                if (viewModel.isTestingMirrors && latency == null) {
+                                    Text(
+                                        "测速中...",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                } else if (latency != null) {
+                                    val color = if (latency < 500) MaterialTheme.colorScheme.primary
+                                    else if (latency < 1500) MaterialTheme.colorScheme.tertiary
+                                    else MaterialTheme.colorScheme.error
+
+                                    Text(
+                                        "${latency}ms",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = color
+                                    )
+                                } else if (viewModel.mirrorLatencies.isNotEmpty()) {
+                                    Text(
+                                        "不可用/超时",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showMirrorDialog = false }) {
+                    Text("确定", fontSize = 13.sp)
                 }
             }
         )

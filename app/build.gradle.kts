@@ -28,8 +28,8 @@ android {
         applicationId = "com.chen.schedule"
         minSdk = 26
         targetSdk = 34
-        versionCode = 30
-        versionName = "1.2.24"
+        versionCode = 31
+        versionName = "1.2.25"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
