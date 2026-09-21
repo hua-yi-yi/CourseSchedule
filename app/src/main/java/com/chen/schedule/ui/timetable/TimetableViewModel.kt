@@ -175,10 +175,10 @@ class TimetableViewModel @Inject constructor(
         }
     }
 
-    fun getFilteredCourses(): List<Course> {
+    fun getFilteredCourses(week: Int = _state.value.currentWeek): List<Course> {
         val s = _state.value
         return s.courses.filter { course ->
-            val weekMatch = course.appliesToWeek(s.currentWeek)
+            val weekMatch = course.appliesToWeek(week)
             val dayMatch = if (s.isDayView) course.dayOfWeek == s.selectedDay else true
             weekMatch && dayMatch
         }

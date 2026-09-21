@@ -1,8 +1,18 @@
 package com.chen.schedule.ui.timetable
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +48,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +58,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -54,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -101,12 +114,11 @@ fun TimetableScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            if (state.currentSemester != null) androidx.compose.material3.SmallFloatingActionButton(
+            if (state.currentSemester != null) FloatingActionButton(
                 onClick = { state.currentSemester?.let { onAddCourse(it.id, null) } },
-                containerColor = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(36.dp)
+                containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Icon(Icons.Default.Add, contentDescription = "添加课程", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Add, contentDescription = "添加课程", tint = MaterialTheme.colorScheme.onPrimary)
             }
         }
     ) { padding ->
@@ -152,33 +164,76 @@ fun TimetableScreen(
                         onNavigateToSettings = onNavigateToSettings
                     )
 
-                    if (state.isDayView) {
-                        DaySelector(
-                            selectedDay = state.selectedDay,
-                            onDaySelected = viewModel::selectDay,
-                            showWeekend = state.showWeekend
-                        )
-                        DayView(
-                            isToday = state.currentWeek == actualWeek && state.selectedDay == LocalDate.now().dayOfWeek.value,
-                            courses = viewModel.getFilteredCourses(),
-                            timeSlots = state.timeSlots,
-                            onCourseClick = { selectedCourse = it },
-                            onBlankCellClick = { slotNumber ->
-                                handleBlankClick(state.selectedDay, slotNumber)
+                    // ===== 左右滑动切换周 (支持手势拖拽、速度快速翻页与平滑横向切换动画) =====
+                    var dragDistance by remember { mutableFloatStateOf(0f) }
+                    val minSwipeDistance = with(LocalDensity.current) { 40.dp.toPx() }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .draggable(
+                                state = rememberDraggableState { delta ->
+                                    dragDistance += delta
+                                },
+                                orientation = Orientation.Horizontal,
+                                onDragStarted = { dragDistance = 0f },
+                                onDragStopped = { velocity ->
+                                    val threshold = minSwipeDistance
+                                    val totalWeeks = semester.totalWeeks
+                                    val currentWeek = state.currentWeek
+                                    if ((dragDistance < -threshold || velocity < -800f) && currentWeek < totalWeeks) {
+                                        viewModel.nextWeek()
+                                    } else if ((dragDistance > threshold || velocity > 800f) && currentWeek > 1) {
+                                        viewModel.prevWeek()
+                                    }
+                                    dragDistance = 0f
+                                }
+                            )
+                    ) {
+                        AnimatedContent(
+                            targetState = state.currentWeek,
+                            transitionSpec = {
+                                if (targetState > initialState) {
+                                    (slideInHorizontally(animationSpec = tween(240)) { width -> width } + fadeIn(animationSpec = tween(240)))
+                                        .togetherWith(slideOutHorizontally(animationSpec = tween(240)) { width -> -width } + fadeOut(animationSpec = tween(240)))
+                                } else {
+                                    (slideInHorizontally(animationSpec = tween(240)) { width -> -width } + fadeIn(animationSpec = tween(240)))
+                                        .togetherWith(slideOutHorizontally(animationSpec = tween(240)) { width -> width } + fadeOut(animationSpec = tween(240)))
+                                }
+                            },
+                            label = "weekTransition"
+                        ) { week ->
+                            if (state.isDayView) {
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    DaySelector(
+                                        selectedDay = state.selectedDay,
+                                        onDaySelected = viewModel::selectDay,
+                                        showWeekend = state.showWeekend
+                                    )
+                                    DayView(
+                                        isToday = week == actualWeek && state.selectedDay == LocalDate.now().dayOfWeek.value,
+                                        courses = viewModel.getFilteredCourses(week),
+                                        timeSlots = state.timeSlots,
+                                        onCourseClick = { selectedCourse = it },
+                                        onBlankCellClick = { slotNumber ->
+                                            handleBlankClick(state.selectedDay, slotNumber)
+                                        }
+                                    )
+                                }
+                            } else {
+                                WeekView(
+                                    courses = viewModel.getFilteredCourses(week),
+                                    timeSlots = state.timeSlots,
+                                    showWeekend = state.showWeekend,
+                                    semesterStartDate = semester.startDate,
+                                    currentWeek = week,
+                                    onCourseClick = { selectedCourse = it },
+                                    onBlankCellClick = { dayOfWeek, slotNumber ->
+                                        handleBlankClick(dayOfWeek, slotNumber)
+                                    }
+                                )
                             }
-                        )
-                    } else {
-                        WeekView(
-                            courses = viewModel.getFilteredCourses(),
-                            timeSlots = state.timeSlots,
-                            showWeekend = state.showWeekend,
-                            semesterStartDate = semester.startDate,
-                            currentWeek = state.currentWeek,
-                            onCourseClick = { selectedCourse = it },
-                            onBlankCellClick = { dayOfWeek, slotNumber ->
-                                handleBlankClick(dayOfWeek, slotNumber)
-                            }
-                        )
+                        }
                     }
                 } // 整页滚动结束
             }
