@@ -42,7 +42,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 private val SLOT_H = 60
-private val TIME_COL = 48
+private val TIME_COL = 36
 
 @Composable
 fun WeekView(
@@ -70,8 +70,8 @@ fun WeekView(
     Card(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
-        shape = MaterialTheme.shapes.large,
+            .padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 4.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -82,15 +82,15 @@ fun WeekView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                    .height(46.dp)
+                    .height(32.dp)
             ) {
                 Box(
                     modifier = Modifier.width(TIME_COL.dp).fillMaxHeight(),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "节次",
-                        fontSize = 11.sp,
+                        "节",
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -101,14 +101,14 @@ fun WeekView(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .padding(vertical = 4.dp, horizontal = 2.dp),
+                            .padding(vertical = 2.dp, horizontal = 1.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(6.dp))
                                 .then(
                                     if (isToday) Modifier.background(
                                         MaterialTheme.colorScheme.primary
@@ -119,7 +119,7 @@ fun WeekView(
                         ) {
                             Text(
                                 day.label,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 fontWeight = if (isToday) FontWeight.Bold else FontWeight.SemiBold,
                                 color = if (isToday) MaterialTheme.colorScheme.onPrimary
                                 else MaterialTheme.colorScheme.onSurface
@@ -127,7 +127,7 @@ fun WeekView(
                             dateOf(day.index)?.let { d ->
                                 Text(
                                     "${d.monthValue}/${d.dayOfMonth}",
-                                    fontSize = 9.5.sp,
+                                    fontSize = 8.5.sp,
                                     fontWeight = if (isToday) FontWeight.Medium else FontWeight.Normal,
                                     color = if (isToday) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
                                     else MaterialTheme.colorScheme.onSurfaceVariant
@@ -188,19 +188,19 @@ fun WeekView(
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text(
                                             "${slot.slotNumber}",
-                                            fontSize = 12.sp,
+                                            fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                         if (slot.startTime.isNotBlank()) {
                                             Text(
                                                 slot.startTime,
-                                                fontSize = 9.sp,
+                                                fontSize = 8.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                             Text(
                                                 slot.endTime,
-                                                fontSize = 9.sp,
+                                                fontSize = 8.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }

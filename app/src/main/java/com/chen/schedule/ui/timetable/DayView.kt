@@ -48,7 +48,7 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 private val DSLOT_H = 60
-private val DTIME_COL = 56
+private val DTIME_COL = 40
 
 @Composable
 fun DayView(
@@ -75,8 +75,8 @@ fun DayView(
     Card(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
-        shape = MaterialTheme.shapes.large,
+            .padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 4.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -86,7 +86,7 @@ fun DayView(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
@@ -97,21 +97,21 @@ fun DayView(
                     ) {
                         Text(
                             "现在",
-                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
                         )
                     }
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(6.dp))
                     Text(
                         "第 ${currentSlot.slotNumber} 节 · ${currentSlot.startTime}-${currentSlot.endTime}",
-                        style = MaterialTheme.typography.labelMedium,
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
             } else {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(2.dp))
             }
 
             BoxWithConstraints(
@@ -167,7 +167,7 @@ fun DayView(
                                 ) {
                                     Text(
                                         "${slot.slotNumber}",
-                                        fontSize = 12.sp,
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (isCurrent) MaterialTheme.colorScheme.onPrimary
                                         else MaterialTheme.colorScheme.onSurface
@@ -176,13 +176,13 @@ fun DayView(
                                 if (slot.startTime.isNotBlank()) {
                                     Text(
                                         slot.startTime,
-                                        fontSize = 9.sp,
+                                        fontSize = 8.sp,
                                         color = if (isCurrent) MaterialTheme.colorScheme.primary
                                         else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Text(
                                         slot.endTime,
-                                        fontSize = 9.sp,
+                                        fontSize = 8.sp,
                                         color = if (isCurrent) MaterialTheme.colorScheme.primary
                                         else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
