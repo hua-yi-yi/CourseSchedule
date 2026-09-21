@@ -175,6 +175,7 @@ private fun RowScope.WeekCell(cell: WeekGridBuilder.Cell?) {
             .defaultWeight()
             .height(22.dp)
             .padding(1.dp)
+            .cornerRadius(3.dp)
             .background(
                 if (cell != null) ColorProvider(Color(cell.color))
                 else GlanceTheme.colors.surfaceVariant
@@ -201,11 +202,12 @@ class WeekWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget = WeekWidget()
 }
 
-/** 数据变更后同时刷新今日课程与周课表组件 */
+/** 数据变更后同时刷新今日课程(4×1)、今日看板(3×3)与周课表(4×4)组件 */
 object WidgetUpdater {
     suspend fun refreshAll(context: Context) {
         runCatching {
             TodayWidget().updateAll(context)
+            Today3x3Widget().updateAll(context)
             WeekWidget().updateAll(context)
         }
         // 课表数据变化后同步重排上课提醒(设置页/导入/编辑等所有写路径都会走到这里)

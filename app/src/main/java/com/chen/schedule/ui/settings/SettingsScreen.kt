@@ -90,6 +90,8 @@ import com.chen.schedule.util.CourseImportData
 import com.chen.schedule.util.JsonImporter
 import com.chen.schedule.widget.TodayWidget
 import com.chen.schedule.widget.TodayWidgetReceiver
+import com.chen.schedule.widget.Today3x3Widget
+import com.chen.schedule.widget.Today3x3WidgetReceiver
 import com.chen.schedule.widget.WeekWidget
 import com.chen.schedule.widget.WeekWidgetReceiver
 import com.chen.schedule.widget.WidgetUpdater
@@ -462,12 +464,15 @@ fun SettingsScreen(
     var showWidgetGuideDialog by remember { mutableStateOf(false) }
     var showMirrorDialog by remember { mutableStateOf(false) }
 
-    val requestAddWidget: (Boolean) -> Unit = { isWeek ->
+    val requestAddWidget: (Int) -> Unit = { widgetType ->
         scope.launch {
             try {
                 val manager = GlanceAppWidgetManager(context)
-                val receiverClass = if (isWeek) WeekWidgetReceiver::class.java else TodayWidgetReceiver::class.java
-                val widgetInstance = if (isWeek) WeekWidget() else TodayWidget()
+                val (receiverClass, widgetInstance) = when (widgetType) {
+                    0 -> Today3x3WidgetReceiver::class.java to Today3x3Widget()
+                    1 -> TodayWidgetReceiver::class.java to TodayWidget()
+                    else -> WeekWidgetReceiver::class.java to WeekWidget()
+                }
                 val pinned = manager.requestPinGlanceAppWidget(receiverClass, widgetInstance)
                 if (pinned) {
                     Toast.makeText(context, "已发起添加请求，请在桌面弹出窗口中点击确认", Toast.LENGTH_LONG).show()
@@ -723,15 +728,21 @@ fun SettingsScreen(
             // ===== 桌面小组件 =====
             SettingsGroup(title = "桌面小组件") {
                 SettingsItem(
+                    title = "添加今日课程看板 (3×3)",
+                    subtitle = "方形看板，完整展示上课时间与上课地点 · 点击尝试添加",
+                    onClick = { requestAddWidget(0) }
+                )
+                GroupDivider()
+                SettingsItem(
                     title = "添加今日课程小组件 (4×1)",
                     subtitle = "横条布局，显示今日课程 · 点击尝试添加",
-                    onClick = { requestAddWidget(false) }
+                    onClick = { requestAddWidget(1) }
                 )
                 GroupDivider()
                 SettingsItem(
                     title = "添加周课表小组件 (4×4)",
                     subtitle = "整周网格，概览周一至周日课程 · 点击尝试添加",
-                    onClick = { requestAddWidget(true) }
+                    onClick = { requestAddWidget(2) }
                 )
                 GroupDivider()
                 SettingsItem(
@@ -995,7 +1006,7 @@ fun SettingsScreen(
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                "1. 返回手机主屏幕，长按桌面空白处（或双指在屏幕上向内捏合）；\n2. 点击屏幕下方出现的「添加微件 / 小组件 / 插件」；\n3. 在应用列表中找到「课程表」；\n4. 长按「今日课程」或「周课表」将其拖动至桌面合适位置即可！",
+                                "1. 返回手机主屏幕，长按桌面空白处（或双指在屏幕上向内捏合）；\n2. 点击屏幕下方出现的「添加微件 / 小组件 / 插件」；\n3. 在应用列表中找到「课程表」；\n4. 选择「今日课程看板 (3×3)」、「今日课程 (4×1)」或「周课表 (4×4)」将其拖动至桌面合适位置即可！",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontSize = 12.sp,
                                 lineHeight = 18.sp

@@ -31,5 +31,6 @@
     <string name="schedule_config">作息时间配置</string>
     <string name="semester_management">学期管理</string>
     <string name="widget_description">今日课程:显示当前学期、周次与今天的课程列表</string>
+    <string name="today_3x3_widget_description">今日课程看板:3×3 方形组件，完整展示上课时间与上课地点</string>
     <string name="week_widget_description">周课表:4×4 大组件,展示当前学期的整周课程网格</string>
 </resources>
