@@ -30,17 +30,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.SuggestionChip
+import com.chen.schedule.data.scraper.SchoolPreset
+import com.chen.schedule.data.scraper.SchoolRegistry
+import com.chen.schedule.data.scraper.SchoolSystemType
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -144,8 +150,10 @@ fun ImportScreen(
     val context = LocalContext.current
     var showJsonGuide by remember { mutableStateOf(false) }
     var showCsvGuide by remember { mutableStateOf(false) }
-    // 导入方式二选一:0 = 河南科技大学教务导入,1 = 其他方式
+    // 导入方式二选一:0 = 高校教务系统导入, 1 = 文件与文本导入
     var importMode by remember { mutableStateOf(0) }
+    var schoolSearchQuery by remember { mutableStateOf("") }
+    val matchedPresets = remember(schoolSearchQuery) { SchoolRegistry.search(schoolSearchQuery) }
 
     // 确认导入成功后直接返回主页
     LaunchedEffect(state.importDone) {
@@ -202,62 +210,134 @@ fun ImportScreen(
                         selected = importMode == 0,
                         onClick = { importMode = 0 },
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) { Text("河南科技大学导入", fontSize = 13.sp) }
+                    ) { Text("高校教务导入", fontSize = 13.sp) }
                     SegmentedButton(
                         selected = importMode == 1,
                         onClick = { importMode = 1 },
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) { Text("其他方式", fontSize = 13.sp) }
+                    ) { Text("文件与文本导入", fontSize = 13.sp) }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
             }
 
             if (importMode == 0) {
 
-            // ===== 河南科技大学教务系统导入 =====
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large,
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                // 高校搜索栏
+                item {
+                    OutlinedTextField(
+                        value = schoolSearchQuery,
+                        onValueChange = { schoolSearchQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("搜索高校名称 / 拼音首字母 (如: 河科大、浙工大、正方)...", fontSize = 12.5.sp) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = "搜索", modifier = Modifier.size(18.dp))
+                        },
+                        trailingIcon = {
+                            if (schoolSearchQuery.isNotBlank()) {
+                                IconButton(onClick = { schoolSearchQuery = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "清空", modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        },
+                        singleLine = true
                     )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.School,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
+                    Spacer(Modifier.height(10.dp))
+                }
+
+                if (matchedPresets.isEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            shape = MaterialTheme.shapes.medium,
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                             )
-                            Spacer(Modifier.width(10.dp))
-                            Column {
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("未找到匹配的高校预设", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(4.dp))
                                 Text(
-                                    "河南科技大学教务系统导入",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    "VPN 登录后自动读取课表,无需手动整理",
+                                    "如果您的学校使用正方教务系统，可直接使用正方经典版入口输入教务地址进行登录导入；或使用「文件与文本导入」。",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                Spacer(Modifier.height(10.dp))
+                                Button(onClick = onScraperLogin, modifier = Modifier.fillMaxWidth()) {
+                                    Text("使用正方经典版教务登录")
+                                }
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
-                        Button(
-                            onClick = onHaustImport,
-                            modifier = Modifier.fillMaxWidth()
+                    }
+                } else {
+                    items(matchedPresets, key = { it.id }) { preset ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            shape = MaterialTheme.shapes.large,
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (preset.systemType == SchoolSystemType.WEB_VPN_EAMS)
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                                else
+                                    MaterialTheme.colorScheme.surfaceContainerLow
+                            )
                         ) {
-                            Icon(Icons.Default.CloudDownload, "导入", modifier = Modifier.size(15.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("进入教务系统导入")
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.School,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        preset.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (preset.badge.isNotBlank()) {
+                                        SuggestionChip(
+                                            onClick = {},
+                                            label = { Text(preset.badge, fontSize = 11.sp) }
+                                        )
+                                    }
+                                }
+                                if (preset.description.isNotBlank()) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        preset.description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(Modifier.height(10.dp))
+                                Button(
+                                    onClick = {
+                                        if (preset.systemType == SchoolSystemType.WEB_VPN_EAMS) {
+                                            onHaustImport()
+                                        } else {
+                                            onScraperLogin()
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.CloudDownload, "导入", modifier = Modifier.size(15.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        if (preset.systemType == SchoolSystemType.WEB_VPN_EAMS)
+                                            "进入 ${preset.name} · VPN/校内导入"
+                                        else
+                                            "进入教务登录抓取"
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-            }
-
             } else {
 
             // AI 截图识别(折叠,小字)

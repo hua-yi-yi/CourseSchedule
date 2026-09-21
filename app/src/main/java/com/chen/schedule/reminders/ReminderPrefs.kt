@@ -20,9 +20,15 @@ class ReminderPrefs(context: Context) {
         get() = prefs.getInt(KEY_LEAD, DEFAULT_LEAD_MINUTES)
         set(value) = prefs.edit().putInt(KEY_LEAD, value.coerceIn(1, 120)).apply()
 
+    /** 上课中是否在通知栏常驻卡片(默认开启)。 */
+    var ongoingClassEnabled: Boolean
+        get() = prefs.getBoolean(KEY_ONGOING, true)
+        set(value) = prefs.edit().putBoolean(KEY_ONGOING, value).apply()
+
     companion object {
         const val DEFAULT_LEAD_MINUTES = 20
         private const val KEY_ENABLED = "enabled"
         private const val KEY_LEAD = "lead_minutes"
+        private const val KEY_ONGOING = "ongoing_class_enabled"
     }
 }

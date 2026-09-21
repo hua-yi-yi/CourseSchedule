@@ -80,4 +80,69 @@ object CourseConflictDetector {
             checkConflict(target, existing)
         }
     }
+
+    /**
+     * 课程聚类模型：代表同一时段的课程簇。
+     * [primaryCourse] 为当前在课表格面上展示的代表课程；
+     * [allCourses] 包含该时段所有重叠的课程列表。
+     */
+    data class CourseCluster(
+        val primaryCourse: Course,
+        val allCourses: List<Course>
+    ) {
+        val isOverlapping: Boolean get() = allCourses.size > 1
+        val overlapCount: Int get() = allCourses.size
+    }
+
+    /**
+     * 将同一天的课程按节次重叠关系进行连通图聚类。
+     * 若两门课程节次有交集，则归入同一个聚类。
+     */
+    fun groupOverlappingCourses(courses: List<Course>): List<List<Course>> {
+        if (courses.isEmpty()) return emptyList()
+        val visited = BooleanArray(courses.size)
+        val clusters = mutableListOf<List<Course>>()
+
+        fun overlaps(a: Course, b: Course): Boolean =
+            maxOf(a.startSlot, b.startSlot) <= minOf(a.endSlot, b.endSlot)
+
+        for (i in courses.indices) {
+            if (visited[i]) continue
+            val cluster = mutableListOf<Course>()
+            val queue = ArrayDeque<Int>()
+            queue.add(i)
+            visited[i] = true
+            while (queue.isNotEmpty()) {
+                val currIdx = queue.removeFirst()
+                cluster.add(courses[currIdx])
+                for (j in courses.indices) {
+                    if (!visited[j] && overlaps(courses[currIdx], courses[j])) {
+                        visited[j] = true
+                        queue.add(j)
+                    }
+                }
+            }
+            clusters.add(cluster.sortedWith(compareBy({ it.startSlot }, { it.endSlot }, { it.id })))
+        }
+        return clusters.sortedBy { it.first().startSlot }
+    }
+
+    /**
+     * 将课程列表按星期和节次聚类，并根据用户偏好 [preferredCourseIds] 选定当前展示的 primaryCourse。
+     */
+    fun resolveClusters(
+        courses: List<Course>,
+        preferredCourseIds: Set<Long> = emptySet()
+    ): List<CourseCluster> {
+        val byDay = courses.groupBy { it.dayOfWeek }
+        val result = mutableListOf<CourseCluster>()
+        for ((_, dayCourses) in byDay) {
+            val clusters = groupOverlappingCourses(dayCourses)
+            for (clusterCourses in clusters) {
+                val primary = clusterCourses.find { it.id in preferredCourseIds } ?: clusterCourses.first()
+                result.add(CourseCluster(primaryCourse = primary, allCourses = clusterCourses))
+            }
+        }
+        return result
+    }
 }

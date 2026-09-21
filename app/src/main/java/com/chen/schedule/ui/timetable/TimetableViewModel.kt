@@ -46,7 +46,9 @@ data class TimetableState(
     val isDayView: Boolean = false,
     val showWeekend: Boolean = true,
     /** 引导面板:null = 不显示。 */
-    val guide: ScheduleGuide? = null
+    val guide: ScheduleGuide? = null,
+    /** 用户选中的同时间优选展示课程 ID 集合 */
+    val preferredCourseIds: Set<Long> = emptySet()
 ) {
     /** 学期与作息是否都已有效配置。 */
     val isConfigured: Boolean get() = currentSemester?.isDefined == true && timeSlots.isNotEmpty()
@@ -87,9 +89,20 @@ class TimetableViewModel @Inject constructor(
     val state: StateFlow<TimetableState> = _state.asStateFlow()
 
     private var slotObservation: Job? = null
+    private val prefs = context.getSharedPreferences("timetable_prefs", Context.MODE_PRIVATE)
 
     init {
+        _state.update { it.copy(preferredCourseIds = loadPreferredCourseIds()) }
         observeSemesterAndCourses()
+    }
+
+    private fun loadPreferredCourseIds(): Set<Long> {
+        val raw = prefs.getStringSet("preferred_course_ids", emptySet()).orEmpty()
+        return raw.mapNotNull { it.toLongOrNull() }.toSet()
+    }
+
+    private fun savePreferredCourseIds(ids: Set<Long>) {
+        prefs.edit().putStringSet("preferred_course_ids", ids.map { it.toString() }.toSet()).apply()
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -182,6 +195,25 @@ class TimetableViewModel @Inject constructor(
             val dayMatch = if (s.isDayView) course.dayOfWeek == s.selectedDay else true
             weekMatch && dayMatch
         }
+    }
+
+    /**
+     * 设置用户在重叠课程弹窗退出时选择的优选展示课程。
+     */
+    fun setPreferredCourse(course: Course, cluster: List<Course>) {
+        val clusterIds = cluster.map { it.id }.toSet()
+        val current = _state.value.preferredCourseIds
+        val updated = (current - clusterIds) + course.id
+        savePreferredCourseIds(updated)
+        _state.update { it.copy(preferredCourseIds = updated) }
+    }
+
+    /**
+     * 获取按时段聚类后的课程簇列表，内部已选定 primaryCourse。
+     */
+    fun getCourseClusters(week: Int = _state.value.currentWeek): List<com.chen.schedule.util.CourseConflictDetector.CourseCluster> {
+        val filtered = getFilteredCourses(week)
+        return com.chen.schedule.util.CourseConflictDetector.resolveClusters(filtered, _state.value.preferredCourseIds)
     }
 
     /**

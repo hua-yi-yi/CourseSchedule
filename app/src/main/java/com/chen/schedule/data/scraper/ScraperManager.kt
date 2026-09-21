@@ -20,4 +20,21 @@ class ScraperManager @Inject constructor(
 
     /** 所有可用适配器 */
     fun available(): List<ScraperAdapter> = adapters.values.toList()
+
+    /** 获取所有支持的高校预设列表 */
+    fun presets(): List<SchoolPreset> = SchoolRegistry.allPresets()
+
+    /** 搜索高校预设 */
+    fun searchPresets(query: String): List<SchoolPreset> = SchoolRegistry.search(query)
+
+    /** 根据高校预设配置适配器 */
+    fun configurePreset(preset: SchoolPreset): ScraperAdapter? {
+        val adapter = adapter(ZhengfangScraper.NAME) ?: return null
+        adapter.config = ScraperConfig(
+            name = preset.name,
+            baseUrl = preset.baseUrl,
+            loginUrl = preset.loginUrl
+        )
+        return adapter
+    }
 }

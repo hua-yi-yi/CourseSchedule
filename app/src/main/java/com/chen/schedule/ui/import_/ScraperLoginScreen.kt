@@ -21,6 +21,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,6 +35,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -91,7 +95,24 @@ fun ScraperLoginScreen(
             Button(onClick = onHaustImport, modifier = Modifier.fillMaxWidth()) {
                 Text("河南科技大学 · VPN / 校内导入")
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
+
+            val presets = remember { viewModel.presets().filter { it.baseUrl.isNotBlank() } }
+            if (presets.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    presets.forEach { preset ->
+                        AssistChip(
+                            onClick = { viewModel.selectPreset(preset) },
+                            label = { Text(preset.name, fontSize = 12.sp) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
             OutlinedTextField(
                 value = state.url,
                 onValueChange = viewModel::onUrlChange,

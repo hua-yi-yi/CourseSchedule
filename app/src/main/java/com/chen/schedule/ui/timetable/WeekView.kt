@@ -46,16 +46,17 @@ private val TIME_COL = 36
 
 @Composable
 fun WeekView(
-    courses: List<Course>,
+    clusters: List<com.chen.schedule.util.CourseConflictDetector.CourseCluster>,
     timeSlots: List<TimeSlot>,
     showWeekend: Boolean,
     semesterStartDate: Long?,
     currentWeek: Int,
-    onCourseClick: (Course) -> Unit,
+    onCourseClick: (primaryCourse: Course, cluster: List<Course>) -> Unit,
     onBlankCellClick: (dayOfWeek: Int, slotNumber: Int) -> Unit = { _, _ -> }
 ) {
     val days = DayOfWeek.entries.filter { showWeekend || it.index <= 5 }
-    val visibleSlots = com.chen.schedule.util.TimetableSlots.rows(timeSlots, courses)
+    val allCourses = clusters.flatMap { it.allCourses }
+    val visibleSlots = com.chen.schedule.util.TimetableSlots.rows(timeSlots, allCourses)
     val density = LocalDensity.current
 
     val semesterMonday = semesterStartDate?.let {
@@ -225,8 +226,9 @@ fun WeekView(
                         }
                     }
 
-                    // Layer 2: 课程卡片
-                    courses.forEach { course ->
+                    // Layer 2: 课程卡片 (支持同一时段多门课层叠展示)
+                    clusters.forEach { cluster ->
+                        val course = cluster.primaryCourse
                         val dayIndex = days.indexOfFirst { it.index == course.dayOfWeek }
                         if (dayIndex < 0) return@forEach
 
@@ -238,6 +240,21 @@ fun WeekView(
                         val yPx = (firstRow * slotHPx).toInt()
 
                         val accent = Color(course.color)
+
+                        // 若有多门课重叠, 绘制一层底层底框产生层叠视觉提示
+                        if (cluster.isOverlapping) {
+                            Box(
+                                modifier = Modifier
+                                    .offset { IntOffset(xPx + 2, yPx + 2) }
+                                    .width(cellWidthDp)
+                                    .height((SLOT_H * span).dp)
+                                    .padding(1.5.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(accent.copy(alpha = 0.12f))
+                                    .border(0.8.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+                            )
+                        }
+
                         CourseBlock(
                             course = course,
                             span = span,
@@ -248,12 +265,13 @@ fun WeekView(
                                 .height((SLOT_H * span).dp)
                                 .padding(1.5.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(accent.copy(alpha = 0.15f))
-                                .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
-                                .clickable { onCourseClick(course) }
+                                .background(accent.copy(alpha = 0.16f))
+                                .border(1.dp, accent.copy(alpha = 0.50f), RoundedCornerShape(8.dp))
+                                .clickable { onCourseClick(course, cluster.allCourses) }
                                 .padding(horizontal = if (cellWidthDp < 60.dp) 2.5.dp else 5.dp, vertical = 3.5.dp),
                             compact = span == 1,
-                            narrow = cellWidthDp < 60.dp
+                            narrow = cellWidthDp < 60.dp,
+                            overlapCount = cluster.overlapCount
                         )
                     }
                 }
@@ -262,7 +280,30 @@ fun WeekView(
     }
 }
 
-/** 课程块:左侧色条 + 信息列(周视图与日视图共用视觉语言) */
+/** 兼容旧版调用的 WeekView 重载 */
+@Composable
+fun WeekView(
+    courses: List<Course>,
+    timeSlots: List<TimeSlot>,
+    showWeekend: Boolean,
+    semesterStartDate: Long?,
+    currentWeek: Int,
+    onCourseClick: (Course) -> Unit,
+    onBlankCellClick: (dayOfWeek: Int, slotNumber: Int) -> Unit = { _, _ -> }
+) {
+    val clusters = com.chen.schedule.util.CourseConflictDetector.resolveClusters(courses)
+    WeekView(
+        clusters = clusters,
+        timeSlots = timeSlots,
+        showWeekend = showWeekend,
+        semesterStartDate = semesterStartDate,
+        currentWeek = currentWeek,
+        onCourseClick = { primary, _ -> onCourseClick(primary) },
+        onBlankCellClick = onBlankCellClick
+    )
+}
+
+/** 课程块:左侧色条 + 信息列(周视图与日视图共用视觉语言)，右上角标注重叠门数 */
 @Composable
 internal fun CourseBlock(
     course: Course,
@@ -270,51 +311,73 @@ internal fun CourseBlock(
     accent: Color,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
-    narrow: Boolean = false
+    narrow: Boolean = false,
+    overlapCount: Int = 1
 ) {
-    Row(modifier = modifier) {
-        if (!narrow) Box(
-            modifier = Modifier
-                .width(2.5.dp)
-                .fillMaxHeight()
-                .clip(RoundedCornerShape(1.5.dp))
-                .background(accent)
-        )
-        Column(modifier = Modifier.padding(start = if (narrow) 0.dp else 4.dp).fillMaxWidth()) {
-            Text(
-                course.name,
-                fontSize = if (narrow) 10.5.sp else 11.5.sp,
-                lineHeight = if (narrow) 12.5.sp else 13.5.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = if (span >= 2) (if (narrow) 3 else 2) else 2,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface
+    Box(modifier = modifier) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            if (!narrow) Box(
+                modifier = Modifier
+                    .width(2.5.dp)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(1.5.dp))
+                    .background(accent)
             )
-            // 地点完整展示: 放宽行数限制至 4-5 行并允许自动软折行, 确保超长教室名完整呈现
-            if (course.classroom.isNotBlank()) {
-                androidx.compose.foundation.layout.Spacer(Modifier.height(1.dp))
+            Column(modifier = Modifier.padding(start = if (narrow) 0.dp else 4.dp).fillMaxWidth()) {
                 Text(
-                    "@${course.classroom}",
-                    fontSize = if (narrow) 8.5.sp else 9.sp,
-                    lineHeight = if (narrow) 10.5.sp else 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = if (span >= 2) 5 else 3,
+                    course.name,
+                    fontSize = if (narrow) 10.5.sp else 11.5.sp,
+                    lineHeight = if (narrow) 12.5.sp else 13.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = if (span >= 2) (if (narrow) 3 else 2) else 2,
                     overflow = TextOverflow.Ellipsis,
-                    softWrap = true,
-                    color = accent.copy(alpha = 0.95f)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-            }
-            if (!compact) {
-                if (course.teacher.isNotBlank() && span >= 3) {
+                // 地点完整展示: 放宽行数限制至 4-5 行并允许自动软折行, 确保超长教室名完整呈现
+                if (course.classroom.isNotBlank()) {
+                    androidx.compose.foundation.layout.Spacer(Modifier.height(1.dp))
                     Text(
-                        course.teacher,
-                        fontSize = 8.sp,
-                        lineHeight = 10.sp,
-                        maxLines = 1,
+                        "@${course.classroom}",
+                        fontSize = if (narrow) 8.5.sp else 9.sp,
+                        lineHeight = if (narrow) 10.5.sp else 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = if (span >= 2) 5 else 3,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                        softWrap = true,
+                        color = accent.copy(alpha = 0.95f)
                     )
                 }
+                if (!compact) {
+                    if (course.teacher.isNotBlank() && span >= 3) {
+                        Text(
+                            course.teacher,
+                            fontSize = 8.sp,
+                            lineHeight = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                        )
+                    }
+                }
+            }
+        }
+
+        // 重叠角标：右上角展示「X门」徽标
+        if (overlapCount > 1) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .clip(RoundedCornerShape(3.5.dp))
+                    .background(accent.copy(alpha = 0.92f))
+                    .padding(horizontal = 3.dp, vertical = 0.5.dp)
+            ) {
+                Text(
+                    text = "${overlapCount}门",
+                    color = Color.White,
+                    fontSize = 7.5.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    lineHeight = 8.5.sp
+                )
             }
         }
     }

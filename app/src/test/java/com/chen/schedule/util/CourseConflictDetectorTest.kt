@@ -108,4 +108,59 @@ class CourseConflictDetectorTest {
         val course = Course(id = 10L, dayOfWeek = 1, startSlot = 1, endSlot = 2, startWeek = 1, endWeek = 16)
         assertNull(CourseConflictDetector.checkConflict(course, course))
     }
+
+    @Test
+    fun groupOverlappingCourses_clustersOverlappingSlots() {
+        val courseA = Course(id = 1L, name = "计算机网络", dayOfWeek = 1, startSlot = 1, endSlot = 2)
+        val courseB = Course(id = 2L, name = "操作系统", dayOfWeek = 1, startSlot = 2, endSlot = 3)
+        val courseC = Course(id = 3L, name = "大学体育", dayOfWeek = 1, startSlot = 5, endSlot = 6)
+
+        val groups = CourseConflictDetector.groupOverlappingCourses(listOf(courseA, courseB, courseC))
+        assertEquals(2, groups.size)
+        // A 与 B 在第 2 节相交，聚类在一起
+        assertEquals(2, groups[0].size)
+        assertEquals(setOf(1L, 2L), groups[0].map { it.id }.toSet())
+        // C 独立聚类
+        assertEquals(1, groups[1].size)
+        assertEquals(3L, groups[1].first().id)
+    }
+
+    @Test
+    fun resolveClusters_respectsPreferredCourseIds() {
+        val course1 = Course(id = 101L, name = "概率论", dayOfWeek = 2, startSlot = 3, endSlot = 4)
+        val course2 = Course(id = 102L, name = "离散数学", dayOfWeek = 2, startSlot = 3, endSlot = 4)
+
+        // 默认无偏好时，第一门为 primaryCourse
+        val clustersDefault = CourseConflictDetector.resolveClusters(listOf(course1, course2))
+        assertEquals(1, clustersDefault.size)
+        val cluster1 = clustersDefault.first()
+        org.junit.Assert.assertTrue(cluster1.isOverlapping)
+        assertEquals(2, cluster1.overlapCount)
+        assertEquals(101L, cluster1.primaryCourse.id)
+
+        // 指定偏好 102L 时，102L 成为代表课程并在最上层展示
+        val clustersPreferred = CourseConflictDetector.resolveClusters(
+            listOf(course1, course2),
+            preferredCourseIds = setOf(102L)
+        )
+        assertEquals(1, clustersPreferred.size)
+        assertEquals(102L, clustersPreferred.first().primaryCourse.id)
+    }
+
+    @Test
+    fun resolveClusters_multiDaysAndMultipleClusters() {
+        val mon1 = Course(id = 1L, dayOfWeek = 1, startSlot = 1, endSlot = 2)
+        val mon2 = Course(id = 2L, dayOfWeek = 1, startSlot = 1, endSlot = 2)
+        val wed = Course(id = 3L, dayOfWeek = 3, startSlot = 3, endSlot = 4)
+
+        val clusters = CourseConflictDetector.resolveClusters(listOf(mon1, mon2, wed))
+        assertEquals(2, clusters.size)
+        val monCluster = clusters.first { it.primaryCourse.dayOfWeek == 1 }
+        val wedCluster = clusters.first { it.primaryCourse.dayOfWeek == 3 }
+
+        org.junit.Assert.assertTrue(monCluster.isOverlapping)
+        assertEquals(2, monCluster.overlapCount)
+        org.junit.Assert.assertFalse(wedCluster.isOverlapping)
+        assertEquals(1, wedCluster.overlapCount)
+    }
 }

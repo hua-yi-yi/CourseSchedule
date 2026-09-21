@@ -17,18 +17,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Add
@@ -101,7 +94,8 @@ fun TimetableScreen(
     viewModel: TimetableViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    var selectedCourse by remember { mutableStateOf<Course?>(null) }
+    var selectedCluster by remember { mutableStateOf<List<Course>?>(null) }
+    var activeCourseIndex by remember { mutableStateOf(0) }
     var pendingDelete by remember { mutableStateOf<Course?>(null) }
 
     /** 统一的「点击空白格」入口:返回非 null 表示配置完整,可直接进入新增课程。 */
@@ -207,9 +201,12 @@ fun TimetableScreen(
                                 )
                                 DayView(
                                     isToday = week == actualWeek && state.selectedDay == LocalDate.now().dayOfWeek.value,
-                                    courses = viewModel.getFilteredCourses(week),
+                                    clusters = viewModel.getCourseClusters(week),
                                     timeSlots = state.timeSlots,
-                                    onCourseClick = { selectedCourse = it },
+                                    onCourseClick = { primary, cluster ->
+                                        selectedCluster = cluster
+                                        activeCourseIndex = cluster.indexOfFirst { it.id == primary.id }.coerceAtLeast(0)
+                                    },
                                     onBlankCellClick = { slotNumber ->
                                         handleBlankClick(state.selectedDay, slotNumber)
                                     }
@@ -217,12 +214,15 @@ fun TimetableScreen(
                             }
                         } else {
                             WeekView(
-                                courses = viewModel.getFilteredCourses(week),
+                                clusters = viewModel.getCourseClusters(week),
                                 timeSlots = state.timeSlots,
                                 showWeekend = state.showWeekend,
                                 semesterStartDate = semester.startDate,
                                 currentWeek = week,
-                                onCourseClick = { selectedCourse = it },
+                                onCourseClick = { primary, cluster ->
+                                    selectedCluster = cluster
+                                    activeCourseIndex = cluster.indexOfFirst { it.id == primary.id }.coerceAtLeast(0)
+                                },
                                 onBlankCellClick = { dayOfWeek, slotNumber ->
                                     handleBlankClick(dayOfWeek, slotNumber)
                                 }
@@ -278,20 +278,26 @@ fun TimetableScreen(
         )
     }
 
-    // 课程详情弹窗
-    selectedCourse?.let { course ->
+    // 课程详情弹窗 (支持重叠课程左右滑动与退出记忆)
+    selectedCluster?.let { cluster ->
         CourseDetailDialog(
-            course = course,
-            onDismiss = { selectedCourse = null },
-            onEdit = {
+            cluster = cluster,
+            initialIndex = activeCourseIndex,
+            onDismiss = { closedCourse ->
+                viewModel.setPreferredCourse(closedCourse, cluster)
+                selectedCluster = null
+            },
+            onEdit = { course ->
                 state.currentSemester?.let { sem ->
+                    viewModel.setPreferredCourse(course, cluster)
                     onEditCourse(course.id, sem.id)
-                    selectedCourse = null
+                    selectedCluster = null
                 }
             },
-            onDelete = {
+            onDelete = { course ->
+                viewModel.setPreferredCourse(course, cluster)
                 pendingDelete = course
-                selectedCourse = null
+                selectedCluster = null
             }
         )
     }
@@ -561,71 +567,149 @@ private fun EmptySemesterState(
 
 @Composable
 private fun CourseDetailDialog(
-    course: Course,
-    onDismiss: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
+    cluster: List<Course>,
+    initialIndex: Int = 0,
+    onDismiss: (Course) -> Unit,
+    onEdit: (Course) -> Unit,
+    onDelete: (Course) -> Unit
 ) {
-    val accent = Color(course.color)
+    val pagerState = rememberPagerState(
+        initialPage = initialIndex.coerceIn(0, (cluster.size - 1).coerceAtLeast(0))
+    ) {
+        cluster.size
+    }
+    val coroutineScope = rememberCoroutineScope()
+    val currentCourse = cluster.getOrNull(pagerState.currentPage) ?: cluster.first()
+
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { onDismiss(currentCourse) },
         shape = RoundedCornerShape(22.dp),
-        icon = {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(accent.copy(alpha = 0.18f))
-                    .border(1.2.dp, accent.copy(alpha = 0.40f), RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    course.name.take(1),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = accent
-                )
+        title = if (cluster.size > 1) {
+            {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            if (pagerState.currentPage > 0) {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                                }
+                            }
+                        },
+                        enabled = pagerState.currentPage > 0,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(Icons.Default.ChevronLeft, contentDescription = "上一门")
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .padding(horizontal = 10.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            "第 ${pagerState.currentPage + 1}/${cluster.size} 门 (左右滑动)",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            if (pagerState.currentPage < cluster.size - 1) {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                }
+                            }
+                        },
+                        enabled = pagerState.currentPage < cluster.size - 1,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(Icons.Default.ChevronRight, contentDescription = "下一门")
+                    }
+                }
             }
-        },
-        title = {
-            Text(
-                course.name,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
+        } else null,
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (course.teacher.isNotBlank()) {
-                    DetailRow(Icons.Default.Person, "教师", course.teacher)
-                }
-                if (course.classroom.isNotBlank()) {
-                    DetailRow(Icons.Default.Place, "教室", course.classroom)
-                }
-                DetailRow(
-                    Icons.Default.Schedule, "时间",
-                    "${DayOfWeek.entries.find { it.index == course.dayOfWeek }?.label ?: ""} ${course.startSlot}-${course.endSlot} 节"
-                )
-                DetailRow(
-                    Icons.Default.DateRange, "周次",
-                    "第 ${course.startWeek}-${course.endWeek} 周 · ${course.weekType.label}"
-                )
-                if (course.note.isNotBlank()) {
-                    DetailRow(Icons.AutoMirrored.Filled.Notes, "备注", course.note)
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxWidth(),
+                key = { page -> "${cluster[page].id}_$page" }
+            ) { page ->
+                val course = cluster[page]
+                val accent = Color(course.color)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(accent.copy(alpha = 0.18f))
+                                .border(1.2.dp, accent.copy(alpha = 0.40f), RoundedCornerShape(14.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                course.name.take(1),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = accent
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            course.name,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(Modifier.height(2.dp))
+
+                    if (course.teacher.isNotBlank()) {
+                        DetailRow(Icons.Default.Person, "教师", course.teacher)
+                    }
+                    if (course.classroom.isNotBlank()) {
+                        DetailRow(Icons.Default.Place, "教室", course.classroom)
+                    }
+                    DetailRow(
+                        Icons.Default.Schedule, "时间",
+                        "${DayOfWeek.entries.find { it.index == course.dayOfWeek }?.label ?: ""} ${course.startSlot}-${course.endSlot} 节"
+                    )
+                    DetailRow(
+                        Icons.Default.DateRange, "周次",
+                        "第 ${course.startWeek}-${course.endWeek} 周 · ${course.weekType.label}"
+                    )
+                    if (course.note.isNotBlank()) {
+                        DetailRow(Icons.AutoMirrored.Filled.Notes, "备注", course.note)
+                    }
                 }
             }
         },
         confirmButton = {
-            Button(onClick = onEdit) { Text("编辑") }
+            Button(onClick = { onEdit(currentCourse) }) { Text("编辑") }
         },
         dismissButton = {
             Row {
-                TextButton(onClick = onDelete) {
+                TextButton(onClick = { onDelete(currentCourse) }) {
                     Text("删除", color = MaterialTheme.colorScheme.error)
                 }
-                TextButton(onClick = onDismiss) { Text("关闭") }
+                TextButton(onClick = { onDismiss(currentCourse) }) { Text("关闭") }
             }
         }
     )

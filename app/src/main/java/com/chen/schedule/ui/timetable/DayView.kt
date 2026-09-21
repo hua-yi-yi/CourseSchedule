@@ -52,13 +52,14 @@ private val DTIME_COL = 40
 
 @Composable
 fun DayView(
-    courses: List<Course>,
+    clusters: List<com.chen.schedule.util.CourseConflictDetector.CourseCluster>,
     timeSlots: List<TimeSlot>,
     isToday: Boolean = true,
-    onCourseClick: (Course) -> Unit,
+    onCourseClick: (primaryCourse: Course, cluster: List<Course>) -> Unit,
     onBlankCellClick: (slotNumber: Int) -> Unit = {}
 ) {
-    val visibleSlots = com.chen.schedule.util.TimetableSlots.rows(timeSlots, courses)
+    val allCourses = clusters.flatMap { it.allCourses }
+    val visibleSlots = com.chen.schedule.util.TimetableSlots.rows(timeSlots, allCourses)
     val density = LocalDensity.current
 
     val now = LocalTime.now()
@@ -210,8 +211,9 @@ fun DayView(
                     }
                 }
 
-                // Layer 2: 课程卡片
-                courses.forEach { course ->
+                // Layer 2: 课程卡片 (支持同一时段多门课层叠展示)
+                clusters.forEach { cluster ->
+                    val course = cluster.primaryCourse
                     val firstRow = visibleSlots.indexOfFirst { it.slotNumber >= course.startSlot }
                     val lastRow = visibleSlots.indexOfLast { it.slotNumber <= course.endSlot }
                     if (firstRow < 0 || lastRow < firstRow) return@forEach
@@ -220,6 +222,21 @@ fun DayView(
                     val yPx = (firstRow * slotHPx).toInt()
 
                     val accent = Color(course.color)
+
+                    // 若有多门课重叠, 绘制底层底框产生层叠视觉
+                    if (cluster.isOverlapping) {
+                        Box(
+                            modifier = Modifier
+                                .offset { IntOffset(xPx + 3, yPx + 3) }
+                                .width(contentWidthDp)
+                                .height((DSLOT_H * span).dp)
+                                .padding(3.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(accent.copy(alpha = 0.10f))
+                                .border(0.8.dp, accent.copy(alpha = 0.30f), RoundedCornerShape(12.dp))
+                        )
+                    }
+
                     Box(
                         modifier = Modifier
                             .offset { IntOffset(xPx, yPx) }
@@ -229,7 +246,7 @@ fun DayView(
                             .clip(RoundedCornerShape(12.dp))
                             .background(accent.copy(alpha = 0.15f))
                             .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                            .clickable { onCourseClick(course) }
+                            .clickable { onCourseClick(course, cluster.allCourses) }
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -240,7 +257,7 @@ fun DayView(
                                     .clip(RoundedCornerShape(2.dp))
                                     .background(accent)
                             )
-                            Column(modifier = Modifier.padding(start = 10.dp).fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
                                 Text(
                                     course.name,
                                     fontSize = 15.sp,
@@ -278,6 +295,21 @@ fun DayView(
                                     color = accent
                                 )
                             }
+                            if (cluster.isOverlapping) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(accent)
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        "${cluster.overlapCount}门",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -285,4 +317,23 @@ fun DayView(
             }
         }
     }
+}
+
+/** 兼容旧版调用的 DayView 重载 */
+@Composable
+fun DayView(
+    courses: List<Course>,
+    timeSlots: List<TimeSlot>,
+    isToday: Boolean = true,
+    onCourseClick: (Course) -> Unit,
+    onBlankCellClick: (slotNumber: Int) -> Unit = {}
+) {
+    val clusters = com.chen.schedule.util.CourseConflictDetector.resolveClusters(courses)
+    DayView(
+        clusters = clusters,
+        timeSlots = timeSlots,
+        isToday = isToday,
+        onCourseClick = { primary, _ -> onCourseClick(primary) },
+        onBlankCellClick = onBlankCellClick
+    )
 }

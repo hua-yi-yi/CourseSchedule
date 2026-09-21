@@ -24,6 +24,25 @@ object ClassReminderPlanner {
         val startTime: String
     )
 
+    /** 进行中课程信息模型。 */
+    data class OngoingCourseInfo(
+        val courseName: String,
+        val classroom: String,
+        val teacher: String,
+        val slotRange: String,
+        val startTime: String,
+        val endTime: String,
+        val startAtMillis: Long,
+        val endAtMillis: Long
+    )
+
+    /** 正在上课的开始/结束触发事件。 */
+    data class OngoingEvent(
+        val triggerAtMillis: Long,
+        val isStart: Boolean,
+        val info: OngoingCourseInfo
+    )
+
     /**
      * @param nowMillis 当前时刻(早于等于它的提醒被过滤)
      * @param slots 当前学期作息方案的节次
@@ -72,5 +91,99 @@ object ClassReminderPlanner {
             .sortedBy { it.triggerAtMillis }
             .take(maxPlans)
             .toList()
+    }
+
+    /**
+     * 判断当前时刻是否有课程正在进行。
+     * 若此时正好处于某门课的 [startTime, endTime) 之间，则返回该课程的进行中快照，否则返回 null。
+     */
+    fun findCurrentOngoingCourse(
+        nowMillis: Long,
+        slots: List<TimeSlot>,
+        courses: List<Course>,
+        currentWeek: Int,
+        todayDayOfWeek: Int,
+        zone: ZoneId = ZoneId.systemDefault()
+    ): OngoingCourseInfo? {
+        val slotByNumber = slots.associateBy { it.slotNumber }
+        val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+        return courses.asSequence()
+            .filter { it.dayOfWeek == todayDayOfWeek }
+            .filter { it.appliesToWeek(currentWeek) }
+            .mapNotNull { course ->
+                val startSlot = slotByNumber[course.startSlot] ?: return@mapNotNull null
+                val endSlot = slotByNumber[course.endSlot] ?: startSlot
+                val startTime = ScheduleStatus.parseTime(startSlot.startTime) ?: return@mapNotNull null
+                val endTime = ScheduleStatus.parseTime(endSlot.endTime) ?: return@mapNotNull null
+                val startMillis = today.atTime(startTime).atZone(zone).toInstant().toEpochMilli()
+                val endMillis = today.atTime(endTime).atZone(zone).toInstant().toEpochMilli()
+                if (nowMillis in startMillis until endMillis) {
+                    OngoingCourseInfo(
+                        courseName = course.name,
+                        classroom = course.classroom,
+                        teacher = course.teacher,
+                        slotRange = if (course.endSlot > course.startSlot) {
+                            "第 ${course.startSlot}-${course.endSlot} 节"
+                        } else {
+                            "第 ${course.startSlot} 节"
+                        },
+                        startTime = startSlot.startTime,
+                        endTime = endSlot.endTime,
+                        startAtMillis = startMillis,
+                        endAtMillis = endMillis
+                    )
+                } else {
+                    null
+                }
+            }
+            .firstOrNull()
+    }
+
+    /**
+     * 计算今天后续所有课程的开始与下课事件点（用于自动刷新/移除正在上课看板）。
+     */
+    fun planOngoingEvents(
+        nowMillis: Long,
+        slots: List<TimeSlot>,
+        courses: List<Course>,
+        currentWeek: Int,
+        todayDayOfWeek: Int,
+        zone: ZoneId = ZoneId.systemDefault(),
+        maxEvents: Int = 64
+    ): List<OngoingEvent> {
+        val slotByNumber = slots.associateBy { it.slotNumber }
+        val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+        val events = mutableListOf<OngoingEvent>()
+        for (course in courses) {
+            if (course.dayOfWeek != todayDayOfWeek || !course.appliesToWeek(currentWeek)) continue
+            val startSlot = slotByNumber[course.startSlot] ?: continue
+            val endSlot = slotByNumber[course.endSlot] ?: startSlot
+            val startTime = ScheduleStatus.parseTime(startSlot.startTime) ?: continue
+            val endTime = ScheduleStatus.parseTime(endSlot.endTime) ?: continue
+            val startMillis = today.atTime(startTime).atZone(zone).toInstant().toEpochMilli()
+            val endMillis = today.atTime(endTime).atZone(zone).toInstant().toEpochMilli()
+            val slotRange = if (course.endSlot > course.startSlot) {
+                "第 ${course.startSlot}-${course.endSlot} 节"
+            } else {
+                "第 ${course.startSlot} 节"
+            }
+            val info = OngoingCourseInfo(
+                courseName = course.name,
+                classroom = course.classroom,
+                teacher = course.teacher,
+                slotRange = slotRange,
+                startTime = startSlot.startTime,
+                endTime = endSlot.endTime,
+                startAtMillis = startMillis,
+                endAtMillis = endMillis
+            )
+            if (startMillis > nowMillis) {
+                events.add(OngoingEvent(startMillis, isStart = true, info = info))
+            }
+            if (endMillis > nowMillis) {
+                events.add(OngoingEvent(endMillis, isStart = false, info = info))
+            }
+        }
+        return events.sortedBy { it.triggerAtMillis }.take(maxEvents)
     }
 }

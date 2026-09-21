@@ -40,6 +40,35 @@ class ClassReminderReceiver : BroadcastReceiver() {
                     }
                 }
             }
+            ClassReminderManager.ACTION_CLASS_START -> {
+                val courseName = intent.getStringExtra(ClassReminderManager.EXTRA_TITLE).orEmpty()
+                val classroom = intent.getStringExtra(ClassReminderManager.EXTRA_CLASSROOM).orEmpty()
+                val teacher = intent.getStringExtra(ClassReminderManager.EXTRA_TEACHER).orEmpty()
+                val slotRange = intent.getStringExtra(ClassReminderManager.EXTRA_SLOT_RANGE).orEmpty()
+                val startTime = intent.getStringExtra(ClassReminderManager.EXTRA_START_TIME).orEmpty()
+                val endTime = intent.getStringExtra(ClassReminderManager.EXTRA_END_TIME).orEmpty()
+                val prefs = ReminderPrefs(appContext)
+                if (prefs.enabled && prefs.ongoingClassEnabled && courseName.isNotBlank()) {
+                    ClassReminderManager.notifyOngoing(
+                        appContext,
+                        ClassReminderPlanner.OngoingCourseInfo(
+                            courseName = courseName,
+                            classroom = classroom,
+                            teacher = teacher,
+                            slotRange = slotRange,
+                            startTime = startTime,
+                            endTime = endTime,
+                            startAtMillis = 0L,
+                            endAtMillis = 0L
+                        )
+                    )
+                }
+            }
+            ClassReminderManager.ACTION_CLASS_END -> {
+                ClassReminderManager.clearOngoing(appContext)
+                // 下课后异步触发一次重排以检查后续状态与小组件刷新
+                ClassReminderManager.rescheduleAsync(appContext)
+            }
             else -> notifyClass(appContext, intent)
         }
     }

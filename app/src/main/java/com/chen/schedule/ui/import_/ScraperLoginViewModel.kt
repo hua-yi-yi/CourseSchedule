@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class ScraperLoginState(
-    val url: String = "https://jwgl.haust.edu.cn/eams/homeExt.action",
+    val url: String = "",
     val username: String = "",
     val password: String = "",
     val captchaBytes: ByteArray? = null,
@@ -55,6 +55,14 @@ class ScraperLoginViewModel @Inject constructor(
     fun onUsernameChange(value: String) = _state.update { it.copy(username = value) }
     fun onPasswordChange(value: String) = _state.update { it.copy(password = value) }
     fun onCaptchaChange(value: String) = _state.update { it.copy(captchaCode = value) }
+
+    fun presets(): List<com.chen.schedule.data.scraper.SchoolPreset> = scraperManager.presets()
+
+    fun selectPreset(preset: com.chen.schedule.data.scraper.SchoolPreset) {
+        if (preset.baseUrl.isNotBlank()) {
+            _state.update { it.copy(url = preset.baseUrl, message = "已选择: ${preset.name}", isError = false) }
+        }
+    }
 
     /** 根据用户输入的地址更新抓取器配置;返回错误信息或 null */
     private fun applyScraperConfig(): String? {

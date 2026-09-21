@@ -116,6 +116,7 @@ class SettingsViewModel @Inject constructor(
 
     var reminderEnabled by androidx.compose.runtime.mutableStateOf(false); private set
     var reminderLead by androidx.compose.runtime.mutableStateOf(ReminderPrefs.DEFAULT_LEAD_MINUTES); private set
+    var reminderOngoing by androidx.compose.runtime.mutableStateOf(true); private set
 
     var autoCheckUpdate by androidx.compose.runtime.mutableStateOf(true); private set
     var useMirror by androidx.compose.runtime.mutableStateOf(true); private set
@@ -131,6 +132,7 @@ class SettingsViewModel @Inject constructor(
     init {
         reminderEnabled = reminderPrefs.enabled
         reminderLead = reminderPrefs.leadMinutes
+        reminderOngoing = reminderPrefs.ongoingClassEnabled
 
         autoCheckUpdate = updatePrefs.autoCheckUpdate
         useMirror = updatePrefs.useMirror
@@ -234,6 +236,13 @@ class SettingsViewModel @Inject constructor(
     fun updateReminderLead(minutes: Int) {
         reminderPrefs.leadMinutes = minutes
         reminderLead = minutes
+        ClassReminderManager.rescheduleAsync(context)
+    }
+
+    /** 开关上课中常驻看板:立即更新偏好并重排看板与闹钟。 */
+    fun updateReminderOngoing(enabled: Boolean) {
+        reminderPrefs.ongoingClassEnabled = enabled
+        reminderOngoing = enabled
         ClassReminderManager.rescheduleAsync(context)
     }
 
@@ -676,6 +685,36 @@ fun SettingsScreen(
                             label = { Text("提前 $minutes 分钟", fontSize = 12.sp) }
                         )
                     }
+                }
+                GroupDivider()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("上课中常驻看板", style = MaterialTheme.typography.bodyMedium, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            if (!viewModel.reminderEnabled) {
+                                "需先开启上方提醒总开关"
+                            } else if (viewModel.reminderOngoing) {
+                                "正在上课时常驻显示教室、节次与下课时间，下课后自动清除"
+                            } else {
+                                "已关闭，上课时不显示常驻卡片"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = viewModel.reminderOngoing,
+                        enabled = viewModel.reminderEnabled,
+                        onCheckedChange = { enabled ->
+                            viewModel.updateReminderOngoing(enabled)
+                        }
+                    )
                 }
             }
 
