@@ -1,22 +1,23 @@
 package com.chen.schedule.ui.timetable
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -56,12 +57,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -164,75 +166,67 @@ fun TimetableScreen(
                         onNavigateToSettings = onNavigateToSettings
                     )
 
-                    // ===== 左右滑动切换周 (支持手势拖拽、速度快速翻页与平滑横向切换动画) =====
-                    var dragDistance by remember { mutableFloatStateOf(0f) }
-                    val minSwipeDistance = with(LocalDensity.current) { 40.dp.toPx() }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .draggable(
-                                state = rememberDraggableState { delta ->
-                                    dragDistance += delta
-                                },
-                                orientation = Orientation.Horizontal,
-                                onDragStarted = { dragDistance = 0f },
-                                onDragStopped = { velocity ->
-                                    val threshold = minSwipeDistance
-                                    val totalWeeks = semester.totalWeeks
-                                    val currentWeek = state.currentWeek
-                                    if ((dragDistance < -threshold || velocity < -800f) && currentWeek < totalWeeks) {
-                                        viewModel.nextWeek()
-                                    } else if ((dragDistance > threshold || velocity > 800f) && currentWeek > 1) {
-                                        viewModel.prevWeek()
-                                    }
-                                    dragDistance = 0f
-                                }
-                            )
+                    // ===== 极度跟手的真实左右滑动切周 (HorizontalPager 实时跟随手指、惯性滑动与边缘回弹) =====
+                    val pagerState = rememberPagerState(
+                        initialPage = (state.currentWeek - 1).coerceIn(0, (semester.totalWeeks - 1).coerceAtLeast(0))
                     ) {
-                        AnimatedContent(
-                            targetState = state.currentWeek,
-                            transitionSpec = {
-                                if (targetState > initialState) {
-                                    (slideInHorizontally(animationSpec = tween(240)) { width -> width } + fadeIn(animationSpec = tween(240)))
-                                        .togetherWith(slideOutHorizontally(animationSpec = tween(240)) { width -> -width } + fadeOut(animationSpec = tween(240)))
-                                } else {
-                                    (slideInHorizontally(animationSpec = tween(240)) { width -> -width } + fadeIn(animationSpec = tween(240)))
-                                        .togetherWith(slideOutHorizontally(animationSpec = tween(240)) { width -> width } + fadeOut(animationSpec = tween(240)))
+                        semester.totalWeeks.coerceAtLeast(1)
+                    }
+
+                    // 监听 Pager 滑动结束 (settledPage), 同步当前查看周次到 ViewModel
+                    LaunchedEffect(pagerState) {
+                        snapshotFlow { pagerState.settledPage }
+                            .collect { settledPage ->
+                                val newWeek = settledPage + 1
+                                if (newWeek != state.currentWeek) {
+                                    viewModel.setWeek(newWeek)
                                 }
-                            },
-                            label = "weekTransition"
-                        ) { week ->
-                            if (state.isDayView) {
-                                Column(modifier = Modifier.fillMaxWidth()) {
-                                    DaySelector(
-                                        selectedDay = state.selectedDay,
-                                        onDaySelected = viewModel::selectDay,
-                                        showWeekend = state.showWeekend
-                                    )
-                                    DayView(
-                                        isToday = week == actualWeek && state.selectedDay == LocalDate.now().dayOfWeek.value,
-                                        courses = viewModel.getFilteredCourses(week),
-                                        timeSlots = state.timeSlots,
-                                        onCourseClick = { selectedCourse = it },
-                                        onBlankCellClick = { slotNumber ->
-                                            handleBlankClick(state.selectedDay, slotNumber)
-                                        }
-                                    )
-                                }
-                            } else {
-                                WeekView(
+                            }
+                    }
+
+                    // 监听外部按键切周 (如顶栏 ‹ / › / 回到本周按键点击), 平滑滚动 Pager
+                    LaunchedEffect(state.currentWeek) {
+                        val targetPage = (state.currentWeek - 1).coerceIn(0, (semester.totalWeeks - 1).coerceAtLeast(0))
+                        if (pagerState.currentPage != targetPage && targetPage < pagerState.pageCount) {
+                            pagerState.animateScrollToPage(targetPage)
+                        }
+                    }
+
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxWidth(),
+                        key = { page -> page }
+                    ) { page ->
+                        val week = page + 1
+                        if (state.isDayView) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                DaySelector(
+                                    selectedDay = state.selectedDay,
+                                    onDaySelected = viewModel::selectDay,
+                                    showWeekend = state.showWeekend
+                                )
+                                DayView(
+                                    isToday = week == actualWeek && state.selectedDay == LocalDate.now().dayOfWeek.value,
                                     courses = viewModel.getFilteredCourses(week),
                                     timeSlots = state.timeSlots,
-                                    showWeekend = state.showWeekend,
-                                    semesterStartDate = semester.startDate,
-                                    currentWeek = week,
                                     onCourseClick = { selectedCourse = it },
-                                    onBlankCellClick = { dayOfWeek, slotNumber ->
-                                        handleBlankClick(dayOfWeek, slotNumber)
+                                    onBlankCellClick = { slotNumber ->
+                                        handleBlankClick(state.selectedDay, slotNumber)
                                     }
                                 )
                             }
+                        } else {
+                            WeekView(
+                                courses = viewModel.getFilteredCourses(week),
+                                timeSlots = state.timeSlots,
+                                showWeekend = state.showWeekend,
+                                semesterStartDate = semester.startDate,
+                                currentWeek = week,
+                                onCourseClick = { selectedCourse = it },
+                                onBlankCellClick = { dayOfWeek, slotNumber ->
+                                    handleBlankClick(dayOfWeek, slotNumber)
+                                }
+                            )
                         }
                     }
                 } // 整页滚动结束
@@ -313,12 +307,12 @@ private fun TopMenu(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(28.dp)) {
+        IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(34.dp)) {
             Icon(
                 Icons.Default.Menu,
                 contentDescription = "菜单",
                 tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(22.dp)
             )
         }
         DropdownMenu(
@@ -326,13 +320,13 @@ private fun TopMenu(
             onDismissRequest = { menuOpen = false }
         ) {
             DropdownMenuItem(
-                text = { Text("导入课表", fontSize = 13.sp) },
-                leadingIcon = { Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                text = { Text("导入课表", fontSize = 13.5.sp) },
+                leadingIcon = { Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 onClick = { menuOpen = false; onNavigateToImport() }
             )
             DropdownMenuItem(
-                text = { Text("设置", fontSize = 13.sp) },
-                leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                text = { Text("设置", fontSize = 13.5.sp) },
+                leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 onClick = { menuOpen = false; onNavigateToSettings() }
             )
         }
@@ -370,7 +364,7 @@ private fun CompactTopBar(
         )
         Text(
             semesterName,
-            fontSize = 11.5.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -382,54 +376,54 @@ private fun CompactTopBar(
 
         Spacer(Modifier.weight(1f))
 
-        // 2. 中间: 极简周切换 ‹ 第 N 周 › (+ 回本周微胶囊)
+        // 2. 中间: 周切换 ‹ 第 N 周 › (+ 回本周微胶囊)
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
                 onClick = onPrevWeek,
                 enabled = currentWeek > 1,
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier.size(32.dp)
             ) {
                 Icon(
                     Icons.Default.ChevronLeft, "上一周",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek > 1) 1f else 0.25f),
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
             Text(
                 "第$currentWeek",
-                fontSize = 12.sp,
+                fontSize = 13.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
                 "/$totalWeeks",
-                fontSize = 9.5.sp,
+                fontSize = 10.5.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             IconButton(
                 onClick = onNextWeek,
                 enabled = currentWeek < totalWeeks,
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier.size(32.dp)
             ) {
                 Icon(
                     Icons.Default.ChevronRight, "下一周",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek < totalWeeks) 1f else 0.25f),
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
             if (!isCurrentWeek) {
                 Text(
                     "本周",
-                    fontSize = 9.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable(onClick = onBackToToday)
-                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
                 )
             }
         }
@@ -439,24 +433,24 @@ private fun CompactTopBar(
         // 3. 右侧: 周末开关微按钮 + 视图切换微按钮
         Text(
             text = if (showWeekend) "周末" else "五天",
-            fontSize = 9.5.sp,
+            fontSize = 10.5.sp,
             fontWeight = FontWeight.Medium,
             color = if (showWeekend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .clip(RoundedCornerShape(4.dp))
                 .background(if (showWeekend) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent)
                 .clickable(onClick = onToggleWeekend)
-                .padding(horizontal = 4.dp, vertical = 2.dp)
+                .padding(horizontal = 5.dp, vertical = 2.5.dp)
         )
 
         Spacer(Modifier.width(2.dp))
 
-        IconButton(onClick = onToggleView, modifier = Modifier.size(28.dp)) {
+        IconButton(onClick = onToggleView, modifier = Modifier.size(34.dp)) {
             Icon(
                 if (isDayView) Icons.AutoMirrored.Filled.Notes else Icons.Default.DateRange,
                 contentDescription = if (isDayView) "切换周视图" else "切换日视图",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
     }

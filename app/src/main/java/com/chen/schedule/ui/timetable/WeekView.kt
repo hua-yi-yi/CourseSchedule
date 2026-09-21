@@ -69,7 +69,7 @@ fun WeekView(
 
     Card(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 4.dp),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
@@ -141,7 +141,7 @@ fun WeekView(
             // ===== Grid + 课程卡片 =====
             // 垂直滚动由主页统一接管:上滑时头部与周切换随内容一起滑出屏幕
             BoxWithConstraints(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxWidth()
             ) {
                 val cellWidthDp = (maxWidth - TIME_COL.dp) / days.size
                 val cellWidthPx: Float
@@ -246,12 +246,12 @@ fun WeekView(
                                 .offset { IntOffset(xPx, yPx) }
                                 .width(cellWidthDp)
                                 .height((SLOT_H * span).dp)
-                                .padding(2.5.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .padding(1.5.dp)
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(accent.copy(alpha = 0.15f))
-                                .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                                .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
                                 .clickable { onCourseClick(course) }
-                                .padding(horizontal = if (cellWidthDp < 60.dp) 3.5.dp else 6.dp, vertical = 5.dp),
+                                .padding(horizontal = if (cellWidthDp < 60.dp) 2.5.dp else 5.dp, vertical = 3.5.dp),
                             compact = span == 1,
                             narrow = cellWidthDp < 60.dp
                         )
@@ -280,35 +280,36 @@ internal fun CourseBlock(
                 .clip(RoundedCornerShape(1.5.dp))
                 .background(accent)
         )
-        Column(modifier = Modifier.padding(start = if (narrow) 0.dp else 5.dp).fillMaxWidth()) {
+        Column(modifier = Modifier.padding(start = if (narrow) 0.dp else 4.dp).fillMaxWidth()) {
             Text(
                 course.name,
-                fontSize = if (narrow) 11.sp else 11.5.sp,
-                lineHeight = 13.5.sp,
+                fontSize = if (narrow) 10.5.sp else 11.5.sp,
+                lineHeight = if (narrow) 12.5.sp else 13.5.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines = if (narrow && span > 1) 3 else 2,
+                maxLines = if (span >= 2) (if (narrow) 3 else 2) else 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            // 地点始终完整展示,不受 compact 限制
+            // 地点完整展示: 放宽行数限制至 4-5 行并允许自动软折行, 确保超长教室名完整呈现
             if (course.classroom.isNotBlank()) {
                 androidx.compose.foundation.layout.Spacer(Modifier.height(1.dp))
                 Text(
                     "@${course.classroom}",
-                    fontSize = 9.sp,
-                    lineHeight = 11.sp,
+                    fontSize = if (narrow) 8.5.sp else 9.sp,
+                    lineHeight = if (narrow) 10.5.sp else 11.sp,
                     fontWeight = FontWeight.Medium,
-                    maxLines = 2,
+                    maxLines = if (span >= 2) 5 else 3,
                     overflow = TextOverflow.Ellipsis,
+                    softWrap = true,
                     color = accent.copy(alpha = 0.95f)
                 )
             }
             if (!compact) {
-                if (course.teacher.isNotBlank() && span >= 2) {
+                if (course.teacher.isNotBlank() && span >= 3) {
                     Text(
                         course.teacher,
-                        fontSize = 8.5.sp,
-                        lineHeight = 10.5.sp,
+                        fontSize = 8.sp,
+                        lineHeight = 10.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)

@@ -44,7 +44,7 @@ data class TimetableState(
     val currentWeek: Int = 1,
     val selectedDay: Int = java.time.LocalDate.now().dayOfWeek.value, // Monday = DayOfWeek.MON.index
     val isDayView: Boolean = false,
-    val showWeekend: Boolean = java.time.LocalDate.now().dayOfWeek.value > 5,
+    val showWeekend: Boolean = true,
     /** 引导面板:null = 不显示。 */
     val guide: ScheduleGuide? = null
 ) {

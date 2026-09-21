@@ -74,7 +74,7 @@ fun DayView(
 
     Card(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 4.dp),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
@@ -116,7 +116,7 @@ fun DayView(
 
             BoxWithConstraints(
                 // 垂直滚动由主页统一接管:上滑时头部与周切换随内容一起滑出屏幕
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxWidth()
             ) {
                 val contentWidthDp = maxWidth - DTIME_COL.dp
                 val timeColPx: Float
@@ -255,7 +255,8 @@ fun DayView(
                                         "@${course.classroom}",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Medium,
-                                        maxLines = 2,
+                                        maxLines = 4,
+                                        softWrap = true,
                                         overflow = TextOverflow.Ellipsis,
                                         color = accent.copy(alpha = 0.95f)
                                     )
