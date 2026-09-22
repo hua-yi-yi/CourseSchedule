@@ -105,4 +105,64 @@ class WeekGridBuilderTest {
         assertEquals(WeekGridBuilder.TEXT_LIGHT, WeekGridBuilder.textColorFor(0xFF1E6BE0L)) // 品牌蓝
         assertEquals(WeekGridBuilder.TEXT_LIGHT, WeekGridBuilder.textColorFor(0xFF2E7D32L)) // 深绿
     }
+
+    @Test
+    fun `单元格正确保存教室与起止时间并格式化展示`() {
+        val timeSlots = listOf(
+            com.chen.schedule.domain.model.TimeSlot(slotNumber = 1, startTime = "08:00", endTime = "08:45"),
+            com.chen.schedule.domain.model.TimeSlot(slotNumber = 2, startTime = "08:55", endTime = "09:40")
+        )
+        val c = Course(
+            name = "高数",
+            classroom = "教101",
+            teacher = "张老师",
+            dayOfWeek = 1,
+            startSlot = 1,
+            endSlot = 2,
+            startWeek = 1,
+            endWeek = 16,
+            weekType = WeekType.ALL
+        )
+        val grid = WeekGridBuilder.build(listOf(c), week = 1, timeSlots = timeSlots)
+        val cell1 = grid[0][0]
+        val cell2 = grid[1][0]
+        assertNotNull(cell1)
+        assertNotNull(cell2)
+
+        assertEquals("教101", cell1?.classroom)
+        assertEquals("08:00", cell1?.startTime)
+        assertEquals("09:40", cell1?.endTime)
+        assertEquals(0, cell1?.slotIndexInCourse)
+        assertEquals(2, cell1?.courseSpan)
+
+        val (main1, sub1) = WeekGridBuilder.formatCellText(cell1!!)
+        assertEquals("高数", main1)
+        assertEquals("@教101", sub1)
+
+        val (main2, sub2) = WeekGridBuilder.formatCellText(cell2!!)
+        assertEquals("@教101", main2)
+        assertEquals("08:00-09:40", sub2)
+    }
+
+    @Test
+    fun `单节课单元格主文本为课程名副文本为教室`() {
+        val timeSlots = listOf(
+            com.chen.schedule.domain.model.TimeSlot(slotNumber = 3, startTime = "10:00", endTime = "10:45")
+        )
+        val c = Course(
+            name = "班会",
+            classroom = "综201",
+            dayOfWeek = 2,
+            startSlot = 3,
+            endSlot = 3,
+            startWeek = 1,
+            endWeek = 16
+        )
+        val grid = WeekGridBuilder.build(listOf(c), week = 1, timeSlots = timeSlots)
+        val cell = grid[2][1]
+        assertNotNull(cell)
+        val (main, sub) = WeekGridBuilder.formatCellText(cell!!)
+        assertEquals("班会", main)
+        assertEquals("@综201", sub)
+    }
 }
