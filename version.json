@@ -1,10 +1,10 @@
 {
-  "versionName": "1.2.31",
-  "versionTag": "v1.2.31",
-  "title": "v1.2.31",
+  "versionName": "1.2.32",
+  "versionTag": "v1.2.32",
+  "title": "v1.2.32",
   "publishedAt": "2026-09-22",
-  "fileSizeBytes": 3055708,
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.31/CourseSchedule-v1.2.31.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.31",
-  "changelog": "- 4×4 周课表大组件全方位美化升级，与应用主页风格深度融合对齐：\n  - 课程卡片视觉重塑（告别刺眼生硬大色块）：\n    - 采用与主页一致的优雅浅淡柔和背景色（依据课程专属色自适应动态渲染柔和粉彩底色）；\n    - 课程左侧内嵌 2.5dp 纯色微条，准确呼应应用内课程调色盘专属颜色；\n    - 卡片内文字采用 Material 3 onSurface 高对比度加粗标题，地点与时间采用 onSurfaceVariant 自然排版，无论深浅色模式都兼具高级美感与极佳可读性；\n  - 星期表头完全对齐主页视觉：\n    - 表头整体置于带圆角的优雅底托中，左侧标注「节」次表头；\n    - 每一列同步显示星期（如「一」）与当日对应的公历日期（如「9/22」）；\n    - 智能识别今天，以品牌主题色胶囊卡片（primary）高亮突出今日列；\n  - 顶栏信息层级统一：以主页 CompactTopBar 规范排版「第 N 周」粗体主标题、「整周视图」微徽章与学期副标题。"
+  "fileSizeBytes": 3055712,
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.32/CourseSchedule-v1.2.32.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.32",
+  "changelog": "- 应用内静默更新全生命周期后台下载与断点状态保持：\n  - 彻底解决更新时若中途退出弹窗或切出设置页，后台下载被意外中断、重新进入后下载进度清零的问题；\n  - 下载引擎脱离页面 ViewModel 生命周期，提升至 Application 级别 CoroutineScope，无论切换界面、返回课表主页还是应用退至后台，均在后台平稳静默下载；\n  - 重新进入设置页时，自动无缝承接当前正在进行的后台下载进度百分比与传输大小，弹窗与列表状态完全同步，杜绝进度归零；\n  - 设置列表「检查更新」行交互增强：后台下载期间直接展示「后台下载中」徽章、动态进度条与实时下载详情（如 45% (8.2 MB / 18.3 MB)），点击即可随时打开弹窗查看或直接安装；\n  - 本地已完整下载的 APK 自动识别就绪，秒级直接调起「立即安装」，免去重复消耗流量与等待。"
 }

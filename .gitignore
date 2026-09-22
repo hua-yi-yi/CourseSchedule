@@ -24,6 +24,7 @@ Thumbs.db
 
 # 本地产物(不随项目分发)
 dist/
+*.apk
 
 # Python 缓存(.github 脚本)
 __pycache__/

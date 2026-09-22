@@ -132,8 +132,7 @@ class SettingsViewModel @Inject constructor(
     var updateResult by androidx.compose.runtime.mutableStateOf<UpdateCheckResult?>(null); private set
     var lastCheckSummary by androidx.compose.runtime.mutableStateOf("点击检查最新版本"); private set
 
-    var downloadState by androidx.compose.runtime.mutableStateOf<DownloadState>(DownloadState.Idle); private set
-    private var downloadJob: kotlinx.coroutines.Job? = null
+    val downloadState: StateFlow<DownloadState> = updateDownloader.downloadState
 
     var isTestingMirrors by androidx.compose.runtime.mutableStateOf(false); private set
     var mirrorLatencies by androidx.compose.runtime.mutableStateOf<Map<GithubMirror, Long?>>(emptyMap()); private set
@@ -148,7 +147,18 @@ class SettingsViewModel @Inject constructor(
         selectedMirror = updatePrefs.selectedMirror
         updateLastCheckSummary()
 
-        if (autoCheckUpdate) {
+        val currentDl = updateDownloader.downloadState.value
+        if (currentDl is DownloadState.Downloading || currentDl is DownloadState.Completed) {
+            val cachedRelease = updateDownloader.currentRelease ?: updateChecker.lastHasUpdateResult?.release
+            if (cachedRelease != null) {
+                updateResult = UpdateCheckResult.HasUpdate(
+                    release = cachedRelease,
+                    currentVersion = "v${com.chen.schedule.BuildConfig.VERSION_NAME}",
+                    isMirrorUsed = useMirror,
+                    mirrorName = selectedMirror.displayName
+                )
+            }
+        } else if (autoCheckUpdate) {
             checkUpdate(manual = false)
         }
     }
@@ -187,6 +197,9 @@ class SettingsViewModel @Inject constructor(
                 val res = updateChecker.checkUpdate()
                 updateResult = res
                 updateLastCheckSummary()
+                if (res is UpdateCheckResult.HasUpdate) {
+                    updateDownloader.syncExistingDownload(res.release.versionTag)
+                }
                 if (manual) {
                     when (res) {
                         is UpdateCheckResult.UpToDate -> {
@@ -215,30 +228,31 @@ class SettingsViewModel @Inject constructor(
 
     fun dismissUpdateDialog() {
         updateResult = null
-        if (downloadState is DownloadState.Completed || downloadState is DownloadState.Failed) {
-            downloadState = DownloadState.Idle
+    }
+
+    fun reopenUpdateDialog() {
+        val release = updateDownloader.currentRelease ?: updateChecker.lastHasUpdateResult?.release
+        if (release != null) {
+            updateResult = UpdateCheckResult.HasUpdate(
+                release = release,
+                currentVersion = "v${com.chen.schedule.BuildConfig.VERSION_NAME}",
+                isMirrorUsed = useMirror,
+                mirrorName = selectedMirror.displayName
+            )
+        } else {
+            checkUpdate(manual = true)
         }
     }
 
     /**
-     * 应用内静默下载 APK并在完成后自动拉起系统安装器。
+     * 应用内静默下载 APK 并在完成后自动拉起系统安装器。
      */
-    fun startDownload(url: String, versionTag: String) {
-        downloadJob?.cancel()
-        downloadJob = viewModelScope.launch {
-            updateDownloader.downloadApk(url, versionTag) { state ->
-                downloadState = state
-                if (state is DownloadState.Completed) {
-                    updateDownloader.installApk(context, state.file)
-                }
-            }
-        }
+    fun startDownload(url: String, versionTag: String, release: AppReleaseInfo? = null) {
+        updateDownloader.startDownload(url, versionTag, release)
     }
 
     fun cancelDownload() {
-        downloadJob?.cancel()
-        downloadJob = null
-        downloadState = DownloadState.Idle
+        updateDownloader.cancelDownload()
     }
 
     fun installDownloadedApk(file: java.io.File) {
@@ -498,6 +512,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val downloadState by viewModel.downloadState.collectAsState()
     var pendingRestore by remember { mutableStateOf<Uri?>(null) }
     var showClearDialog by remember { mutableStateOf(false) }
     var showWidgetGuideDialog by remember { mutableStateOf(false) }
@@ -917,23 +932,106 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(enabled = !viewModel.isCheckingUpdate) { viewModel.checkUpdate(manual = true) }
+                        .clickable(enabled = !viewModel.isCheckingUpdate) {
+                            if (downloadState is DownloadState.Downloading || downloadState is DownloadState.Completed) {
+                                viewModel.reopenUpdateDialog()
+                            } else {
+                                viewModel.checkUpdate(manual = true)
+                            }
+                        }
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "检查更新",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            viewModel.lastCheckSummary,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontSize = 11.5.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "检查更新",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            if (downloadState is DownloadState.Downloading) {
+                                Spacer(Modifier.width(6.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = MaterialTheme.shapes.extraSmall
+                                ) {
+                                    Text(
+                                        "后台下载中",
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                    )
+                                }
+                            } else if (downloadState is DownloadState.Completed) {
+                                Spacer(Modifier.width(6.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = MaterialTheme.shapes.extraSmall
+                                ) {
+                                    Text(
+                                        "已下载完成",
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        when (val dl = downloadState) {
+                            is DownloadState.Downloading -> {
+                                val progressText = if (dl.totalBytes > 0) {
+                                    val downMb = String.format(java.util.Locale.US, "%.1f", dl.bytesDownloaded / (1024.0 * 1024.0))
+                                    val totMb = String.format(java.util.Locale.US, "%.1f", dl.totalBytes / (1024.0 * 1024.0))
+                                    "${dl.progress}% ($downMb MB / $totMb MB) · 点击查看"
+                                } else {
+                                    "正在静默下载更新包... · 点击查看"
+                                }
+                                Spacer(Modifier.height(3.dp))
+                                Text(
+                                    progressText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 11.5.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.height(5.dp))
+                                if (dl.progress >= 0) {
+                                    LinearProgressIndicator(
+                                        progress = { dl.progress / 100f },
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.9f)
+                                            .height(4.dp)
+                                    )
+                                } else {
+                                    LinearProgressIndicator(
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.9f)
+                                            .height(4.dp)
+                                    )
+                                }
+                            }
+                            is DownloadState.Completed -> {
+                                Spacer(Modifier.height(3.dp))
+                                Text(
+                                    "安装包已就绪，点击立即安装",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 11.5.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            else -> {
+                                Text(
+                                    viewModel.lastCheckSummary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 11.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                     if (viewModel.isCheckingUpdate) {
                         CircularProgressIndicator(
@@ -943,7 +1041,11 @@ fun SettingsScreen(
                         )
                     } else {
                         Text(
-                            "立即检测",
+                            when (downloadState) {
+                                is DownloadState.Downloading -> "查看进度"
+                                is DownloadState.Completed -> "立即安装"
+                                else -> "立即检测"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             fontSize = 12.5.sp,
                             color = MaterialTheme.colorScheme.primary,
@@ -1190,8 +1292,7 @@ fun SettingsScreen(
                     }
 
                     // 下载状态与进度展示
-                    val downloadState = viewModel.downloadState
-                    when (downloadState) {
+                    when (val dl = downloadState) {
                         is DownloadState.Downloading -> {
                             Column(
                                 modifier = Modifier
@@ -1199,9 +1300,9 @@ fun SettingsScreen(
                                     .padding(vertical = 4.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                if (downloadState.progress >= 0) {
+                                if (dl.progress >= 0) {
                                     LinearProgressIndicator(
-                                        progress = downloadState.progress / 100f,
+                                        progress = { dl.progress / 100f },
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(6.dp)
@@ -1213,10 +1314,10 @@ fun SettingsScreen(
                                             .height(6.dp)
                                     )
                                 }
-                                val progressDetail = if (downloadState.totalBytes > 0) {
-                                    val downMb = String.format(java.util.Locale.US, "%.1f", downloadState.bytesDownloaded / (1024.0 * 1024.0))
-                                    val totMb = String.format(java.util.Locale.US, "%.1f", downloadState.totalBytes / (1024.0 * 1024.0))
-                                    "${downloadState.progress}% ($downMb MB / $totMb MB)"
+                                val progressDetail = if (dl.totalBytes > 0) {
+                                    val downMb = String.format(java.util.Locale.US, "%.1f", dl.bytesDownloaded / (1024.0 * 1024.0))
+                                    val totMb = String.format(java.util.Locale.US, "%.1f", dl.totalBytes / (1024.0 * 1024.0))
+                                    "${dl.progress}% ($downMb MB / $totMb MB)"
                                 } else {
                                     "正在下载更新包..."
                                 }
@@ -1239,7 +1340,7 @@ fun SettingsScreen(
                         }
                         is DownloadState.Failed -> {
                             Text(
-                                "下载失败: ${downloadState.error}",
+                                "下载失败: ${dl.error}",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontSize = 11.5.sp,
                                 color = MaterialTheme.colorScheme.error
@@ -1257,8 +1358,7 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {
-                val downloadState = viewModel.downloadState
-                when (downloadState) {
+                when (val dl = downloadState) {
                     is DownloadState.Downloading -> {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1273,14 +1373,14 @@ fun SettingsScreen(
                         }
                     }
                     is DownloadState.Completed -> {
-                        Button(onClick = { viewModel.installDownloadedApk(downloadState.file) }) {
+                        Button(onClick = { viewModel.installDownloadedApk(dl.file) }) {
                             Text("立即安装", fontSize = 12.5.sp)
                         }
                     }
                     is DownloadState.Failed -> {
                         Button(onClick = {
                             val url = if (viewModel.useMirror) release.mirrorDownloadUrl else release.officialDownloadUrl
-                            viewModel.startDownload(url, release.versionTag)
+                            viewModel.startDownload(url, release.versionTag, release)
                         }) {
                             Text("重试下载", fontSize = 12.5.sp)
                         }
@@ -1293,7 +1393,7 @@ fun SettingsScreen(
                             if (viewModel.useMirror) {
                                 Button(
                                     onClick = {
-                                        viewModel.startDownload(release.mirrorDownloadUrl, release.versionTag)
+                                        viewModel.startDownload(release.mirrorDownloadUrl, release.versionTag, release)
                                     }
                                 ) {
                                     Text("高速静默下载", fontSize = 12.5.sp)
@@ -1303,7 +1403,7 @@ fun SettingsScreen(
                             FilledTonalButton(
                                 onClick = {
                                     val targetUrl = if (viewModel.useMirror) release.officialDownloadUrl else release.mirrorDownloadUrl
-                                    viewModel.startDownload(targetUrl, release.versionTag)
+                                    viewModel.startDownload(targetUrl, release.versionTag, release)
                                 }
                             ) {
                                 Text(if (viewModel.useMirror) "官方直连下载" else "立即静默下载", fontSize = 12.5.sp)
@@ -1313,7 +1413,6 @@ fun SettingsScreen(
                 }
             },
             dismissButton = {
-                val downloadState = viewModel.downloadState
                 if (downloadState !is DownloadState.Downloading) {
                     TextButton(onClick = { viewModel.dismissUpdateDialog() }) {
                         Text("稍后再说", fontSize = 13.sp)

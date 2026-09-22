@@ -31,6 +31,9 @@ class AppUpdateChecker @Inject constructor(
 
     private val prefs by lazy { UpdatePrefs(context) }
 
+    var lastHasUpdateResult: UpdateCheckResult.HasUpdate? = null
+        private set
+
     companion object {
         const val REPO_OWNER = "hua-yi-yi"
         const val REPO_NAME = "CourseSchedule"
@@ -143,7 +146,7 @@ class AppUpdateChecker @Inject constructor(
 
             val isMirrorUsed = !cleanSourceName.contains("官方直连")
 
-            if (isNew) {
+            val result = if (isNew) {
                 val releaseInfo = AppReleaseInfo(
                     versionName = cleanRemoteName,
                     versionTag = tagName,
@@ -160,8 +163,9 @@ class AppUpdateChecker @Inject constructor(
                     currentVersion = "v$currentVersion",
                     isMirrorUsed = isMirrorUsed,
                     mirrorName = cleanSourceName
-                )
+                ).also { lastHasUpdateResult = it }
             } else {
+                lastHasUpdateResult = null
                 UpdateCheckResult.UpToDate(
                     currentVersion = "v$currentVersion",
                     latestVersion = cleanRemoteName,
@@ -169,6 +173,7 @@ class AppUpdateChecker @Inject constructor(
                     mirrorName = cleanSourceName
                 )
             }
+            result
         } catch (e: Exception) {
             UpdateCheckResult.Error("解析更新信息失败: ${e.message}", canOpenWeb = true)
         }
