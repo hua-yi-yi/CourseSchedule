@@ -1,6 +1,14 @@
 package com.chen.schedule.widget
 
 import android.content.Context
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
+import android.graphics.Typeface
+import androidx.glance.LocalContext
+import androidx.glance.LocalSize
+import androidx.glance.appwidget.SizeMode
+import kotlin.math.ceil
 import androidx.compose.runtime.Composable
 import androidx.glance.ExperimentalGlanceApi
 import androidx.glance.GlanceId
@@ -31,7 +39,6 @@ import androidx.glance.appwidget.cornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.glance.layout.RowScope
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -81,6 +88,8 @@ private val DAY_LABELS = listOf("一", "二", "三", "四", "五", "六", "日")
  * 视觉语言与主页 WeekView 保持高度一致（柔和卡片背景、左侧专属调色条、双行信息、表头日期与今日高亮）。
  */
 class WeekWidget : GlanceAppWidget() {
+
+    override val sizeMode: SizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val data = loadWidgetData(context)
@@ -211,6 +220,15 @@ class WeekWidget : GlanceAppWidget() {
 @OptIn(ExperimentalGlanceApi::class)
 @Composable
 private fun WeekWidgetContent(data: WeekWidgetData) {
+    val context = LocalContext.current
+    val widgetWidth = LocalSize.current.width.value
+    val columns = (0..6).map { WeekGridBuilder.blocks(data.grid, it) }
+    // 容器 24dp + 时间列 26dp，课程格留出边距和色条；再预留 2dp 的测量余量。
+    val textWidth = ((widgetWidth - 24f - 26f) / 7f - 10f).coerceAtLeast(1f)
+    val heights = WeekGridBuilder.rowHeights(columns, data.slotCount, 38f) { cell ->
+        courseTextHeight(context, cell, textWidth)
+    }
+    val bands = WeekGridBuilder.bands(columns, data.slotCount)
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -337,16 +355,35 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
 
         Spacer(modifier = GlanceModifier.height(4.dp))
 
-        // 课表网格: 每行一个节次，包含左侧节次时段与右侧 7 天课程单元格
+        // 按安全分段滚动，每列独立绘制跨节课程块；不会在连堂课中间画分隔线。
         LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-            items(data.rows, itemId = { it.slotNumber.toLong() }) { row ->
+            items(bands, itemId = { it.first.toLong() }) { band ->
                 Row(
-                    modifier = GlanceModifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = GlanceModifier.fillMaxWidth()
                 ) {
-                    SlotTimeCell(row.slotNumber, row.startTime)
-                    row.cells.forEach { cell ->
-                        WeekCell(cell)
+                    Column(modifier = GlanceModifier.width(26.dp)) {
+                        // Glance 的单个 Column 子节点数量有限，长跨节分成小组。
+                        band.toList().chunked(6).forEach { chunk ->
+                            Column {
+                                chunk.forEach { rowIndex ->
+                                    val row = data.rows[rowIndex]
+                                    SlotTimeCell(row.slotNumber, row.startTime, heights[rowIndex])
+                                }
+                            }
+                        }
+                    }
+                    columns.forEach { blocks ->
+                        Column(modifier = GlanceModifier.defaultWeight()) {
+                            blocks.filter { it.startRow in band }.chunked(6).forEach { chunk ->
+                                Column(modifier = GlanceModifier.fillMaxWidth()) {
+                                    chunk.forEach { block ->
+                                        val height = (block.startRow until block.startRow + block.rowSpan)
+                                            .sumOf { heights[it].toDouble() }.toFloat()
+                                        WeekCell(block.cell, height)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -355,11 +392,11 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
 }
 
 @Composable
-private fun SlotTimeCell(slotNumber: Int, startTime: String) {
+private fun SlotTimeCell(slotNumber: Int, startTime: String, height: Float) {
     Box(
         modifier = GlanceModifier
             .width(26.dp)
-            .height(29.dp)
+            .height(height.dp)
             .padding(1.dp)
             .cornerRadius(4.dp)
             .background(GlanceTheme.colors.surfaceVariant),
@@ -393,11 +430,11 @@ private fun SlotTimeCell(slotNumber: Int, startTime: String) {
 }
 
 @Composable
-private fun RowScope.WeekCell(cell: WeekGridBuilder.Cell?) {
+private fun WeekCell(cell: WeekGridBuilder.Cell?, height: Float) {
     Box(
         modifier = GlanceModifier
-            .defaultWeight()
-            .height(29.dp)
+            .fillMaxWidth()
+            .height(height.dp)
             .padding(1.dp)
             .cornerRadius(4.dp)
             .background(
@@ -407,7 +444,7 @@ private fun RowScope.WeekCell(cell: WeekGridBuilder.Cell?) {
         contentAlignment = Alignment.Center
     ) {
         if (cell != null) {
-            val (mainText, subText) = WeekGridBuilder.formatCellText(cell)
+            val mainText = if (cell.extraCount > 0) "${cell.name}+${cell.extraCount}" else cell.name
 
             Row(
                 modifier = GlanceModifier.fillMaxSize(),
@@ -422,7 +459,7 @@ private fun RowScope.WeekCell(cell: WeekGridBuilder.Cell?) {
                         .background(ColorProvider(Color(cell.color)))
                 ) {}
 
-                Spacer(modifier = GlanceModifier.width(2.dp))
+                    Spacer(modifier = GlanceModifier.width(1.dp))
 
                 // 课程内容文字: 主文本为 onSurface 粗体, 次文本为 onSurfaceVariant
                 Column(
@@ -436,27 +473,51 @@ private fun RowScope.WeekCell(cell: WeekGridBuilder.Cell?) {
                     Text(
                         text = mainText,
                         style = TextStyle(
-                            fontSize = 7.5.sp,
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = GlanceTheme.colors.onSurface
+                            color = ColorProvider(Color(WeekGridBuilder.TEXT_DARK))
                         ),
-                        maxLines = 1
+                        maxLines = 2
                     )
-                    if (subText.isNotBlank()) {
+                    if (cell.classroom.isNotBlank()) {
+                        Spacer(modifier = GlanceModifier.height(3.dp))
                         Text(
-                            text = subText,
+                            text = cell.classroom.trim(),
                             style = TextStyle(
-                                fontSize = 6.5.sp,
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = GlanceTheme.colors.onSurfaceVariant
+                                color = ColorProvider(Color(WeekGridBuilder.TEXT_DARK))
                             ),
-                            maxLines = 1
+                            maxLines = Int.MAX_VALUE
                         )
                     }
                 }
             }
         }
     }
+}
+
+/** 用与 RemoteViews 相同的系统文字排版估算高度，地点不截断、不缩成难读的小字。 */
+private fun courseTextHeight(context: Context, cell: WeekGridBuilder.Cell, widthDp: Float): Float {
+    val metrics = context.resources.displayMetrics
+    fun measure(text: String, bold: Boolean, maxLines: Int): Float {
+        val paint = TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 9f, metrics)
+            typeface = if (bold) Typeface.create("sans-serif", Typeface.BOLD)
+                else Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        }
+        val layout = StaticLayout.Builder.obtain(text, 0, text.length, paint,
+            (widthDp * metrics.density).toInt().coerceAtLeast(1))
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+            .setIncludePad(true)
+            .setMaxLines(maxLines)
+            .build()
+        return ceil(layout.height / metrics.density)
+    }
+    val title = if (cell.extraCount > 0) "${cell.name}+${cell.extraCount}" else cell.name
+    val location = cell.classroom.trim()
+    return measure(title, true, 2) +
+        (if (location.isNotEmpty()) 3f + measure(location, false, Int.MAX_VALUE) else 0f) + 12f
 }
 
 /** 周课表组件接收器 */

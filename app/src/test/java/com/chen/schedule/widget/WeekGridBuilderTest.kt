@@ -10,6 +10,67 @@ import org.junit.Test
 
 class WeekGridBuilderTest {
 
+    @Test
+    fun `two consecutive slots form one block preserving full classroom`() {
+        val location = "开元校区公教一号楼南楼 A-502 多媒体教室"
+        val grid = WeekGridBuilder.build(listOf(course(start = 2, end = 3).copy(classroom = location)), 1)
+        val blocks = WeekGridBuilder.blocks(grid, 0)
+        val teaching = blocks.filter { it.cell != null }
+        assertEquals(1, teaching.size)
+        assertEquals(1, teaching.single().startRow)
+        assertEquals(2, teaching.single().rowSpan)
+        assertEquals(location, teaching.single().cell?.classroom)
+        assertEquals(12, blocks.sumOf { it.rowSpan })
+    }
+
+    @Test
+    fun `adjacent distinct lessons and different classrooms stay separate`() {
+        val grid = WeekGridBuilder.build(listOf(
+            course(start = 1, end = 2).copy(classroom = "A101"),
+            course(start = 3, end = 4).copy(classroom = "B202")
+        ), 1)
+        val blocks = WeekGridBuilder.blocks(grid, 0).filter { it.cell != null }
+        assertEquals(listOf(2, 2), blocks.map { it.rowSpan })
+        assertEquals(listOf("A101", "B202"), blocks.map { it.cell?.classroom })
+    }
+
+    @Test
+    fun `scroll bands never split lessons spanning different starting slots`() {
+        val grid = WeekGridBuilder.build(listOf(
+            course(day = 1, start = 1, end = 2),
+            course(day = 2, start = 2, end = 3),
+            course(day = 3, start = 3, end = 5)
+        ), 1)
+        val columns = (0..6).map { WeekGridBuilder.blocks(grid, it) }
+        val bands = WeekGridBuilder.bands(columns, grid.size)
+        assertEquals(0..4, bands.first())
+        columns.flatten().forEach { block ->
+            assertTrue(bands.any { block.startRow in it && block.startRow + block.rowSpan - 1 in it })
+        }
+    }
+
+    @Test
+    fun `long location grows aligned rows without clipping single or merged courses`() {
+        val grid = WeekGridBuilder.build(listOf(
+            course(name = "长地点", start = 1, end = 2),
+            course(name = "单节", day = 2, start = 2, end = 2)
+        ), 1)
+        val columns = (0..6).map { WeekGridBuilder.blocks(grid, it) }
+        fun required(cell: WeekGridBuilder.Cell) = if (cell.name == "长地点") 210f else 90f
+        val heights = WeekGridBuilder.rowHeights(columns, grid.size, 38f, ::required)
+        columns.flatten().filter { it.cell != null }.forEach { block ->
+            val height = (block.startRow until block.startRow + block.rowSpan).sumOf { heights[it].toDouble() }
+            assertTrue(height >= required(block.cell!!))
+        }
+        assertEquals(38f, heights[2])
+    }
+
+    @Test
+    fun `courses entirely outside visible slots do not appear in last row`() {
+        val grid = WeekGridBuilder.build(listOf(course(start = 20, end = 22)), 1)
+        assertTrue(grid.flatten().all { it == null })
+    }
+
     private fun course(
         name: String = "高数",
         day: Int = 1,

@@ -1,11 +1,5 @@
 package com.chen.schedule.ui.settings
 
-import androidx.room.withTransaction
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import com.chen.schedule.util.ScheduleBackup
-import com.chen.schedule.util.SchemeSlots
-import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.Manifest
@@ -49,13 +43,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.LinearProgressIndicator
-import com.chen.schedule.util.update.AppReleaseInfo
-import com.chen.schedule.util.update.AppUpdateChecker
-import com.chen.schedule.util.update.AppUpdateDownloader
 import com.chen.schedule.util.update.DownloadState
 import com.chen.schedule.util.update.GithubMirror
 import com.chen.schedule.util.update.UpdateCheckResult
-import com.chen.schedule.util.update.UpdatePrefs
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -63,9 +53,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.flow.StateFlow
 import com.chen.schedule.ui.theme.BackgroundPreset
-import com.chen.schedule.ui.theme.ThemeConfig
 import com.chen.schedule.ui.theme.ThemePrefs
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,435 +61,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.chen.schedule.data.repository.CourseRepository
-import com.chen.schedule.data.repository.SemesterRepository
-import com.chen.schedule.data.repository.TimeSlotRepository
-import com.chen.schedule.domain.model.Course
-import com.chen.schedule.domain.model.WeekType
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import javax.inject.Inject
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.glance.appwidget.GlanceAppWidgetManager
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.chen.schedule.util.CourseJson
-import com.chen.schedule.util.CourseImportData
-import com.chen.schedule.util.JsonImporter
 import com.chen.schedule.widget.TodayWidget
 import com.chen.schedule.widget.TodayWidgetReceiver
 import com.chen.schedule.widget.Today3x3Widget
 import com.chen.schedule.widget.Today3x3WidgetReceiver
 import com.chen.schedule.widget.WeekWidget
 import com.chen.schedule.widget.WeekWidgetReceiver
-import com.chen.schedule.widget.WidgetUpdater
-import com.chen.schedule.reminders.ClassReminderManager
-import com.chen.schedule.reminders.ReminderPrefs
-import dagger.hilt.android.qualifiers.ApplicationContext
-
-@HiltViewModel
-class SettingsViewModel @Inject constructor(
-    private val database: com.chen.schedule.data.local.AppDatabase,
-    private val courseRepository: CourseRepository,
-    private val semesterRepository: SemesterRepository,
-    private val timeSlotRepository: TimeSlotRepository,
-    private val timeSchemeRepository: com.chen.schedule.data.repository.TimeSchemeRepository,
-    private val updateChecker: AppUpdateChecker,
-    private val updateDownloader: AppUpdateDownloader,
-    @ApplicationContext private val context: Context
-) : ViewModel() {
-
-    private val reminderPrefs by lazy { ReminderPrefs(context) }
-    private val themePrefs by lazy { ThemePrefs(context) }
-    private val updatePrefs by lazy { UpdatePrefs(context) }
-
-    val themeConfig: StateFlow<ThemeConfig> = ThemePrefs.state
-
-    var reminderEnabled by androidx.compose.runtime.mutableStateOf(false); private set
-    var reminderLead by androidx.compose.runtime.mutableStateOf(ReminderPrefs.DEFAULT_LEAD_MINUTES); private set
-    var reminderOngoing by androidx.compose.runtime.mutableStateOf(true); private set
-
-    var autoCheckUpdate by androidx.compose.runtime.mutableStateOf(true); private set
-    var useMirror by androidx.compose.runtime.mutableStateOf(true); private set
-    var selectedMirror by androidx.compose.runtime.mutableStateOf(GithubMirror.GHFAST); private set
-
-    var isCheckingUpdate by androidx.compose.runtime.mutableStateOf(false); private set
-    var updateResult by androidx.compose.runtime.mutableStateOf<UpdateCheckResult?>(null); private set
-    var lastCheckSummary by androidx.compose.runtime.mutableStateOf("点击检查最新版本"); private set
-
-    val downloadState: StateFlow<DownloadState> = updateDownloader.downloadState
-
-    var isTestingMirrors by androidx.compose.runtime.mutableStateOf(false); private set
-    var mirrorLatencies by androidx.compose.runtime.mutableStateOf<Map<GithubMirror, Long?>>(emptyMap()); private set
-
-    init {
-        reminderEnabled = reminderPrefs.enabled
-        reminderLead = reminderPrefs.leadMinutes
-        reminderOngoing = reminderPrefs.ongoingClassEnabled
-
-        autoCheckUpdate = updatePrefs.autoCheckUpdate
-        useMirror = updatePrefs.useMirror
-        selectedMirror = updatePrefs.selectedMirror
-        updateLastCheckSummary()
-
-        val currentDl = updateDownloader.downloadState.value
-        if (currentDl is DownloadState.Downloading || currentDl is DownloadState.Completed) {
-            val cachedRelease = updateDownloader.currentRelease ?: updateChecker.lastHasUpdateResult?.release
-            if (cachedRelease != null) {
-                updateResult = UpdateCheckResult.HasUpdate(
-                    release = cachedRelease,
-                    currentVersion = "v${com.chen.schedule.BuildConfig.VERSION_NAME}",
-                    isMirrorUsed = useMirror,
-                    mirrorName = selectedMirror.displayName
-                )
-            }
-        } else if (autoCheckUpdate) {
-            checkUpdate(manual = false)
-        }
-    }
-
-    fun updateAutoCheckUpdate(enabled: Boolean) {
-        updatePrefs.autoCheckUpdate = enabled
-        autoCheckUpdate = enabled
-    }
-
-    fun updateUseMirror(enabled: Boolean) {
-        updatePrefs.useMirror = enabled
-        useMirror = enabled
-    }
-
-    fun updateSelectedMirror(mirror: GithubMirror) {
-        updatePrefs.selectedMirror = mirror
-        selectedMirror = mirror
-    }
-
-    private fun updateLastCheckSummary() {
-        val last = updatePrefs.lastCheckTime
-        val src = updatePrefs.lastCheckSource
-        lastCheckSummary = if (last > 0L) {
-            val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(last))
-            if (src.isNotBlank()) "上次检查: $dateStr ($src)" else "上次检查: $dateStr"
-        } else {
-            "点击检查最新版本"
-        }
-    }
-
-    fun checkUpdate(manual: Boolean = true) {
-        if (isCheckingUpdate) return
-        isCheckingUpdate = true
-        viewModelScope.launch {
-            try {
-                val res = updateChecker.checkUpdate()
-                updateResult = res
-                updateLastCheckSummary()
-                if (res is UpdateCheckResult.HasUpdate) {
-                    updateDownloader.syncExistingDownload(res.release.versionTag)
-                }
-                if (manual) {
-                    when (res) {
-                        is UpdateCheckResult.UpToDate -> {
-                            val mirrorTag = if (res.isMirrorUsed && !res.mirrorName.isNullOrBlank()) {
-                                " · 经由「${res.mirrorName}」检测"
-                            } else ""
-                            Toast.makeText(context, "当前已是最新版本 (${res.currentVersion})$mirrorTag", Toast.LENGTH_SHORT).show()
-                        }
-                        is UpdateCheckResult.Error -> {
-                            Toast.makeText(context, "检查更新失败: ${res.message}", Toast.LENGTH_LONG).show()
-                        }
-                        is UpdateCheckResult.HasUpdate -> {
-                            // 保持在 updateResult，UI 弹窗展示
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                if (manual) {
-                    Toast.makeText(context, "检查更新异常: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            } finally {
-                isCheckingUpdate = false
-            }
-        }
-    }
-
-    fun dismissUpdateDialog() {
-        updateResult = null
-    }
-
-    fun reopenUpdateDialog() {
-        val release = updateDownloader.currentRelease ?: updateChecker.lastHasUpdateResult?.release
-        if (release != null) {
-            updateResult = UpdateCheckResult.HasUpdate(
-                release = release,
-                currentVersion = "v${com.chen.schedule.BuildConfig.VERSION_NAME}",
-                isMirrorUsed = useMirror,
-                mirrorName = selectedMirror.displayName
-            )
-        } else {
-            checkUpdate(manual = true)
-        }
-    }
-
-    /**
-     * 应用内静默下载 APK 并在完成后自动拉起系统安装器。
-     */
-    fun startDownload(url: String, versionTag: String, release: AppReleaseInfo? = null) {
-        updateDownloader.startDownload(url, versionTag, release)
-    }
-
-    fun cancelDownload() {
-        updateDownloader.cancelDownload()
-    }
-
-    fun installDownloadedApk(file: java.io.File) {
-        updateDownloader.installApk(context, file)
-    }
-
-    fun testAllMirrors() {
-        if (isTestingMirrors) return
-        isTestingMirrors = true
-        viewModelScope.launch {
-            try {
-                mirrorLatencies = updateChecker.testAllMirrors()
-            } catch (_: Exception) {
-            } finally {
-                isTestingMirrors = false
-            }
-        }
-    }
-
-    fun updateThemeMode(mode: Int) {
-        themePrefs.themeMode = mode
-    }
-
-    fun updateBackgroundPreset(preset: BackgroundPreset) {
-        themePrefs.backgroundPresetId = preset.id
-    }
-
-    /** 开关上课提醒:立即重排/取消今天的提醒闹钟。 */
-    fun updateReminderEnabled(enabled: Boolean) {
-        reminderPrefs.enabled = enabled
-        reminderEnabled = enabled
-        ClassReminderManager.rescheduleAsync(context)
-    }
-
-    /** 修改提前量:立即按新提前量重排今天的提醒。 */
-    fun updateReminderLead(minutes: Int) {
-        reminderPrefs.leadMinutes = minutes
-        reminderLead = minutes
-        ClassReminderManager.rescheduleAsync(context)
-    }
-
-    /** 开关上课中常驻看板:立即更新偏好并重排看板与闹钟。 */
-    fun updateReminderOngoing(enabled: Boolean) {
-        reminderPrefs.ongoingClassEnabled = enabled
-        reminderOngoing = enabled
-        ClassReminderManager.rescheduleAsync(context)
-    }
-
-    fun exportToUri(uri: Uri) {
-        viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    val data = database.withTransaction {
-                        val sem = semesterRepository.getCurrentSemester() ?: error("没有当前学期")
-                        val allSlots = timeSlotRepository.getAllTimeSlots().first()
-                        val schemes = timeSchemeRepository.getAllSchemesDirect()
-                            .filter { !it.isLegacy }
-                        ScheduleBackup(
-                            backupVersion = ScheduleBackup.CURRENT_VERSION,
-                            semester = sem,
-                            courses = courseRepository.getCoursesBySemester(sem.id).first(),
-                            // v1 兼容字段:只放「原有作息」(schemeId = 0)的节次,避免多套作息
-                            // 合并后出现重复编号;其他方案各自放在 schemeSlots 中。
-                            timeSlots = allSlots.filter { it.schemeId == 0L },
-                            schemes = schemes,
-                            schemeSlots = allSlots
-                                .groupBy { it.schemeId }
-                                .map { (schemeId, slots) -> SchemeSlots(schemeId, slots) },
-                            semesters = semesterRepository.getAllSemesters().first(),
-                            allCourses = courseRepository.getAllCourses().first()
-                        )
-                    }
-                    // encodeDefaults = true 才能写入 backupVersion=2 / 空列等,
-                    // 否则 v2 与 v1 无法区分。
-                    val json = Json { prettyPrint = true; encodeDefaults = true }
-                        .encodeToString(ScheduleBackup.serializer(), data)
-                    requireNotNull(context.contentResolver.openOutputStream(uri)).use {
-                        it.write(json.toByteArray(Charsets.UTF_8))
-                    }
-                }
-                android.widget.Toast.makeText(context, "导出成功", android.widget.Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                android.widget.Toast.makeText(context, "导出失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    fun exportIcsToUri(uri: Uri) {
-        viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    val sem = semesterRepository.getCurrentSemester() ?: error("没有当前学期")
-                    val courses = courseRepository.getCoursesBySemester(sem.id).first()
-                    val slots = timeSlotRepository.getTimeSlotsBySchemeDirect(sem.schemeId)
-                    val icsString = com.chen.schedule.util.IcsExporter.export(
-                        semester = sem,
-                        courses = courses,
-                        slots = slots,
-                        alarmMinutes = reminderLead.takeIf { reminderEnabled } ?: 20
-                    )
-                    requireNotNull(context.contentResolver.openOutputStream(uri)).use {
-                        it.write(icsString.toByteArray(Charsets.UTF_8))
-                    }
-                }
-                android.widget.Toast.makeText(context, "日历文件导出成功", android.widget.Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                android.widget.Toast.makeText(context, "导出日历失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    fun clearAllData() {
-        viewModelScope.launch {
-            try {
-                val sem = semesterRepository.getCurrentSemester() ?: error("没有当前学期")
-                courseRepository.deleteAllBySemester(sem.id)
-                WidgetUpdater.refreshAll(context)
-                Toast.makeText(context, "数据已清空", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(context, "清空失败: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    fun importData(uri: Uri) {
-        viewModelScope.launch {
-            try {
-                // Pair(实际写入课程数, 是否完整恢复);仅课程 JSON 只替换当前学期
-                val result = withContext(Dispatchers.IO) {
-                    val jsonString = requireNotNull(context.contentResolver.openInputStream(uri)).bufferedReader().use { it.readText() }
-                    val format = Json { ignoreUnknownKeys = true }
-                    val element = format.parseToJsonElement(jsonString)
-                    val backup = if (element is kotlinx.serialization.json.JsonObject && "backupVersion" in element)
-                        format.decodeFromString(ScheduleBackup.serializer(), jsonString) else null
-                    require(backup == null || backup.backupVersion in
-                        ScheduleBackup.LEGACY_VERSION..ScheduleBackup.CURRENT_VERSION) { "不支持此备份版本" }
-                    val courses = backup?.courses ?: JsonImporter.parse(jsonString).getOrThrow()
-                    require(backup != null || courses.isNotEmpty()) { "未找到课程，未修改现有数据" }
-                    // 完整备份要校验备份中的全部课程(跨学期),而不仅是当前学期
-                    val coursesToValidate = backup?.let {
-                        if (it.allCourses.isNotEmpty()) it.allCourses else it.courses
-                    } ?: courses
-                    require(coursesToValidate.all { it.name.isNotBlank() && it.dayOfWeek in 1..7 && it.startSlot > 0 && it.endSlot >= it.startSlot && it.startWeek > 0 && it.endWeek >= it.startWeek }) { "课程数据无效" }
-                    backup?.let { data ->
-                        require(data.semester.totalWeeks in 1..53) { "学期周数无效" }
-                        val semestersInBackup = if (data.semesters.isNotEmpty()) data.semesters else listOf(data.semester)
-                        require(semestersInBackup.all { it.totalWeeks in 1..53 }) { "学期周数无效" }
-                        require(semestersInBackup.all { it.name.isNotBlank() }) { "学期名称无效" }
-                        val isNewFormat = data.backupVersion >= 2
-                        if (isNewFormat) {
-                            // 新版:各方案各自校验(不同方案可以都有「第1节」,合在一起会误报重复)。
-                            data.schemeSlots.forEach { entry ->
-                                if (entry.slots.isNotEmpty()) {
-                                    require(com.chen.schedule.util.ScheduleStatus.isSlotsValid(entry.slots)) {
-                                        "作息方案(编号 ${entry.schemeId})节次无效"
-                                    }
-                                }
-                            }
-                            // 「原有作息」桶同样按单套校验
-                            val legacy = data.schemeSlots.firstOrNull { it.schemeId == 0L }?.slots
-                                ?: data.timeSlots.filter { it.schemeId == 0L }
-                            if (legacy.isNotEmpty()) {
-                                require(com.chen.schedule.util.ScheduleStatus.isSlotsValid(legacy)) {
-                                    "原有作息节次无效"
-                                }
-                            }
-                        } else {
-                            // 旧备份:只有单套作息,走原有解析器校验
-                            if (data.timeSlots.isNotEmpty()) com.chen.schedule.util.TimeSlotParser.parse(
-                                data.timeSlots.joinToString("\n") { slot -> "${slot.slotNumber} ${slot.startTime}-${slot.endTime}" })
-                        }
-                    }
-                    database.withTransaction {
-                        val data = backup
-                        if (data == null) {
-                            // 仅课程 JSON(旧格式):替换当前学期课程,行为不变
-                            val current = semesterRepository.getCurrentSemester() ?: error("请先创建学期")
-                            courseRepository.deleteAllBySemester(current.id)
-                            courseRepository.insertAll(courses.map { it.copy(id = 0, semesterId = current.id) })
-                            courses.size to false
-                        } else {
-                            // ===== 完整恢复:学期 / 课程 / 作息方案全部按备份重建 =====
-
-                            // 1) 先清空旧的自定义方案(避免重复恢复累积同名方案),再补齐内置模板
-                            timeSchemeRepository.deleteAllCustomSchemes()
-                            runCatching { timeSchemeRepository.ensureBuiltInSchemes() }
-                            val builtInsByName = timeSchemeRepository.getAllSchemesDirect()
-                                .filter { it.isBuiltIn }
-                                .associateBy { it.name }
-                            val schemeMap = mutableMapOf<Long, Long>()
-                            val actions = com.chen.schedule.util.BackupRestorePlanner
-                                .schemeActions(data, builtInsByName.keys)
-                            actions.forEach { (oldSchemeId, action) ->
-                                val newId = when (action) {
-                                    is com.chen.schedule.util.BackupRestorePlanner.SchemeAction.ReuseBuiltIn ->
-                                        builtInsByName.getValue(action.builtInName).id
-                                    is com.chen.schedule.util.BackupRestorePlanner.SchemeAction.CreateCustom ->
-                                        timeSchemeRepository.createCustomScheme(
-                                            action.name, action.slots, setCurrent = false
-                                        )
-                                }
-                                schemeMap[oldSchemeId] = newId
-                            }
-
-                            // 2) 用纯逻辑计划器算出「要建哪些学期、课程归哪个学期」
-                            val plan = com.chen.schedule.util.BackupRestorePlanner.plan(data) { old ->
-                                if (old == 0L) 0L else schemeMap[old] ?: 0L
-                            }
-
-                            // 3) 清空本地学期与课程,按备份完整重建
-                            courseRepository.deleteAll()
-                            semesterRepository.deleteAll()
-
-                            val insertedIds = plan.semesters.map { semesterRepository.insert(it) }
-                            val currentId = insertedIds.getOrNull(plan.currentSemesterIndex)
-                                ?: error("备份中没有学期")
-                            semesterRepository.setCurrentSemester(currentId)
-
-                            // 4) 课程:按学期下标换成新插入的学期 id
-                            val toInsert = plan.courses.mapNotNull { (index, course) ->
-                                insertedIds.getOrNull(index)?.let { newSemesterId ->
-                                    course.copy(semesterId = newSemesterId)
-                                }
-                            }
-                            if (toInsert.isNotEmpty()) courseRepository.insertAll(toInsert)
-
-                            // 5) 「原有作息」桶(空则清空,避免残留旧数据)
-                            timeSlotRepository.replaceScheme(0L, plan.legacySlots)
-
-                            // 6) 返回实际写入的课程数(全部学期)与「完整恢复」标记
-                            toInsert.size to true
-                        }
-                    }
-                }
-                WidgetUpdater.refreshAll(context)
-                val (count, fullRestore) = result
-                val message = if (fullRestore) {
-                    "成功恢复 $count 门课程(含全部学期)"
-                } else {
-                    "成功恢复 $count 门课程(当前学期)"
-                }
-                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-
-            } catch (e: Exception) {
-                android.widget.Toast.makeText(context, "导入失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -678,13 +246,13 @@ fun SettingsScreen(
                 GroupDivider()
                 SettingsItem(
                     title = "备份数据",
-                    subtitle = "备份当前学期、课程及作息时间",
+                    subtitle = "备份全部学期、课程及作息方案",
                     onClick = { exportLauncher.launch("course_schedule_backup.json") }
                 )
                 GroupDivider()
                 SettingsItem(
                     title = "恢复数据",
-                    subtitle = "从备份替换恢复当前学期",
+                    subtitle = "完整备份替换全部数据；课程 JSON 仅替换当前学期课程",
                     onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) }
                 )
                 GroupDivider()

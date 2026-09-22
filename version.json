@@ -1,10 +1,10 @@
 {
-  "versionName": "1.2.32",
-  "versionTag": "v1.2.32",
-  "title": "v1.2.32",
+  "versionName": "1.2.33",
+  "versionTag": "v1.2.33",
+  "title": "v1.2.33",
   "publishedAt": "2026-09-22",
-  "fileSizeBytes": 3055712,
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.32/CourseSchedule-v1.2.32.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.32",
-  "changelog": "- 应用内静默更新全生命周期后台下载与断点状态保持：\n  - 彻底解决更新时若中途退出弹窗或切出设置页，后台下载被意外中断、重新进入后下载进度清零的问题；\n  - 下载引擎脱离页面 ViewModel 生命周期，提升至 Application 级别 CoroutineScope，无论切换界面、返回课表主页还是应用退至后台，均在后台平稳静默下载；\n  - 重新进入设置页时，自动无缝承接当前正在进行的后台下载进度百分比与传输大小，弹窗与列表状态完全同步，杜绝进度归零；\n  - 设置列表「检查更新」行交互增强：后台下载期间直接展示「后台下载中」徽章、动态进度条与实时下载详情（如 45% (8.2 MB / 18.3 MB)），点击即可随时打开弹窗查看或直接安装；\n  - 本地已完整下载的 APK 自动识别就绪，秒级直接调起「立即安装」，免去重复消耗流量与等待。"
+  "fileSizeBytes": 3072096,
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.33/CourseSchedule-v1.2.33.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.33",
+  "changelog": "- 4×4 周课表小组件将同一课程的连续节次合并为一个课程块；地点自动换行，并按实际文字高度扩展，整张课表保持对齐并可滚动。\n- 更新下载器修复超时后停留在下载中、取消任务干扰后续任务的问题；增加安装包结构、包名、版本和签名信息校验，移除仅凭文件大小判定成功的兜底。\n- 拆分设置页、SettingsViewModel 与备份恢复服务，统一全部学期恢复的提示文案，恢复事务失败时回滚。\n- 增加跨节布局、真实 HTTP 下载、数据库迁移、重复恢复、失败回滚及安装包缓存回归测试。\n- 下载可在切换页面时继续；进程终止后，未完成的下载需重新点击下载，已校验的完整安装包可复用。"
 }

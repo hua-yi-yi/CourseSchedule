@@ -24,7 +24,9 @@ object WeekGridBuilder {
         val endTime: String = "",
         val slotIndexInCourse: Int = 0,
         val courseSpan: Int = 1,
-        val extraCount: Int = 0
+        val extraCount: Int = 0,
+        // 输入列表中的身份，避免把同名但不同地点/安排的相邻课程误合并。
+        val sourceIndex: Int = -1
     ) {
         val timeDisplay: String
             get() = if (startTime.isNotBlank() && endTime.isNotBlank()) {
@@ -52,10 +54,11 @@ object WeekGridBuilder {
         timeSlots: List<TimeSlot> = emptyList()
     ): List<List<Cell?>> {
         val grid = Array(maxSlots) { arrayOfNulls<Cell>(7) }
-        for (course in courses) {
+        for ((sourceIndex, course) in courses.withIndex()) {
             if (!course.appliesToWeek(week)) continue
             val day = course.dayOfWeek - 1
             if (day !in 0..6) continue
+            if (course.startSlot > maxSlots || course.endSlot < 1 || course.endSlot < course.startSlot) continue
             val start = course.startSlot.coerceIn(1, maxSlots)
             val end = course.endSlot.coerceIn(start, maxSlots)
             val span = end - start + 1
@@ -74,7 +77,8 @@ object WeekGridBuilder {
                     endTime = endTime,
                     slotIndexInCourse = slotIndexInCourse,
                     courseSpan = span,
-                    extraCount = 0
+                    extraCount = 0,
+                    sourceIndex = sourceIndex
                 )
                 grid[idx][day] = when (val cur = grid[idx][day]) {
                     null -> newCell
@@ -83,6 +87,64 @@ object WeekGridBuilder {
             }
         }
         return grid.map { row -> row.toList() }
+    }
+
+    data class Block(val startRow: Int, val rowSpan: Int, val cell: Cell?)
+
+    /** 每个星期独立跨节合并，空节保留，保证七列与左侧时间轴始终对齐。 */
+    fun blocks(grid: List<List<Cell?>>, dayIndex: Int): List<Block> {
+        val result = mutableListOf<Block>()
+        var row = 0
+        while (row < grid.size) {
+            val first = grid[row].getOrNull(dayIndex)
+            var end = row + 1
+            var extraCount = first?.extraCount ?: 0
+            if (first != null && first.sourceIndex >= 0) {
+                while (end < grid.size) {
+                    val next = grid[end].getOrNull(dayIndex) ?: break
+                    if (next.sourceIndex != first.sourceIndex ||
+                        next.slotIndexInCourse != first.slotIndexInCourse + end - row) break
+                    extraCount = maxOf(extraCount, next.extraCount)
+                    end++
+                }
+            }
+            result += Block(row, end - row, first?.copy(extraCount = extraCount))
+            row = end
+        }
+        return result
+    }
+
+    /** 只在所有列都没有跨节课程的位置分段，LazyColumn 不会把一个课程块切开。 */
+    fun bands(columns: List<List<Block>>, rowCount: Int): List<IntRange> {
+        val result = mutableListOf<IntRange>()
+        var start = 0
+        for (boundary in 1..rowCount) {
+            val crosses = columns.any { blocks -> blocks.any {
+                it.startRow < boundary && it.startRow + it.rowSpan > boundary
+            } }
+            if (!crosses) {
+                result += start until boundary
+                start = boundary
+            }
+        }
+        return result
+    }
+
+    /** 为地点文本分配足够高度，再将额外空间均匀分给课程占用的节次。 */
+    fun rowHeights(
+        columns: List<List<Block>>,
+        rowCount: Int,
+        minimumHeight: Float,
+        requiredHeight: (Cell) -> Float
+    ): List<Float> {
+        val heights = MutableList(rowCount) { minimumHeight }
+        columns.flatten().filter { it.cell != null }.sortedBy { it.rowSpan }.forEach { block ->
+            val rows = block.startRow until block.startRow + block.rowSpan
+            val available = rows.sumOf { heights[it].toDouble() }.toFloat()
+            val extra = (requiredHeight(block.cell!!) - available).coerceAtLeast(0f) / block.rowSpan
+            rows.forEach { heights[it] += extra }
+        }
+        return heights
     }
 
     /**

@@ -28,10 +28,10 @@ android {
         applicationId = "com.chen.schedule"
         minSdk = 26
         targetSdk = 34
-        versionCode = 38
-        versionName = "1.2.32"
+        versionCode = 39
+        versionName = "1.2.33"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.chen.schedule.RegressionInstrumentation"
         vectorDrawables {
             useSupportLibrary = true
         }
@@ -71,6 +71,8 @@ android {
         compose = true
         buildConfig = true
     }
+
+    sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
 
     packaging {
         resources {
