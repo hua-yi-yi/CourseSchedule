@@ -165,4 +165,17 @@ class WeekGridBuilderTest {
         assertEquals("班会", main)
         assertEquals("@综201", sub)
     }
+
+    @Test
+    fun `柔和背景色计算保证浅色柔和深色暗雅`() {
+        val green = 0xFF4CAF50L
+        val lightPastel = WeekGridBuilder.pastelColorFor(green, isDark = false)
+        val darkPastel = WeekGridBuilder.pastelColorFor(green, isDark = true)
+        assertTrue(lightPastel != green)
+        assertTrue(darkPastel != green)
+        // 浅色模式混合白色，分量应高于原色
+        val lightR = (lightPastel shr 16 and 0xFF).toInt()
+        val origR = (green shr 16 and 0xFF).toInt()
+        assertTrue(lightR > origR)
+    }
 }

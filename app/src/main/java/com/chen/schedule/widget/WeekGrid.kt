@@ -136,6 +136,26 @@ object WeekGridBuilder {
         return if (luminance > 0.6) TEXT_DARK else TEXT_LIGHT
     }
 
+    /**
+     * 为浅色/深色主题生成与课程原色协调的柔和浅底色(与主页 WeekView 的 accent.copy(alpha = 0.16f) 保持一致)。
+     */
+    fun pastelColorFor(color: Long, isDark: Boolean = false): Long {
+        val r = (color shr 16 and 0xFF).toInt()
+        val g = (color shr 8 and 0xFF).toInt()
+        val b = (color and 0xFF).toInt()
+        return if (!isDark) {
+            val pr = (r * 0.20 + 255 * 0.80).toInt().coerceIn(0, 255)
+            val pg = (g * 0.20 + 255 * 0.80).toInt().coerceIn(0, 255)
+            val pb = (b * 0.20 + 255 * 0.80).toInt().coerceIn(0, 255)
+            (0xFFL shl 24) or (pr.toLong() shl 16) or (pg.toLong() shl 8) or pb.toLong()
+        } else {
+            val pr = (r * 0.30 + 36 * 0.70).toInt().coerceIn(0, 255)
+            val pg = (g * 0.30 + 36 * 0.70).toInt().coerceIn(0, 255)
+            val pb = (b * 0.30 + 36 * 0.70).toInt().coerceIn(0, 255)
+            (0xFFL shl 24) or (pr.toLong() shl 16) or (pg.toLong() shl 8) or pb.toLong()
+        }
+    }
+
     const val TEXT_DARK = 0xFF1B1B1B
     const val TEXT_LIGHT = 0xFFFFFFFF
 }

@@ -20,6 +20,7 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
@@ -44,6 +45,15 @@ import com.chen.schedule.domain.model.TimeSlot
 import com.chen.schedule.domain.model.WeekType
 import com.chen.schedule.util.WeekCalculator
 import dagger.hilt.android.EntryPointAccessors
+import java.time.LocalDate
+
+/** 星期表头的一天数据 */
+data class DayHeaderData(
+    val dayOfWeek: Int,
+    val label: String,
+    val dateDisplay: String = "",
+    val isToday: Boolean = false
+)
 
 /** 周课表中一行节次的数据 */
 data class SlotRowData(
@@ -60,13 +70,15 @@ data class WeekWidgetData(
     val slotCount: Int,
     val grid: List<List<WeekGridBuilder.Cell?>> = emptyList(),
     val todayDayOfWeek: Int = 1,
-    val rows: List<SlotRowData> = emptyList()
+    val rows: List<SlotRowData> = emptyList(),
+    val dayHeaders: List<DayHeaderData> = emptyList()
 )
 
 private val DAY_LABELS = listOf("一", "二", "三", "四", "五", "六", "日")
 
 /**
  * 4×4 周课表大组件:展示当前周的完整课程网格(节次 × 周一~周日)，包含时间与地点。
+ * 视觉语言与主页 WeekView 保持高度一致（柔和卡片背景、左侧专属调色条、双行信息、表头日期与今日高亮）。
  */
 class WeekWidget : GlanceAppWidget() {
 
@@ -103,7 +115,19 @@ class WeekWidget : GlanceAppWidget() {
             ).coerceAtMost(WeekGridBuilder.MAX_SLOTS)
 
             val grid = WeekGridBuilder.build(courses, week, slotCount, configuredSlots)
-            val todayDayOfWeek = java.time.LocalDate.now().dayOfWeek.value
+            val today = LocalDate.now()
+            val todayDayOfWeek = today.dayOfWeek.value
+
+            val semesterMonday = WeekCalculator.semesterMonday(sem.startDate)
+            val dayHeaders = (1..7).map { dayIndex ->
+                val date = semesterMonday.plusDays(((week - 1) * 7 + (dayIndex - 1)).toLong())
+                DayHeaderData(
+                    dayOfWeek = dayIndex,
+                    label = DAY_LABELS[dayIndex - 1],
+                    dateDisplay = "${date.monthValue}/${date.dayOfMonth}",
+                    isToday = date == today
+                )
+            }
 
             val rows = (0 until slotCount).map { slotIdx ->
                 val slotNum = slotIdx + 1
@@ -122,7 +146,8 @@ class WeekWidget : GlanceAppWidget() {
                 slotCount = slotCount,
                 grid = grid,
                 todayDayOfWeek = todayDayOfWeek,
-                rows = rows
+                rows = rows,
+                dayHeaders = dayHeaders
             )
         }.getOrElse {
             emptyWidgetData("周课表", 0)
@@ -131,7 +156,16 @@ class WeekWidget : GlanceAppWidget() {
 
     private fun emptyWidgetData(semesterName: String, week: Int): WeekWidgetData {
         val grid = List(WeekGridBuilder.MIN_SLOTS) { List(7) { null } }
-        val todayDayOfWeek = java.time.LocalDate.now().dayOfWeek.value
+        val today = LocalDate.now()
+        val todayDayOfWeek = today.dayOfWeek.value
+        val dayHeaders = (1..7).map { dayIndex ->
+            DayHeaderData(
+                dayOfWeek = dayIndex,
+                label = DAY_LABELS[dayIndex - 1],
+                dateDisplay = "",
+                isToday = dayIndex == todayDayOfWeek
+            )
+        }
         val rows = (0 until WeekGridBuilder.MIN_SLOTS).map { slotIdx ->
             SlotRowData(
                 slotNumber = slotIdx + 1,
@@ -146,7 +180,8 @@ class WeekWidget : GlanceAppWidget() {
             slotCount = WeekGridBuilder.MIN_SLOTS,
             grid = grid,
             todayDayOfWeek = todayDayOfWeek,
-            rows = rows
+            rows = rows,
+            dayHeaders = dayHeaders
         )
     }
 
@@ -185,22 +220,41 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
             .padding(12.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
-        // 顶部信息区：与其他小组件完全对齐（左侧主标题+副标题，右侧整周视图角标）
+        // 顶部信息区：与主页 CompactTopBar 风格完全对齐
         Row(
             modifier = GlanceModifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = GlanceModifier.defaultWeight()) {
-                Text(
-                    text = "周课表",
-                    style = TextStyle(
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GlanceTheme.colors.onSurface
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (data.currentWeek > 0) "第 ${data.currentWeek} 周" else "周课表",
+                        style = TextStyle(
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GlanceTheme.colors.onSurface
+                        )
                     )
-                )
+                    Spacer(modifier = GlanceModifier.width(6.dp))
+                    Box(
+                        modifier = GlanceModifier
+                            .cornerRadius(4.dp)
+                            .background(GlanceTheme.colors.primaryContainer)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "整周视图",
+                            style = TextStyle(
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = GlanceTheme.colors.onPrimaryContainer
+                            )
+                        )
+                    }
+                }
+                Spacer(modifier = GlanceModifier.height(1.5.dp))
                 Text(
-                    text = if (data.currentWeek > 0) "${data.semesterName} · 第${data.currentWeek}周" else data.semesterName,
+                    text = data.semesterName,
                     style = TextStyle(
                         fontSize = 11.sp,
                         color = GlanceTheme.colors.onSurfaceVariant
@@ -208,33 +262,28 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
                     maxLines = 1
                 )
             }
-            Text(
-                text = "整周视图",
-                style = TextStyle(
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = GlanceTheme.colors.onSurfaceVariant
-                )
-            )
         }
 
         Spacer(modifier = GlanceModifier.height(6.dp))
 
-        // 星期表头（左侧节次列头 + 周一至周日，当日高亮突出）
+        // 星期与日期表头（与主页 WeekView 表头完全对齐：浅色底托、星期+日期、今日胶囊高亮）
         Row(
-            modifier = GlanceModifier.fillMaxWidth(),
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .background(GlanceTheme.colors.surfaceVariant)
+                .cornerRadius(6.dp)
+                .padding(vertical = 2.5.dp, horizontal = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = GlanceModifier
-                    .width(24.dp)
-                    .padding(horizontal = 1.dp),
+                    .width(26.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "节次",
+                    text = "节",
                     style = TextStyle(
-                        fontSize = 8.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = GlanceTheme.colors.onSurfaceVariant
                     ),
@@ -242,30 +291,53 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
                 )
             }
 
-            repeat(7) { index ->
-                val isToday = (index + 1) == data.todayDayOfWeek
+            data.dayHeaders.forEach { header ->
                 Box(
                     modifier = GlanceModifier
                         .defaultWeight()
                         .padding(horizontal = 1.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = DAY_LABELS[index],
-                        style = TextStyle(
-                            fontSize = if (isToday) 9.5.sp else 9.sp,
-                            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isToday) GlanceTheme.colors.primary else GlanceTheme.colors.onSurfaceVariant
-                        ),
-                        maxLines = 1
-                    )
+                    Column(
+                        modifier = GlanceModifier
+                            .fillMaxWidth()
+                            .cornerRadius(4.dp)
+                            .background(
+                                if (header.isToday) GlanceTheme.colors.primary
+                                else ColorProvider(Color.Transparent)
+                            )
+                            .padding(vertical = 2.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = header.label,
+                            style = TextStyle(
+                                fontSize = 10.sp,
+                                fontWeight = if (header.isToday) FontWeight.Bold else FontWeight.Medium,
+                                color = if (header.isToday) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSurface
+                            ),
+                            maxLines = 1
+                        )
+                        if (header.dateDisplay.isNotBlank()) {
+                            Text(
+                                text = header.dateDisplay,
+                                style = TextStyle(
+                                    fontSize = 7.5.sp,
+                                    fontWeight = if (header.isToday) FontWeight.Medium else FontWeight.Normal,
+                                    color = if (header.isToday) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSurfaceVariant
+                                ),
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        Spacer(modifier = GlanceModifier.height(3.dp))
+        Spacer(modifier = GlanceModifier.height(4.dp))
 
-        // 课表网格: 每行一个节次，包含左侧节次时段与右侧 7 天课程单元格（支持自适应平滑滚动）
+        // 课表网格: 每行一个节次，包含左侧节次时段与右侧 7 天课程单元格
         LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
             items(data.rows, itemId = { it.slotNumber.toLong() }) { row ->
                 Row(
@@ -286,10 +358,10 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
 private fun SlotTimeCell(slotNumber: Int, startTime: String) {
     Box(
         modifier = GlanceModifier
-            .width(24.dp)
-            .height(26.dp)
+            .width(26.dp)
+            .height(29.dp)
             .padding(1.dp)
-            .cornerRadius(3.dp)
+            .cornerRadius(4.dp)
             .background(GlanceTheme.colors.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
@@ -300,7 +372,7 @@ private fun SlotTimeCell(slotNumber: Int, startTime: String) {
             Text(
                 text = "$slotNumber",
                 style = TextStyle(
-                    fontSize = 8.5.sp,
+                    fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     color = GlanceTheme.colors.onSurface
                 ),
@@ -325,44 +397,62 @@ private fun RowScope.WeekCell(cell: WeekGridBuilder.Cell?) {
     Box(
         modifier = GlanceModifier
             .defaultWeight()
-            .height(26.dp)
+            .height(29.dp)
             .padding(1.dp)
-            .cornerRadius(3.dp)
+            .cornerRadius(4.dp)
             .background(
-                if (cell != null) ColorProvider(Color(cell.color))
+                if (cell != null) ColorProvider(Color(WeekGridBuilder.pastelColorFor(cell.color, isDark = false)))
                 else GlanceTheme.colors.surfaceVariant
             ),
         contentAlignment = Alignment.Center
     ) {
         if (cell != null) {
-            val textColor = ColorProvider(Color(WeekGridBuilder.textColorFor(cell.color)))
             val (mainText, subText) = WeekGridBuilder.formatCellText(cell)
 
-            Column(
-                modifier = GlanceModifier
-                    .fillMaxSize()
-                    .padding(horizontal = 1.dp, vertical = 0.5.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            Row(
+                modifier = GlanceModifier.fillMaxSize(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = mainText,
-                    style = TextStyle(
-                        fontSize = 7.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = textColor
-                    ),
-                    maxLines = 1
-                )
-                if (subText.isNotBlank()) {
+                // 左侧课程纯色微条 (2.5dp 宽度，与主页 CourseBlock 的左侧微条完全对应)
+                Box(
+                    modifier = GlanceModifier
+                        .width(2.5.dp)
+                        .fillMaxHeight()
+                        .cornerRadius(1.dp)
+                        .background(ColorProvider(Color(cell.color)))
+                ) {}
+
+                Spacer(modifier = GlanceModifier.width(2.dp))
+
+                // 课程内容文字: 主文本为 onSurface 粗体, 次文本为 onSurfaceVariant
+                Column(
+                    modifier = GlanceModifier
+                        .defaultWeight()
+                        .fillMaxHeight()
+                        .padding(horizontal = 1.dp, vertical = 1.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = subText,
+                        text = mainText,
                         style = TextStyle(
-                            fontSize = 6.5.sp,
-                            color = textColor
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GlanceTheme.colors.onSurface
                         ),
                         maxLines = 1
                     )
+                    if (subText.isNotBlank()) {
+                        Text(
+                            text = subText,
+                            style = TextStyle(
+                                fontSize = 6.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = GlanceTheme.colors.onSurfaceVariant
+                            ),
+                            maxLines = 1
+                        )
+                    }
                 }
             }
         }
