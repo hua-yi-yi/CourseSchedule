@@ -1,0 +1,10 @@
+{
+  "versionName": "1.2.30",
+  "versionTag": "v1.2.30",
+  "title": "v1.2.30",
+  "publishedAt": "2026-09-22",
+  "fileSizeBytes": 3055708,
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.30/CourseSchedule-v1.2.30.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.30",
+  "changelog": "- 全新重构升级 GitHub 镜像站检测更新架构（彻底解决镜像站检测 403 拦截）：\n  - 核心痛点彻底解决：深入排查并解决了国内 GHFast、GHProxy 等镜像站出于防刷考虑拦截 api.github.com（直接报 403 拒绝访问）导致应用被迫降级直连官方的问题；\n  - 推出双轨制镜像检测引擎：\n    - 轨道 1（Raw 镜像通道）：全部镜像节点均 100% 极速支持 Raw 资源加速，优先通过选中的镜像拉取 version.json，秒级响应，绝无 403 拦截；\n    - 轨道 2（API 反代通道）：对于完整支持 API 反代的节点（如 GH-Proxy）及官方直连提供多重备用容错；\n  - 节点测速精准化：修正各节点延迟探测机制，直接探测镜像服务器根节点响应，告别测速被误判为超时的现象；\n  - 检测更新来源全透明呈现：\n    - 发现新版时弹窗顶部明确展示「经由『xxx』检测成功」；\n    - 当前已是最新版本时 Toast 清晰提示经由哪个节点检测；\n    - 设置页列表实时持久化记录「上次检查: 2026-09-22 12:25 (GHFast 节点 (推荐))」。"
+}

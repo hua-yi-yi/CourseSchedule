@@ -17,7 +17,7 @@ import javax.inject.Singleton
 
 /**
  * 应用版本更新检测引擎。
- * 对接 GitHub Releases 接口，支持官方直连与国内加速镜像双通道智能回退。
+ * 对接 GitHub Releases 接口与 Raw 镜像元数据，支持全节点高速镜像加速与双通道容错。
  */
 @Singleton
 class AppUpdateChecker @Inject constructor(
@@ -36,7 +36,14 @@ class AppUpdateChecker @Inject constructor(
         const val REPO_NAME = "CourseSchedule"
         const val OFFICIAL_API_URL = "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest"
         const val OFFICIAL_RELEASE_WEB = "https://github.com/$REPO_OWNER/$REPO_NAME/releases/latest"
+        const val OFFICIAL_RAW_VERSION_URL = "https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/main/version.json"
     }
+
+    private data class EndpointCandidate(
+        val name: String,
+        val url: String,
+        val isRawVersion: Boolean
+    )
 
     /**
      * 检查最新版本（挂起函数，在 IO 协程中执行）。
@@ -46,19 +53,23 @@ class AppUpdateChecker @Inject constructor(
         val selected = prefs.selectedMirror
         val useMirror = prefs.useMirror
 
-        // 构造候选请求节点列表
+        // 构造候选请求节点列表（双轨加速架构：优先通过镜像拉取 raw version.json，规避 api.github.com 403 拦截）
         val candidateEndpoints = buildCandidateEndpoints(useMirror, selected)
 
         var lastError: Exception? = null
         var successJson: JSONObject? = null
         var usedMirrorName: String? = null
 
-        for ((name, url) in candidateEndpoints) {
+        for (candidate in candidateEndpoints) {
             try {
                 val req = Request.Builder()
-                    .url(url)
+                    .url(candidate.url)
                     .header("User-Agent", "CourseSchedule-App/${BuildConfig.VERSION_NAME}")
-                    .header("Accept", "application/vnd.github.v3+json")
+                    .apply {
+                        if (!candidate.isRawVersion) {
+                            header("Accept", "application/vnd.github.v3+json")
+                        }
+                    }
                     .build()
 
                 client.newCall(req).execute().use { resp ->
@@ -66,7 +77,7 @@ class AppUpdateChecker @Inject constructor(
                         val bodyStr = resp.body?.string().orEmpty()
                         if (bodyStr.isNotBlank() && bodyStr.trimStart().startsWith("{")) {
                             successJson = JSONObject(bodyStr)
-                            usedMirrorName = name
+                            usedMirrorName = candidate.name
                             return@use
                         }
                     }
@@ -80,31 +91,34 @@ class AppUpdateChecker @Inject constructor(
 
         val json = successJson
         if (json == null) {
-            val msg = lastError?.message ?: "无法连接到 GitHub 检查更新，请检查网络"
+            val msg = lastError?.message ?: "无法连接到更新服务器，请检查网络"
             return@withContext UpdateCheckResult.Error(msg, canOpenWeb = true)
         }
 
         try {
-            val tagName = json.optString("tag_name", "")
-            val title = json.optString("name", tagName).ifBlank { tagName }
-            val changelog = json.optString("body", "").trim().ifBlank { "本次发布暂无详细更新说明" }
-            val htmlUrl = json.optString("html_url", OFFICIAL_RELEASE_WEB)
-            val publishedAtRaw = json.optString("published_at", "")
+            val tagName = json.optString("versionTag").ifBlank { json.optString("tag_name", "") }
+            val title = json.optString("title").ifBlank { json.optString("name", tagName) }.ifBlank { tagName }
+            val changelog = json.optString("changelog").ifBlank { json.optString("body", "").trim() }.ifBlank { "本次发布暂无详细更新说明" }
+            val htmlUrl = json.optString("htmlUrl").ifBlank { json.optString("html_url", OFFICIAL_RELEASE_WEB) }
+            val publishedAtRaw = json.optString("publishedAt").ifBlank { json.optString("published_at", "") }
             val publishedAt = if (publishedAtRaw.contains("T")) publishedAtRaw.substringBefore("T") else publishedAtRaw
 
             // 解析 APK 附件下载直链
-            val assets = json.optJSONArray("assets")
-            var officialApkUrl = ""
-            var apkSize: Long? = null
-            if (assets != null) {
-                for (i in 0 until assets.length()) {
-                    val asset = assets.optJSONObject(i) ?: continue
-                    val assetName = asset.optString("name", "")
-                    if (assetName.endsWith(".apk", ignoreCase = true)) {
-                        officialApkUrl = asset.optString("browser_download_url", "")
-                        val size = asset.optLong("size", -1L)
-                        if (size > 0) apkSize = size
-                        break
+            var officialApkUrl = json.optString("officialDownloadUrl").ifBlank { json.optString("apkUrl", "") }
+            var apkSize: Long? = json.optLong("fileSizeBytes", -1L).takeIf { it > 0 }
+
+            if (officialApkUrl.isBlank()) {
+                val assets = json.optJSONArray("assets")
+                if (assets != null) {
+                    for (i in 0 until assets.length()) {
+                        val asset = assets.optJSONObject(i) ?: continue
+                        val assetName = asset.optString("name", "")
+                        if (assetName.endsWith(".apk", ignoreCase = true)) {
+                            officialApkUrl = asset.optString("browser_download_url", "")
+                            val size = asset.optLong("size", -1L)
+                            if (size > 0 && apkSize == null) apkSize = size
+                            break
+                        }
                     }
                 }
             }
@@ -122,8 +136,12 @@ class AppUpdateChecker @Inject constructor(
             val mirrorToUse = if (useMirror) selected else GithubMirror.DIRECT
             val mirrorApkUrl = mirrorToUse.wrapUrl(officialApkUrl)
 
-            // 记录成功检测时间
+            // 记录成功检测时间与来源节点
+            val cleanSourceName = usedMirrorName ?: "官方直连"
             prefs.lastCheckTime = System.currentTimeMillis()
+            prefs.lastCheckSource = cleanSourceName
+
+            val isMirrorUsed = !cleanSourceName.contains("官方直连")
 
             if (isNew) {
                 val releaseInfo = AppReleaseInfo(
@@ -140,13 +158,15 @@ class AppUpdateChecker @Inject constructor(
                 UpdateCheckResult.HasUpdate(
                     release = releaseInfo,
                     currentVersion = "v$currentVersion",
-                    isMirrorUsed = usedMirrorName != null && usedMirrorName != "官方直连",
-                    mirrorName = usedMirrorName
+                    isMirrorUsed = isMirrorUsed,
+                    mirrorName = cleanSourceName
                 )
             } else {
                 UpdateCheckResult.UpToDate(
                     currentVersion = "v$currentVersion",
-                    latestVersion = cleanRemoteName
+                    latestVersion = cleanRemoteName,
+                    isMirrorUsed = isMirrorUsed,
+                    mirrorName = cleanSourceName
                 )
             }
         } catch (e: Exception) {
@@ -166,22 +186,95 @@ class AppUpdateChecker @Inject constructor(
         jobs.awaitAll().toMap()
     }
 
-    private fun buildCandidateEndpoints(useMirror: Boolean, selected: GithubMirror): List<Pair<String, String>> {
-        val list = mutableListOf<Pair<String, String>>()
+    private fun buildCandidateEndpoints(useMirror: Boolean, selected: GithubMirror): List<EndpointCandidate> {
+        val list = mutableListOf<EndpointCandidate>()
         if (useMirror && selected != GithubMirror.DIRECT) {
-            list.add(selected.displayName to selected.wrapApiUrl(OFFICIAL_API_URL))
-            list.add("官方直连" to OFFICIAL_API_URL)
-            // 追加备用镜像
-            if (selected != GithubMirror.GHFAST) {
-                list.add(GithubMirror.GHFAST.displayName to GithubMirror.GHFAST.wrapApiUrl(OFFICIAL_API_URL))
+            // 1. 首选: 用户指定的镜像站 -> 拉取 version.json (国内全节点 100% 极速加速 raw)
+            list.add(
+                EndpointCandidate(
+                    name = selected.displayName,
+                    url = selected.wrapUrl(OFFICIAL_RAW_VERSION_URL),
+                    isRawVersion = true
+                )
+            )
+            // 2. 若用户指定的是 GH-Proxy，可尝试其完整的 API 反代
+            if (selected == GithubMirror.GH_PROXY_COM) {
+                list.add(
+                    EndpointCandidate(
+                        name = "${selected.displayName} (API)",
+                        url = "https://gh-proxy.com/$OFFICIAL_API_URL",
+                        isRawVersion = false
+                    )
+                )
             }
-            if (selected != GithubMirror.GHPROXY_NET) {
-                list.add(GithubMirror.GHPROXY_NET.displayName to GithubMirror.GHPROXY_NET.wrapApiUrl(OFFICIAL_API_URL))
+            // 3. 备用镜像 Raw 通道
+            val backupMirrors = listOf(GithubMirror.GHFAST, GithubMirror.GHPROXY_NET, GithubMirror.GH_PROXY_COM)
+                .filter { it != selected }
+            for (m in backupMirrors) {
+                list.add(
+                    EndpointCandidate(
+                        name = "${m.displayName} (备用)",
+                        url = m.wrapUrl(OFFICIAL_RAW_VERSION_URL),
+                        isRawVersion = true
+                    )
+                )
             }
+            // 4. GH-Proxy API 备用通道
+            if (selected != GithubMirror.GH_PROXY_COM) {
+                list.add(
+                    EndpointCandidate(
+                        name = "GH-Proxy 镜像 (API)",
+                        url = "https://gh-proxy.com/$OFFICIAL_API_URL",
+                        isRawVersion = false
+                    )
+                )
+            }
+            // 5. 官方直连保底
+            list.add(
+                EndpointCandidate(
+                    name = "官方直连",
+                    url = OFFICIAL_API_URL,
+                    isRawVersion = false
+                )
+            )
+            list.add(
+                EndpointCandidate(
+                    name = "官方直连 (Raw)",
+                    url = OFFICIAL_RAW_VERSION_URL,
+                    isRawVersion = true
+                )
+            )
         } else {
-            list.add("官方直连" to OFFICIAL_API_URL)
-            list.add(GithubMirror.GHFAST.displayName to GithubMirror.GHFAST.wrapApiUrl(OFFICIAL_API_URL))
-            list.add(GithubMirror.GHPROXY_NET.displayName to GithubMirror.GHPROXY_NET.wrapApiUrl(OFFICIAL_API_URL))
+            // 官方直连模式
+            list.add(
+                EndpointCandidate(
+                    name = "官方直连",
+                    url = OFFICIAL_API_URL,
+                    isRawVersion = false
+                )
+            )
+            list.add(
+                EndpointCandidate(
+                    name = "官方直连 (Raw)",
+                    url = OFFICIAL_RAW_VERSION_URL,
+                    isRawVersion = true
+                )
+            )
+            // 备用镜像通道
+            list.add(
+                EndpointCandidate(
+                    name = "GHFast 节点 (备用)",
+                    url = GithubMirror.GHFAST.wrapUrl(OFFICIAL_RAW_VERSION_URL),
+                    isRawVersion = true
+                )
+            )
+            list.add(
+                EndpointCandidate(
+                    name = "GH-Proxy 节点 (API备用)",
+                    url = "https://gh-proxy.com/$OFFICIAL_API_URL",
+                    isRawVersion = false
+                )
+            )
         }
         return list
     }

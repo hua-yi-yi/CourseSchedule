@@ -170,9 +170,10 @@ class SettingsViewModel @Inject constructor(
 
     private fun updateLastCheckSummary() {
         val last = updatePrefs.lastCheckTime
+        val src = updatePrefs.lastCheckSource
         lastCheckSummary = if (last > 0L) {
             val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(last))
-            "上次检查: $dateStr"
+            if (src.isNotBlank()) "上次检查: $dateStr ($src)" else "上次检查: $dateStr"
         } else {
             "点击检查最新版本"
         }
@@ -189,7 +190,10 @@ class SettingsViewModel @Inject constructor(
                 if (manual) {
                     when (res) {
                         is UpdateCheckResult.UpToDate -> {
-                            Toast.makeText(context, "当前已是最新版本 (${res.currentVersion})", Toast.LENGTH_SHORT).show()
+                            val mirrorTag = if (res.isMirrorUsed && !res.mirrorName.isNullOrBlank()) {
+                                " · 经由「${res.mirrorName}」检测"
+                            } else ""
+                            Toast.makeText(context, "当前已是最新版本 (${res.currentVersion})$mirrorTag", Toast.LENGTH_SHORT).show()
                         }
                         is UpdateCheckResult.Error -> {
                             Toast.makeText(context, "检查更新失败: ${res.message}", Toast.LENGTH_LONG).show()

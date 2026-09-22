@@ -31,6 +31,7 @@ enum class GithubMirror(
         if (isDomainReplace && replaceDomain.isNotBlank()) {
             return originalUrl.replace("https://github.com", "https://$replaceDomain")
                 .replace("http://github.com", "https://$replaceDomain")
+                .replace("https://raw.githubusercontent.com", "https://raw.$replaceDomain")
         }
         val p = prefix ?: return originalUrl
         val cleanPrefix = if (p.endsWith("/")) p else "$p/"
@@ -59,10 +60,12 @@ enum class GithubMirror(
         suspend fun testLatency(mirror: GithubMirror, client: OkHttpClient): Long? {
             val testTarget = if (mirror == DIRECT) {
                 "https://api.github.com"
-            } else if (mirror.isDomainReplace) {
+            } else if (mirror.prefix != null) {
+                mirror.prefix
+            } else if (mirror.isDomainReplace && mirror.replaceDomain.isNotBlank()) {
                 "https://${mirror.replaceDomain}"
             } else {
-                mirror.wrapUrl("https://github.com")
+                "https://api.github.com"
             }
 
             return withContext(Dispatchers.IO) {

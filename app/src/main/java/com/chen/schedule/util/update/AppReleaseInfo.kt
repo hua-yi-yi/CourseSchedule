@@ -34,7 +34,9 @@ sealed class UpdateCheckResult {
      */
     data class UpToDate(
         val currentVersion: String,
-        val latestVersion: String
+        val latestVersion: String,
+        val isMirrorUsed: Boolean = false,
+        val mirrorName: String? = null
     ) : UpdateCheckResult()
 
     /**

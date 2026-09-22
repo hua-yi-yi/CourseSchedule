@@ -37,10 +37,16 @@ class UpdatePrefs(context: Context) {
         get() = prefs.getLong(KEY_LAST_CHECK_TIME, 0L)
         set(value) = prefs.edit().putLong(KEY_LAST_CHECK_TIME, value).apply()
 
+    /** 上次检测成功的来源节点名称 */
+    var lastCheckSource: String
+        get() = prefs.getString(KEY_LAST_CHECK_SOURCE, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_LAST_CHECK_SOURCE, value).apply()
+
     companion object {
         private const val KEY_AUTO_CHECK = "auto_check_update"
         private const val KEY_USE_MIRROR = "use_mirror"
         private const val KEY_SELECTED_MIRROR = "selected_mirror"
         private const val KEY_LAST_CHECK_TIME = "last_check_time"
+        private const val KEY_LAST_CHECK_SOURCE = "last_check_source"
     }
 }
