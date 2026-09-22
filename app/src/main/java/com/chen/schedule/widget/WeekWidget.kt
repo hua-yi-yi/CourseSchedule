@@ -121,22 +121,44 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
             .fillMaxSize()
             .appWidgetBackground()
             .background(GlanceTheme.colors.surface)
-            .cornerRadius(16.dp)
-            .padding(10.dp)
+            .cornerRadius(18.dp)
+            .padding(12.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
-        // 标题:学期 · 第 N 周
-        Text(
-            text = "${data.semesterName} · 第${data.currentWeek}周",
-            style = TextStyle(
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = GlanceTheme.colors.onSurface
-            ),
-            maxLines = 1
-        )
+        // 顶部信息区：完全与其他小组件统一结构（左侧主标题+副标题，右侧视图摘要）
+        Row(
+            modifier = GlanceModifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = GlanceModifier.defaultWeight()) {
+                Text(
+                    text = "周课表",
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GlanceTheme.colors.onSurface
+                    )
+                )
+                Text(
+                    text = if (data.currentWeek > 0) "${data.semesterName} · 第${data.currentWeek}周" else data.semesterName,
+                    style = TextStyle(
+                        fontSize = 11.sp,
+                        color = GlanceTheme.colors.onSurfaceVariant
+                    ),
+                    maxLines = 1
+                )
+            }
+            Text(
+                text = "整周视图",
+                style = TextStyle(
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = GlanceTheme.colors.onSurfaceVariant
+                )
+            )
+        }
 
-        Spacer(modifier = GlanceModifier.height(4.dp))
+        Spacer(modifier = GlanceModifier.height(6.dp))
 
         // 星期表头
         Row(modifier = GlanceModifier.fillMaxWidth()) {

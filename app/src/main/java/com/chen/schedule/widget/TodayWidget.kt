@@ -37,7 +37,7 @@ import com.chen.schedule.MainActivity
 
 /**
  * 4×1 今日课程小组件：
- * 横条紧凑排版，完整展示上课时间、节次与上课地点。
+ * 与 3×3、4×4 保持完全一致的视觉规范（18dp 大圆角、统一双层顶栏、内嵌卡片底衬）。
  */
 class TodayWidget : GlanceAppWidget() {
 
@@ -67,51 +67,73 @@ private fun TodayWidgetContent(data: WidgetData) {
             .fillMaxSize()
             .appWidgetBackground()
             .background(GlanceTheme.colors.surface)
-            .cornerRadius(16.dp)
-            .padding(10.dp)
+            .cornerRadius(18.dp)
+            .padding(12.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
-        // 顶栏：学期 · 周次 · 星期
+        // 顶部信息区：完全与 3×3 对齐（主标题日期·星期，副标题学期·周次，右侧课程数）
         Row(
             modifier = GlanceModifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = if (data.currentWeek <= 0) data.semesterName
-                else "${data.semesterName} · 第${data.currentWeek}周 · ${data.dayOfWeekLabel}",
-                style = TextStyle(
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = GlanceTheme.colors.onSurface
-                ),
-                modifier = GlanceModifier.defaultWeight(),
-                maxLines = 1
-            )
-            if (data.courses.isNotEmpty()) {
+            Column(modifier = GlanceModifier.defaultWeight()) {
                 Text(
-                    text = "${data.courses.size}门课",
+                    text = "${data.dateLabel} · ${data.dayOfWeekLabel}",
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GlanceTheme.colors.onSurface
+                    )
+                )
+                Text(
+                    text = if (data.currentWeek > 0) "${data.semesterName} · 第${data.currentWeek}周" else data.semesterName,
                     style = TextStyle(
                         fontSize = 11.sp,
+                        color = GlanceTheme.colors.onSurfaceVariant
+                    ),
+                    maxLines = 1
+                )
+            }
+            Text(
+                text = if (data.courses.isNotEmpty()) "共 ${data.courses.size} 门课" else "无课",
+                style = TextStyle(
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = GlanceTheme.colors.onSurfaceVariant
+                )
+            )
+        }
+
+        Spacer(modifier = GlanceModifier.height(8.dp))
+
+        if (data.courses.isEmpty()) {
+            Column(
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .padding(top = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "今日无课",
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GlanceTheme.colors.onSurfaceVariant
+                    )
+                )
+                Spacer(modifier = GlanceModifier.height(4.dp))
+                Text(
+                    text = "享受属于自己的自由时间吧",
+                    style = TextStyle(
+                        fontSize = 11.5.sp,
                         color = GlanceTheme.colors.onSurfaceVariant
                     )
                 )
             }
-        }
-
-        Spacer(modifier = GlanceModifier.height(6.dp))
-
-        if (data.courses.isEmpty()) {
-            Text(
-                text = "今日无课",
-                style = TextStyle(
-                    fontSize = 13.sp,
-                    color = GlanceTheme.colors.onSurfaceVariant
-                )
-            )
         } else {
-            LazyColumn(modifier = GlanceModifier.fillMaxWidth()) {
+            LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                 items(data.courses) { course ->
-                    CourseRow(course)
+                    TodayCourseCard(course)
                 }
             }
         }
@@ -119,65 +141,62 @@ private fun TodayWidgetContent(data: WidgetData) {
 }
 
 @Composable
-private fun CourseRow(course: WidgetCourse) {
+private fun TodayCourseCard(course: WidgetCourse) {
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .padding(vertical = 3.dp),
+            .padding(vertical = 3.5.dp)
+            .background(GlanceTheme.colors.surfaceVariant)
+            .cornerRadius(10.dp)
+            .padding(horizontal = 8.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 课程颜色微条
+        // 左侧课程微条（与应用内调色盘颜色完全对应）
         Box(
             modifier = GlanceModifier
                 .width(3.dp)
-                .height(30.dp)
+                .height(44.dp)
                 .background(ColorProvider(Color(course.color)))
                 .cornerRadius(1.5.dp)
         ) {}
 
-        Spacer(modifier = GlanceModifier.width(6.dp))
-
-        // 节次与时间区间
-        Column(modifier = GlanceModifier.width(68.dp)) {
-            Text(
-                text = if (course.startTime.isNotBlank()) course.startTime else "第${course.startSlot}节",
-                style = TextStyle(
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = GlanceTheme.colors.primary
-                ),
-                maxLines = 1
-            )
-            Text(
-                text = course.slotDisplay,
-                style = TextStyle(
-                    fontSize = 9.5.sp,
-                    color = GlanceTheme.colors.onSurfaceVariant
-                ),
-                maxLines = 1
-            )
-        }
-
-        Spacer(modifier = GlanceModifier.width(6.dp))
+        Spacer(modifier = GlanceModifier.width(8.dp))
 
         Column(modifier = GlanceModifier.defaultWeight()) {
+            // 课程名称：完整显示
             Text(
                 text = course.name,
                 style = TextStyle(
-                    fontSize = 12.5.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = GlanceTheme.colors.onSurface
                 ),
                 maxLines = 1
             )
+
+            Spacer(modifier = GlanceModifier.height(2.dp))
+
+            // 上课时间：完整写下具体起止时间与节次
             Text(
                 text = if (course.startTime.isNotBlank() && course.endTime.isNotBlank()) {
-                    "${course.startTime}-${course.endTime} · ${course.locationAndTeacherDisplay}"
+                    "时间: ${course.startTime} - ${course.endTime} (${course.slotDisplay})"
                 } else {
-                    course.locationAndTeacherDisplay
+                    "时间: ${course.slotDisplay}"
                 },
                 style = TextStyle(
-                    fontSize = 10.5.sp,
+                    fontSize = 11.sp,
+                    color = GlanceTheme.colors.onSurfaceVariant
+                ),
+                maxLines = 1
+            )
+
+            Spacer(modifier = GlanceModifier.height(1.5.dp))
+
+            // 上课地点：完整写下教室地点（支持软折行不截断）与任课教师
+            Text(
+                text = "地点: ${course.locationAndTeacherDisplay}",
+                style = TextStyle(
+                    fontSize = 11.sp,
                     color = GlanceTheme.colors.onSurfaceVariant
                 ),
                 maxLines = 2
