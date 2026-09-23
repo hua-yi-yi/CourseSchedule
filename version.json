@@ -1,10 +1,10 @@
 {
-  "versionName": "1.2.35",
-  "versionTag": "v1.2.35",
-  "title": "v1.2.35",
+  "versionName": "1.2.36",
+  "versionTag": "v1.2.36",
+  "title": "v1.2.36",
   "publishedAt": "2026-09-23",
   "fileSizeBytes": 3072096,
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.35/CourseSchedule-v1.2.35.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.35",
-  "changelog": "- 4×4 周课表小组件移除周次、学期名称和“整周视图”顶栏，收紧外边距，让课程网格显示更多内容。\n- 今日 4×1、今日 3×3 和周课表 4×4 小组件的标题、课程卡片及空白区域均可点击打开应用。"
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.36/CourseSchedule-v1.2.36.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.36",
+  "changelog": "- 4×4 周课表小组件统一星期表头、节次时间格与课程卡片的圆角和文字层级，整体排版更协调。\n- 课程卡片按设备浅色或深色模式使用柔和底色，并自动选择清晰的文字颜色；保持原有课程显示面积和点击打开应用的行为。"
 }

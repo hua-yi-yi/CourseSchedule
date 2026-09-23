@@ -1,6 +1,7 @@
 package com.chen.schedule.widget
 
 import android.content.Context
+import android.content.res.Configuration
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
@@ -221,6 +222,8 @@ class WeekWidget : GlanceAppWidget() {
 @Composable
 private fun WeekWidgetContent(data: WeekWidgetData) {
     val context = LocalContext.current
+    val isDarkTheme = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+        Configuration.UI_MODE_NIGHT_YES
     val widgetWidth = LocalSize.current.width.value
     val columns = (0..6).map { WeekGridBuilder.blocks(data.grid, it) }
     // 容器 16dp + 时间列 26dp，课程格留出边距和色条；再预留 2dp 的测量余量。
@@ -243,7 +246,7 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .background(GlanceTheme.colors.surfaceVariant)
-                .cornerRadius(6.dp)
+                .cornerRadius(8.dp)
                 .padding(vertical = 2.5.dp, horizontal = 2.dp)
                 .clickable(actionStartActivity<MainActivity>()),
             verticalAlignment = Alignment.CenterVertically
@@ -274,7 +277,7 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
                     Column(
                         modifier = GlanceModifier
                             .fillMaxWidth()
-                            .cornerRadius(4.dp)
+                            .cornerRadius(6.dp)
                             .background(
                                 if (header.isToday) GlanceTheme.colors.primary
                                 else ColorProvider(Color.Transparent)
@@ -336,7 +339,7 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
                                     chunk.forEach { block ->
                                         val height = (block.startRow until block.startRow + block.rowSpan)
                                             .sumOf { heights[it].toDouble() }.toFloat()
-                                        WeekCell(block.cell, height)
+                                        WeekCell(block.cell, height, isDarkTheme)
                                     }
                                 }
                             }
@@ -355,7 +358,7 @@ private fun SlotTimeCell(slotNumber: Int, startTime: String, height: Float) {
             .width(26.dp)
             .height(height.dp)
             .padding(1.dp)
-            .cornerRadius(4.dp)
+            .cornerRadius(8.dp)
             .background(GlanceTheme.colors.surfaceVariant)
             .clickable(actionStartActivity<MainActivity>()),
         contentAlignment = Alignment.Center
@@ -367,9 +370,9 @@ private fun SlotTimeCell(slotNumber: Int, startTime: String, height: Float) {
             Text(
                 text = "$slotNumber",
                 style = TextStyle(
-                    fontSize = 9.sp,
+                    fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = GlanceTheme.colors.onSurface
+                    color = GlanceTheme.colors.onSurfaceVariant
                 ),
                 maxLines = 1
             )
@@ -377,7 +380,7 @@ private fun SlotTimeCell(slotNumber: Int, startTime: String, height: Float) {
                 Text(
                     text = startTime,
                     style = TextStyle(
-                        fontSize = 6.5.sp,
+                        fontSize = 7.sp,
                         color = GlanceTheme.colors.onSurfaceVariant
                     ),
                     maxLines = 1
@@ -388,15 +391,21 @@ private fun SlotTimeCell(slotNumber: Int, startTime: String, height: Float) {
 }
 
 @Composable
-private fun WeekCell(cell: WeekGridBuilder.Cell?, height: Float) {
+private fun WeekCell(cell: WeekGridBuilder.Cell?, height: Float, isDarkTheme: Boolean) {
+    val courseBackground = cell?.let {
+        WeekGridBuilder.pastelColorFor(it.color, isDark = isDarkTheme)
+    }
+    val courseTextColor = courseBackground?.let {
+        Color(WeekGridBuilder.textColorFor(it))
+    }
     Box(
         modifier = GlanceModifier
             .fillMaxWidth()
             .height(height.dp)
             .padding(1.dp)
-            .cornerRadius(4.dp)
+            .cornerRadius(8.dp)
             .background(
-                if (cell != null) ColorProvider(Color(WeekGridBuilder.pastelColorFor(cell.color, isDark = false)))
+                if (courseBackground != null) ColorProvider(Color(courseBackground))
                 else GlanceTheme.colors.surfaceVariant
             )
             .clickable(actionStartActivity<MainActivity>()),
@@ -404,6 +413,7 @@ private fun WeekCell(cell: WeekGridBuilder.Cell?, height: Float) {
     ) {
         if (cell != null) {
             val mainText = if (cell.extraCount > 0) "${cell.name}+${cell.extraCount}" else cell.name
+            val textColor = requireNotNull(courseTextColor)
 
             Row(
                 modifier = GlanceModifier.fillMaxSize(),
@@ -434,7 +444,7 @@ private fun WeekCell(cell: WeekGridBuilder.Cell?, height: Float) {
                         style = TextStyle(
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = ColorProvider(Color(WeekGridBuilder.TEXT_DARK))
+                            color = ColorProvider(textColor)
                         ),
                         maxLines = 2
                     )
@@ -443,9 +453,9 @@ private fun WeekCell(cell: WeekGridBuilder.Cell?, height: Float) {
                         Text(
                             text = cell.classroom.trim(),
                             style = TextStyle(
-                                fontSize = 9.sp,
+                                fontSize = 8.5.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = ColorProvider(Color(WeekGridBuilder.TEXT_DARK))
+                                color = ColorProvider(textColor.copy(alpha = 0.86f))
                             ),
                             maxLines = Int.MAX_VALUE
                         )

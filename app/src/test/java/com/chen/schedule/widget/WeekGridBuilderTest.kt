@@ -234,6 +234,8 @@ class WeekGridBuilderTest {
         val darkPastel = WeekGridBuilder.pastelColorFor(green, isDark = true)
         assertTrue(lightPastel != green)
         assertTrue(darkPastel != green)
+        assertEquals(WeekGridBuilder.TEXT_DARK, WeekGridBuilder.textColorFor(lightPastel))
+        assertEquals(WeekGridBuilder.TEXT_LIGHT, WeekGridBuilder.textColorFor(darkPastel))
         // 浅色模式混合白色，分量应高于原色
         val lightR = (lightPastel shr 16 and 0xFF).toInt()
         val origR = (green shr 16 and 0xFF).toInt()
