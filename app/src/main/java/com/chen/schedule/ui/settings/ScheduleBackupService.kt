@@ -65,7 +65,7 @@ class ScheduleBackupService @Inject constructor(
             val jsonString = requireNotNull(context.contentResolver.openInputStream(uri)).bufferedReader().use { it.readText() }
             val format = Json { ignoreUnknownKeys = true }
             val element = format.parseToJsonElement(jsonString)
-            val backup = if (element is kotlinx.serialization.json.JsonObject && "backupVersion" in element)
+            val backup = if (ScheduleBackupFormat.isFullBackup(element))
                 format.decodeFromString(ScheduleBackup.serializer(), jsonString) else null
             require(backup == null || backup.backupVersion in
                 ScheduleBackup.LEGACY_VERSION..ScheduleBackup.CURRENT_VERSION) { "不支持此备份版本" }
@@ -77,6 +77,7 @@ class ScheduleBackupService @Inject constructor(
             } ?: courses
             require(coursesToValidate.all { it.name.isNotBlank() && it.dayOfWeek in 1..7 && it.startSlot > 0 && it.endSlot >= it.startSlot && it.startWeek > 0 && it.endWeek >= it.startWeek }) { "课程数据无效" }
             backup?.let { data ->
+                BackupRestorePlanner.validateReferences(data)
                 require(data.semester.totalWeeks in 1..53) { "学期周数无效" }
                 val semestersInBackup = if (data.semesters.isNotEmpty()) data.semesters else listOf(data.semester)
                 require(semestersInBackup.all { it.totalWeeks in 1..53 }) { "学期周数无效" }

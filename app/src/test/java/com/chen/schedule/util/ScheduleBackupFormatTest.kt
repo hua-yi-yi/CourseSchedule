@@ -60,10 +60,18 @@ class ScheduleBackupFormatTest {
         """.trimIndent()
         val restored = Json { ignoreUnknownKeys = true }
             .decodeFromString(ScheduleBackup.serializer(), legacyJson)
+        assertTrue(ScheduleBackupFormat.isFullBackup(Json.parseToJsonElement(legacyJson)))
         assertEquals(ScheduleBackup.LEGACY_VERSION, restored.backupVersion)
         assertEquals(1, restored.timeSlots.size)
         assertTrue(restored.schemeSlots.isEmpty())
         assertTrue(restored.schemes.isEmpty())
+    }
+
+    @Test fun courseImportWithoutSemesterIsNotFullBackup() {
+        val importJson = """{"semesterName":"秋季","courses":[]}"""
+        assertFalse(ScheduleBackupFormat.isFullBackup(Json.parseToJsonElement(importJson)))
+        val importWithTextSemester = """{"semester":"秋季","courses":[]}"""
+        assertFalse(ScheduleBackupFormat.isFullBackup(Json.parseToJsonElement(importWithTextSemester)))
     }
 
     /**

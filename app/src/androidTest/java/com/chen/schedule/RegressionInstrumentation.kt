@@ -12,9 +12,11 @@ import com.chen.schedule.domain.model.Course
 import com.chen.schedule.domain.model.Semester
 import com.chen.schedule.domain.model.TimeSlot
 import com.chen.schedule.ui.settings.ScheduleBackupService
+import com.chen.schedule.util.ScheduleBackup
 import com.chen.schedule.util.update.AppUpdateDownloader
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
@@ -28,6 +30,7 @@ class RegressionInstrumentation : Instrumentation() {
             "migration1to3" to { migration(1) },
             "migration2to3" to { migration(2) },
             "backupRoundTripAndRollback" to { backupRoundTrip() },
+            "legacyBackupWithAndWithoutCourses" to { legacyBackup() },
             "apkCacheIdentityAndCorruption" to { apkCacheValidation() }
         )
         var failures = 0
@@ -123,6 +126,42 @@ class RegressionInstrumentation : Instrumentation() {
             check(courses.getAllCourses().first() == beforeCourses)
             check(schemes.getAllSchemesDirect() == beforeSchemes)
             check(slots.getAllTimeSlots().first() == beforeSlots)
+        } finally { file.delete(); db.close() }
+    }
+
+    private fun legacyBackup() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(targetContext, AppDatabase::class.java).build()
+        val file = File.createTempFile("legacy-backup-regression", ".json", targetContext.cacheDir)
+        try {
+            val courses = CourseRepository(db.courseDao())
+            val semesters = SemesterRepository(db.semesterDao())
+            val slots = TimeSlotRepository(db.timeSlotDao())
+            val schemes = TimeSchemeRepository(db, db.timeSchemeDao(), db.timeSlotDao(), db.semesterDao(), db.courseDao())
+            val service = ScheduleBackupService(db, courses, semesters, slots, schemes, targetContext)
+            val oldId = semesters.insert(Semester(name = "本机旧学期", totalWeeks = 20))
+            courses.insert(Course(name = "本机旧课", semesterId = oldId))
+            val legacySemester = Semester(id = 42, name = "备份学期", startDate = 1725235200000,
+                totalWeeks = 20, isCurrent = true)
+            val legacySlot = TimeSlot(slotNumber = 1, startTime = "08:00", endTime = "08:45")
+            val legacyCourse = Course(name = "备份课程", semesterId = 42)
+            val backup = ScheduleBackup(semester = legacySemester, courses = listOf(legacyCourse),
+                timeSlots = listOf(legacySlot))
+            val content = Json.encodeToString(ScheduleBackup.serializer(), backup)
+            check("backupVersion" !in content)
+            file.writeText(content)
+
+            val restored = service.importData(Uri.fromFile(file))
+            check(restored.fullRestore && restored.count == 1)
+            check(semesters.getAllSemesters().first().single().name == "备份学期")
+            check(courses.getAllCourses().first().single().name == "备份课程")
+            check(slots.getAllTimeSlots().first().single { it.schemeId == 0L }.startTime == "08:00")
+
+            file.writeText(Json.encodeToString(ScheduleBackup.serializer(), backup.copy(courses = emptyList())))
+            val emptyRestored = service.importData(Uri.fromFile(file))
+            check(emptyRestored.fullRestore && emptyRestored.count == 0)
+            check(semesters.getAllSemesters().first().single().name == "备份学期")
+            check(courses.getAllCourses().first().isEmpty())
+            check(slots.getAllTimeSlots().first().single { it.schemeId == 0L }.startTime == "08:00")
         } finally { file.delete(); db.close() }
     }
 

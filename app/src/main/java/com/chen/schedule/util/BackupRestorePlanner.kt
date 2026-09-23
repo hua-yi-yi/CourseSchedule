@@ -15,9 +15,39 @@ import com.chen.schedule.domain.model.TimeSlot
  * 约定:
  * - 返回的 [RestorePlan.semesters] 中 `id = 0`(待插入),`schemeId` 已通过 [schemeIdMapper] 映射;
  * - 课程按「学期下标」返回,由调用方在插入学期后把下标换成真实 id;
- * - 备份里找不到对应学期的课程会被丢弃(不静默挂到别的学期上)。
+ * - 引用不完整的备份在恢复前会被拒绝,避免丢课或把课程挂到别的学期。
  */
 object BackupRestorePlanner {
+
+    /** 在修改数据库前拒绝会造成静默丢课或作息回退的不完整备份。 */
+    fun validateReferences(backup: ScheduleBackup) {
+        val semesters = if (backup.semesters.isNotEmpty()) backup.semesters else listOf(backup.semester)
+        val semesterIds = semesters.map { it.id }.toSet()
+        require(semesterIds.size == semesters.size) { "备份中学期编号重复" }
+        require(backup.semester.id in semesterIds) { "备份中的当前学期不存在" }
+
+        // v2 全量列表为空时表示确实没有跨学期课程,但兼容字段 courses 仍可能有当前学期课程。
+        val coursesToRestore = if (backup.allCourses.isNotEmpty()) backup.allCourses else backup.courses
+        if (coursesToRestore.isNotEmpty()) {
+            require(coursesToRestore.all { it.semesterId in semesterIds }) {
+                "备份中有课程关联了不存在的学期"
+            }
+        }
+
+        val schemeIds = backup.schemes.map { it.id }.toSet()
+        require(schemeIds.size == backup.schemes.size && 0L !in schemeIds) {
+            "备份中作息方案编号重复或无效"
+        }
+        require(semesters.all { it.schemeId == 0L || it.schemeId in schemeIds }) {
+            "备份中有学期关联了不存在的作息方案"
+        }
+        val slotSchemeIds = backup.schemeSlots.map { it.schemeId }
+        require(slotSchemeIds.size == slotSchemeIds.toSet().size) { "备份中作息方案节次重复" }
+        require(backup.schemeSlots.all { entry ->
+            (entry.schemeId == 0L || entry.schemeId in schemeIds) &&
+                entry.slots.all { it.schemeId == entry.schemeId }
+        }) { "备份中有节次关联了不存在或不匹配的作息方案" }
+    }
 
     /** 恢复计划。 */
     data class RestorePlan(

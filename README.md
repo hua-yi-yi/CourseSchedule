@@ -102,7 +102,7 @@ git push origin v1.0.2
 
 > 首次需在仓库 **Settings → Secrets and variables → Actions** 配置:
 > `RELEASE_KEYSTORE_B64`(keystore 的 base64)、`RELEASE_STORE_PASSWORD`、`RELEASE_KEY_PASSWORD`、`RELEASE_KEY_ALIAS`。
-> 未配置时 CI 降级构建 debug APK。
+> 普通分支和 PR 构建在未配置签名时会生成 debug APK；版本标签发布必须配置全部签名密钥，否则构建失败且不会创建 Release。
 
 ## 测试
 

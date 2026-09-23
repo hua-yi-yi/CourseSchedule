@@ -4,6 +4,7 @@ import com.chen.schedule.domain.model.Course
 import com.chen.schedule.domain.model.Semester
 import com.chen.schedule.domain.model.TimeSlot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -63,8 +64,8 @@ class BackupRestorePlannerTest {
         assertTrue(plan.courses.all { it.second.id == 0L })
     }
 
-    /** 课程若指向备份中不存在的学期,应被丢弃,而不是挂到别的学期上。 */
-    @Test fun dropsCoursesWithUnknownSemester() {
+    /** 完整恢复前必须拒绝孤儿课程，不能在报告成功时少恢复一门课。 */
+    @Test fun rejectsCoursesWithUnknownSemester() {
         val backup = ScheduleBackup(
             backupVersion = ScheduleBackup.CURRENT_VERSION,
             semester = semester(1, "唯一学期", 0, isCurrent = true),
@@ -73,9 +74,60 @@ class BackupRestorePlannerTest {
             semesters = listOf(semester(1, "唯一学期", 0, isCurrent = true)),
             allCourses = listOf(course("有效", 1), course("孤儿", 999))
         )
-        val plan = BackupRestorePlanner.plan(backup) { 0L }
-        assertEquals(1, plan.courses.size)
-        assertEquals("有效", plan.courses.first().second.name)
+        assertThrows(IllegalArgumentException::class.java) {
+            BackupRestorePlanner.validateReferences(backup)
+        }
+    }
+
+    @Test fun rejectsMissingSchemeAndMismatchedSlotReferences() {
+        val base = ScheduleBackup(
+            backupVersion = ScheduleBackup.CURRENT_VERSION,
+            semester = semester(1, "学期", 7, isCurrent = true),
+            courses = emptyList(),
+            timeSlots = emptyList(),
+            semesters = listOf(semester(1, "学期", 7, isCurrent = true))
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            BackupRestorePlanner.validateReferences(base)
+        }
+
+        val withScheme = base.copy(schemes = listOf(
+            com.chen.schedule.domain.model.TimeScheme(id = 7, name = "作息")
+        ))
+        BackupRestorePlanner.validateReferences(withScheme)
+        assertThrows(IllegalArgumentException::class.java) {
+            BackupRestorePlanner.validateReferences(withScheme.copy(
+                schemeSlots = listOf(SchemeSlots(7, listOf(slot(1, 8))))
+            ))
+        }
+    }
+
+    @Test fun rejectsMissingCurrentSemester() {
+        val backup = ScheduleBackup(
+            backupVersion = ScheduleBackup.CURRENT_VERSION,
+            semester = semester(2, "当前学期", 0, isCurrent = true),
+            courses = emptyList(),
+            timeSlots = emptyList(),
+            semesters = listOf(semester(1, "其他学期", 0))
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            BackupRestorePlanner.validateReferences(backup)
+        }
+    }
+
+    /** 旧版/全量列表为空时,兼容字段 courses 的孤儿引用也必须拒绝。 */
+    @Test fun rejectsOrphanInFallbackCourses() {
+        val backup = ScheduleBackup(
+            backupVersion = ScheduleBackup.CURRENT_VERSION,
+            semester = semester(1, "唯一学期", 0, isCurrent = true),
+            courses = listOf(course("孤儿", 999)),
+            timeSlots = emptyList(),
+            semesters = listOf(semester(1, "唯一学期", 0, isCurrent = true)),
+            allCourses = emptyList()
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            BackupRestorePlanner.validateReferences(backup)
+        }
     }
 
     /** 旧版备份(无 semesters / allCourses)仍按单学期恢复,课程挂到该学期。 */
