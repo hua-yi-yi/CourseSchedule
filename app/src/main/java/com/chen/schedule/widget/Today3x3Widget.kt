@@ -69,7 +69,9 @@ private fun Today3x3WidgetContent(data: WidgetData) {
     ) {
         // 顶部信息区：日期 · 星期与学期周次
         Row(
-            modifier = GlanceModifier.fillMaxWidth(),
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .clickable(actionStartActivity<MainActivity>()),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = GlanceModifier.defaultWeight()) {
@@ -106,7 +108,8 @@ private fun Today3x3WidgetContent(data: WidgetData) {
             Column(
                 modifier = GlanceModifier
                     .fillMaxSize()
-                    .padding(top = 28.dp),
+                    .padding(top = 28.dp)
+                    .clickable(actionStartActivity<MainActivity>()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -144,7 +147,8 @@ private fun Today3x3CourseCard(course: WidgetCourse) {
             .padding(vertical = 3.5.dp)
             .background(GlanceTheme.colors.surfaceVariant)
             .cornerRadius(10.dp)
-            .padding(horizontal = 8.dp, vertical = 7.dp),
+            .padding(horizontal = 8.dp, vertical = 7.dp)
+            .clickable(actionStartActivity<MainActivity>()),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // 左侧课程微条（与应用内颜色对应，柔和细致）

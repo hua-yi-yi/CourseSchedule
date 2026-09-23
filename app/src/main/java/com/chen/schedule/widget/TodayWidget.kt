@@ -73,7 +73,9 @@ private fun TodayWidgetContent(data: WidgetData) {
     ) {
         // 顶部信息区：完全与 3×3 对齐（主标题日期·星期，副标题学期·周次，右侧课程数）
         Row(
-            modifier = GlanceModifier.fillMaxWidth(),
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .clickable(actionStartActivity<MainActivity>()),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = GlanceModifier.defaultWeight()) {
@@ -110,7 +112,8 @@ private fun TodayWidgetContent(data: WidgetData) {
             Column(
                 modifier = GlanceModifier
                     .fillMaxSize()
-                    .padding(top = 16.dp),
+                    .padding(top = 16.dp)
+                    .clickable(actionStartActivity<MainActivity>()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -148,7 +151,8 @@ private fun TodayCourseCard(course: WidgetCourse) {
             .padding(vertical = 3.5.dp)
             .background(GlanceTheme.colors.surfaceVariant)
             .cornerRadius(10.dp)
-            .padding(horizontal = 8.dp, vertical = 7.dp),
+            .padding(horizontal = 8.dp, vertical = 7.dp)
+            .clickable(actionStartActivity<MainActivity>()),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // 左侧课程微条（与应用内调色盘颜色完全对应）

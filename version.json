@@ -1,10 +1,10 @@
 {
-  "versionName": "1.2.34",
-  "versionTag": "v1.2.34",
-  "title": "v1.2.34",
+  "versionName": "1.2.35",
+  "versionTag": "v1.2.35",
+  "title": "v1.2.35",
   "publishedAt": "2026-09-23",
-  "fileSizeBytes": 3072092,
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.34/CourseSchedule-v1.2.34.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.34",
-  "changelog": "- 修复无版本号的旧版完整备份被当作仅课程文件导入的问题；空课程备份也可完整恢复学期与作息。\n- 完整恢复前校验课程、学期、作息方案及节次的关联，遇到不完整备份时明确报错，避免静默丢失数据。\n- 版本标签发布必须配置正式签名，避免将无法覆盖升级的 debug APK 作为正式版本发布。\n- 增加旧备份导入与异常引用的回归测试。"
+  "fileSizeBytes": 3072096,
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.35/CourseSchedule-v1.2.35.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.35",
+  "changelog": "- 4×4 周课表小组件移除周次、学期名称和“整周视图”顶栏，收紧外边距，让课程网格显示更多内容。\n- 今日 4×1、今日 3×3 和周课表 4×4 小组件的标题、课程卡片及空白区域均可点击打开应用。"
 }

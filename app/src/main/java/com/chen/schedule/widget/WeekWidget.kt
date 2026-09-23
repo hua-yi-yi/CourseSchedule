@@ -223,8 +223,8 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
     val context = LocalContext.current
     val widgetWidth = LocalSize.current.width.value
     val columns = (0..6).map { WeekGridBuilder.blocks(data.grid, it) }
-    // 容器 24dp + 时间列 26dp，课程格留出边距和色条；再预留 2dp 的测量余量。
-    val textWidth = ((widgetWidth - 24f - 26f) / 7f - 10f).coerceAtLeast(1f)
+    // 容器 16dp + 时间列 26dp，课程格留出边距和色条；再预留 2dp 的测量余量。
+    val textWidth = ((widgetWidth - 16f - 26f) / 7f - 10f).coerceAtLeast(1f)
     val heights = WeekGridBuilder.rowHeights(columns, data.slotCount, 38f) { cell ->
         courseTextHeight(context, cell, textWidth)
     }
@@ -235,62 +235,17 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
             .appWidgetBackground()
             .background(GlanceTheme.colors.surface)
             .cornerRadius(18.dp)
-            .padding(12.dp)
+            .padding(8.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
-        // 顶部信息区：与主页 CompactTopBar 风格完全对齐
-        Row(
-            modifier = GlanceModifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = GlanceModifier.defaultWeight()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = if (data.currentWeek > 0) "第 ${data.currentWeek} 周" else "周课表",
-                        style = TextStyle(
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = GlanceTheme.colors.onSurface
-                        )
-                    )
-                    Spacer(modifier = GlanceModifier.width(6.dp))
-                    Box(
-                        modifier = GlanceModifier
-                            .cornerRadius(4.dp)
-                            .background(GlanceTheme.colors.primaryContainer)
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "整周视图",
-                            style = TextStyle(
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = GlanceTheme.colors.onPrimaryContainer
-                            )
-                        )
-                    }
-                }
-                Spacer(modifier = GlanceModifier.height(1.5.dp))
-                Text(
-                    text = data.semesterName,
-                    style = TextStyle(
-                        fontSize = 11.sp,
-                        color = GlanceTheme.colors.onSurfaceVariant
-                    ),
-                    maxLines = 1
-                )
-            }
-        }
-
-        Spacer(modifier = GlanceModifier.height(6.dp))
-
         // 星期与日期表头（与主页 WeekView 表头完全对齐：浅色底托、星期+日期、今日胶囊高亮）
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .background(GlanceTheme.colors.surfaceVariant)
                 .cornerRadius(6.dp)
-                .padding(vertical = 2.5.dp, horizontal = 2.dp),
+                .padding(vertical = 2.5.dp, horizontal = 2.dp)
+                .clickable(actionStartActivity<MainActivity>()),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -359,7 +314,9 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
         LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
             items(bands, itemId = { it.first.toLong() }) { band ->
                 Row(
-                    modifier = GlanceModifier.fillMaxWidth()
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .clickable(actionStartActivity<MainActivity>())
                 ) {
                     Column(modifier = GlanceModifier.width(26.dp)) {
                         // Glance 的单个 Column 子节点数量有限，长跨节分成小组。
@@ -399,7 +356,8 @@ private fun SlotTimeCell(slotNumber: Int, startTime: String, height: Float) {
             .height(height.dp)
             .padding(1.dp)
             .cornerRadius(4.dp)
-            .background(GlanceTheme.colors.surfaceVariant),
+            .background(GlanceTheme.colors.surfaceVariant)
+            .clickable(actionStartActivity<MainActivity>()),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -440,7 +398,8 @@ private fun WeekCell(cell: WeekGridBuilder.Cell?, height: Float) {
             .background(
                 if (cell != null) ColorProvider(Color(WeekGridBuilder.pastelColorFor(cell.color, isDark = false)))
                 else GlanceTheme.colors.surfaceVariant
-            ),
+            )
+            .clickable(actionStartActivity<MainActivity>()),
         contentAlignment = Alignment.Center
     ) {
         if (cell != null) {
