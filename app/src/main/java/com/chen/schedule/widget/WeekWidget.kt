@@ -84,6 +84,32 @@ data class WeekWidgetData(
 
 private val DAY_LABELS = listOf("一", "二", "三", "四", "五", "六", "日")
 
+/** 课表背景使用分层的中性色，让课程卡片保持视觉焦点。 */
+private data class WeekWidgetSurfaces(
+    val shell: ColorProvider,
+    val grid: ColorProvider,
+    val time: ColorProvider,
+    val empty: ColorProvider
+) {
+    companion object {
+        fun forTheme(isDark: Boolean): WeekWidgetSurfaces = if (isDark) {
+            WeekWidgetSurfaces(
+                shell = ColorProvider(Color(0xFF121B2A)),
+                grid = ColorProvider(Color(0xFF192638)),
+                time = ColorProvider(Color(0xFF2A3B52)),
+                empty = ColorProvider(Color(0xFF223147))
+            )
+        } else {
+            WeekWidgetSurfaces(
+                shell = ColorProvider(Color(0xFFEAF1FB)),
+                grid = ColorProvider(Color(0xFFFBFCFF)),
+                time = ColorProvider(Color(0xFFE4EDF9)),
+                empty = ColorProvider(Color(0xFFF0F4FA))
+            )
+        }
+    }
+}
+
 /**
  * 4×4 周课表大组件:展示当前周的完整课程网格(节次 × 周一~周日)，包含时间与地点。
  * 视觉语言与主页 WeekView 保持高度一致（柔和卡片背景、左侧专属调色条、双行信息、表头日期与今日高亮）。
@@ -224,10 +250,11 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
     val context = LocalContext.current
     val isDarkTheme = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
         Configuration.UI_MODE_NIGHT_YES
+    val surfaces = WeekWidgetSurfaces.forTheme(isDarkTheme)
     val widgetWidth = LocalSize.current.width.value
     val columns = (0..6).map { WeekGridBuilder.blocks(data.grid, it) }
-    // 容器 16dp + 时间列 26dp，课程格留出边距和色条；再预留 2dp 的测量余量。
-    val textWidth = ((widgetWidth - 16f - 26f) / 7f - 10f).coerceAtLeast(1f)
+    // 外边距 16dp + 网格内边距 4dp + 时间列 26dp，课程格再留出边距和色条。
+    val textWidth = ((widgetWidth - 20f - 26f) / 7f - 10f).coerceAtLeast(1f)
     val heights = WeekGridBuilder.rowHeights(columns, data.slotCount, 38f) { cell ->
         courseTextHeight(context, cell, textWidth)
     }
@@ -236,110 +263,115 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
         modifier = GlanceModifier
             .fillMaxSize()
             .appWidgetBackground()
-            .background(GlanceTheme.colors.surface)
+            .background(surfaces.shell)
             .cornerRadius(18.dp)
             .padding(8.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
-        // 星期与日期表头（与主页 WeekView 表头完全对齐：浅色底托、星期+日期、今日胶囊高亮）
-        Row(
+        // 表头与可滚动课表共用一整块底板，今日仍用主题主色突出。
+        Column(
             modifier = GlanceModifier
-                .fillMaxWidth()
-                .background(GlanceTheme.colors.surfaceVariant)
-                .cornerRadius(8.dp)
-                .padding(vertical = 2.5.dp, horizontal = 2.dp)
-                .clickable(actionStartActivity<MainActivity>()),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .background(surfaces.grid)
+                .cornerRadius(10.dp)
+                .padding(2.dp)
+                .clickable(actionStartActivity<MainActivity>())
         ) {
-            Box(
+            Row(
                 modifier = GlanceModifier
-                    .width(26.dp),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(vertical = 2.5.dp, horizontal = 2.dp)
+                    .clickable(actionStartActivity<MainActivity>()),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "节",
-                    style = TextStyle(
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GlanceTheme.colors.onSurfaceVariant
-                    ),
-                    maxLines = 1
-                )
-            }
-
-            data.dayHeaders.forEach { header ->
                 Box(
                     modifier = GlanceModifier
-                        .defaultWeight()
-                        .padding(horizontal = 1.dp),
+                        .width(26.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
+                    Text(
+                        text = "节",
+                        style = TextStyle(
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GlanceTheme.colors.onSurfaceVariant
+                        ),
+                        maxLines = 1
+                    )
+                }
+
+                data.dayHeaders.forEach { header ->
+                    Box(
                         modifier = GlanceModifier
-                            .fillMaxWidth()
-                            .cornerRadius(6.dp)
-                            .background(
-                                if (header.isToday) GlanceTheme.colors.primary
-                                else ColorProvider(Color.Transparent)
-                            )
-                            .padding(vertical = 2.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalAlignment = Alignment.CenterVertically
+                            .defaultWeight()
+                            .padding(horizontal = 1.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = header.label,
-                            style = TextStyle(
-                                fontSize = 10.sp,
-                                fontWeight = if (header.isToday) FontWeight.Bold else FontWeight.Medium,
-                                color = if (header.isToday) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSurface
-                            ),
-                            maxLines = 1
-                        )
-                        if (header.dateDisplay.isNotBlank()) {
+                        Column(
+                            modifier = GlanceModifier
+                                .fillMaxWidth()
+                                .cornerRadius(6.dp)
+                                .background(
+                                    if (header.isToday) GlanceTheme.colors.primary
+                                    else ColorProvider(Color.Transparent)
+                                )
+                                .padding(vertical = 2.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
-                                text = header.dateDisplay,
+                                text = header.label,
                                 style = TextStyle(
-                                    fontSize = 7.5.sp,
-                                    fontWeight = if (header.isToday) FontWeight.Medium else FontWeight.Normal,
-                                    color = if (header.isToday) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSurfaceVariant
+                                    fontSize = 10.sp,
+                                    fontWeight = if (header.isToday) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (header.isToday) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSurface
                                 ),
                                 maxLines = 1
                             )
+                            if (header.dateDisplay.isNotBlank()) {
+                                Text(
+                                    text = header.dateDisplay,
+                                    style = TextStyle(
+                                        fontSize = 7.5.sp,
+                                        fontWeight = if (header.isToday) FontWeight.Medium else FontWeight.Normal,
+                                        color = if (header.isToday) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSurfaceVariant
+                                    ),
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
 
-        Spacer(modifier = GlanceModifier.height(4.dp))
-
-        // 按安全分段滚动，每列独立绘制跨节课程块；不会在连堂课中间画分隔线。
-        LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-            items(bands, itemId = { it.first.toLong() }) { band ->
-                Row(
-                    modifier = GlanceModifier
-                        .fillMaxWidth()
-                        .clickable(actionStartActivity<MainActivity>())
-                ) {
-                    Column(modifier = GlanceModifier.width(26.dp)) {
-                        // Glance 的单个 Column 子节点数量有限，长跨节分成小组。
-                        band.toList().chunked(6).forEach { chunk ->
-                            Column {
-                                chunk.forEach { rowIndex ->
-                                    val row = data.rows[rowIndex]
-                                    SlotTimeCell(row.slotNumber, row.startTime, heights[rowIndex])
+            // 按安全分段滚动，每列独立绘制跨节课程块；不会在连堂课中间画分隔线。
+            LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+                items(bands, itemId = { it.first.toLong() }) { band ->
+                    Row(
+                        modifier = GlanceModifier
+                            .fillMaxWidth()
+                            .clickable(actionStartActivity<MainActivity>())
+                    ) {
+                        Column(modifier = GlanceModifier.width(26.dp)) {
+                            // Glance 的单个 Column 子节点数量有限，长跨节分成小组。
+                            band.toList().chunked(6).forEach { chunk ->
+                                Column {
+                                    chunk.forEach { rowIndex ->
+                                        val row = data.rows[rowIndex]
+                                        SlotTimeCell(row.slotNumber, row.startTime, heights[rowIndex], surfaces.time)
+                                    }
                                 }
                             }
                         }
-                    }
-                    columns.forEach { blocks ->
-                        Column(modifier = GlanceModifier.defaultWeight()) {
-                            blocks.filter { it.startRow in band }.chunked(6).forEach { chunk ->
-                                Column(modifier = GlanceModifier.fillMaxWidth()) {
-                                    chunk.forEach { block ->
-                                        val height = (block.startRow until block.startRow + block.rowSpan)
-                                            .sumOf { heights[it].toDouble() }.toFloat()
-                                        WeekCell(block.cell, height, isDarkTheme)
+                        columns.forEach { blocks ->
+                            Column(modifier = GlanceModifier.defaultWeight()) {
+                                blocks.filter { it.startRow in band }.chunked(6).forEach { chunk ->
+                                    Column(modifier = GlanceModifier.fillMaxWidth()) {
+                                        chunk.forEach { block ->
+                                            val height = (block.startRow until block.startRow + block.rowSpan)
+                                                .sumOf { heights[it].toDouble() }.toFloat()
+                                            WeekCell(block.cell, height, isDarkTheme, surfaces.empty)
+                                        }
                                     }
                                 }
                             }
@@ -352,14 +384,14 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
 }
 
 @Composable
-private fun SlotTimeCell(slotNumber: Int, startTime: String, height: Float) {
+private fun SlotTimeCell(slotNumber: Int, startTime: String, height: Float, background: ColorProvider) {
     Box(
         modifier = GlanceModifier
             .width(26.dp)
             .height(height.dp)
             .padding(1.dp)
             .cornerRadius(8.dp)
-            .background(GlanceTheme.colors.surfaceVariant)
+            .background(background)
             .clickable(actionStartActivity<MainActivity>()),
         contentAlignment = Alignment.Center
     ) {
@@ -391,7 +423,12 @@ private fun SlotTimeCell(slotNumber: Int, startTime: String, height: Float) {
 }
 
 @Composable
-private fun WeekCell(cell: WeekGridBuilder.Cell?, height: Float, isDarkTheme: Boolean) {
+private fun WeekCell(
+    cell: WeekGridBuilder.Cell?,
+    height: Float,
+    isDarkTheme: Boolean,
+    emptyBackground: ColorProvider
+) {
     val courseBackground = cell?.let {
         WeekGridBuilder.pastelColorFor(it.color, isDark = isDarkTheme)
     }
@@ -406,7 +443,7 @@ private fun WeekCell(cell: WeekGridBuilder.Cell?, height: Float, isDarkTheme: Bo
             .cornerRadius(8.dp)
             .background(
                 if (courseBackground != null) ColorProvider(Color(courseBackground))
-                else GlanceTheme.colors.surfaceVariant
+                else emptyBackground
             )
             .clickable(actionStartActivity<MainActivity>()),
         contentAlignment = Alignment.Center
