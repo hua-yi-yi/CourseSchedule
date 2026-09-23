@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="week_widget_canvas">#EAF1FB</color>
+    <color name="week_widget_time">#E4EDF9</color>
+    <color name="week_widget_empty">#F0F4FA</color>
+</resources>

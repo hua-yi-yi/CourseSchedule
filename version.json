@@ -1,10 +1,10 @@
 {
-  "versionName": "1.2.37",
-  "versionTag": "v1.2.37",
-  "title": "v1.2.37",
+  "versionName": "1.2.38",
+  "versionTag": "v1.2.38",
+  "title": "v1.2.38",
   "publishedAt": "2026-09-23",
-  "fileSizeBytes": 3072096,
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.37/CourseSchedule-v1.2.37.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.37",
-  "changelog": "- 重新设计 4×4 周课表小组件背景：浅色与深色模式分别采用柔和的蓝灰配色，时间格和空白格层次更清晰。\n- 星期表头与可滚动课表共用一整块连续圆角底板，移除两者之间的空隙。"
+  "fileSizeBytes": 3072364,
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.38/CourseSchedule-v1.2.38.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.38",
+  "changelog": "- 4×4 周课表小组件移除外框、内底板及格子之间的留白，背景从边缘连续铺满。\n- 节次行随小组件高度伸展，消除课表下方的大块空白；深色模式切换时背景同步更新。"
 }
