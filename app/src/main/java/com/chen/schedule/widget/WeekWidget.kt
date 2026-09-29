@@ -3,27 +3,31 @@ package com.chen.schedule.widget
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
-import android.graphics.Typeface
-import androidx.glance.LocalContext
-import androidx.glance.LocalSize
-import androidx.glance.appwidget.SizeMode
-import kotlin.math.ceil
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.glance.ExperimentalGlanceApi
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.LocalContext
+import androidx.glance.LocalSize
+import androidx.glance.action.actionStartActivity
+import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.appWidgetBackground
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.updateAll
-import androidx.glance.action.actionStartActivity
-import androidx.glance.action.clickable
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -36,19 +40,14 @@ import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.width
-import androidx.glance.appwidget.appWidgetBackground
-import androidx.glance.appwidget.cornerRadius
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
-import com.chen.schedule.data.local.entity.CourseEntity
-import com.chen.schedule.data.local.entity.TimeSlotEntity
 import com.chen.schedule.MainActivity
 import com.chen.schedule.R
+import com.chen.schedule.data.local.entity.CourseEntity
+import com.chen.schedule.data.local.entity.TimeSlotEntity
 import com.chen.schedule.di.DatabaseEntryPoint
 import com.chen.schedule.domain.model.Course
 import com.chen.schedule.domain.model.TimeSlot
@@ -56,6 +55,7 @@ import com.chen.schedule.domain.model.WeekType
 import com.chen.schedule.util.WeekCalculator
 import dagger.hilt.android.EntryPointAccessors
 import java.time.LocalDate
+import kotlin.math.ceil
 
 /** 星期表头的一天数据 */
 data class DayHeaderData(
@@ -86,9 +86,10 @@ data class WeekWidgetData(
 
 private val DAY_LABELS = listOf("一", "二", "三", "四", "五", "六", "日")
 
-/** 整个课表共用一块底色，时间格和空白格仅用色差区分。 */
+/** 课表底板与各元素背景颜色 */
 private data class WeekWidgetSurfaces(
     val canvas: ColorProvider,
+    val header: ColorProvider,
     val time: ColorProvider,
     val empty: ColorProvider
 )
@@ -97,13 +98,14 @@ private data class WeekWidgetSurfaces(
 @SuppressLint("RestrictedApi")
 private val WEEK_WIDGET_SURFACES = WeekWidgetSurfaces(
     canvas = ColorProvider(R.color.week_widget_canvas),
+    header = ColorProvider(R.color.week_widget_header),
     time = ColorProvider(R.color.week_widget_time),
     empty = ColorProvider(R.color.week_widget_empty)
 )
 
 /**
  * 4×4 周课表大组件:展示当前周的完整课程网格(节次 × 周一~周日)，包含时间与地点。
- * 视觉语言与主页 WeekView 保持高度一致（柔和卡片背景、左侧专属调色条、双行信息、表头日期与今日高亮）。
+ * 视觉语言与主页 WeekView 保持高度一致（全局统一圆角、柔和卡片背景、左侧专属调色条、双行信息、表头日期与今日高亮）。
  */
 class WeekWidget : GlanceAppWidget() {
 
@@ -112,7 +114,7 @@ class WeekWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val data = loadWidgetData(context)
         provideContent {
-            GlanceTheme {
+            ScheduleGlanceTheme {
                 WeekWidgetContent(data)
             }
         }
@@ -245,27 +247,32 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
     val widgetWidth = LocalSize.current.width.value
     val widgetHeight = LocalSize.current.height.value
     val columns = (0..6).map { WeekGridBuilder.blocks(data.grid, it) }
-    // 背景铺满组件；除时间列外，课程格只需为文字和色条预留宽度。
-    val textWidth = ((widgetWidth - 26f) / 7f - 10f).coerceAtLeast(1f)
+    // 背景铺满组件；除时间列与左右间距外，课程格只需为文字和色条预留宽度。
+    val textWidth = ((widgetWidth - 34f) / 7f - 8f).coerceAtLeast(1f)
     // 节次行至少填满可见高度，较长的课程地点仍可把对应行撑高并滚动。
-    val headerHeight = if (data.dayHeaders.any { it.dateDisplay.isNotBlank() }) 34f else 24f
+    val headerHeight = if (data.dayHeaders.any { it.dateDisplay.isNotBlank() }) 36f else 26f
     val minimumRowHeight = ((widgetHeight - headerHeight) / data.slotCount).coerceAtLeast(38f)
     val heights = WeekGridBuilder.rowHeights(columns, data.slotCount, minimumRowHeight) { cell ->
         courseTextHeight(context, cell, textWidth)
     }
     val bands = WeekGridBuilder.bands(columns, data.slotCount)
+
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
             .appWidgetBackground()
             .background(surfaces.canvas)
-            .cornerRadius(18.dp)
+            .cornerRadius(16.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
-        // 表头与可滚动课表直接绘制在同一块铺满组件的底板上。
+        // 表头与可滚动课表直接绘制在铺满组件的圆角底板上。
+        // 表头增加圆角容器 (8dp)，与主页 WeekView 星期栏视觉完全对齐
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
+                .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 3.dp)
+                .cornerRadius(8.dp)
+                .background(surfaces.header)
                 .padding(vertical = 2.5.dp)
                 .clickable(actionStartActivity<MainActivity>()),
             verticalAlignment = Alignment.CenterVertically
@@ -287,7 +294,9 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
 
             data.dayHeaders.forEach { header ->
                 Box(
-                    modifier = GlanceModifier.defaultWeight(),
+                    modifier = GlanceModifier
+                        .defaultWeight()
+                        .padding(horizontal = 0.5.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -327,8 +336,12 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
             }
         }
 
-        // 按安全分段滚动，每列独立绘制跨节课程块；不会在连堂课中间画分隔线。
-        LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+        // 按安全分段滚动，每列独立绘制跨节圆角课程卡片；具有统一的呼吸感与边缘微距。
+        LazyColumn(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .padding(start = 4.dp, end = 4.dp, bottom = 4.dp)
+        ) {
             items(bands, itemId = { it.first.toLong() }) { band ->
                 Row(
                     modifier = GlanceModifier
@@ -371,6 +384,8 @@ private fun SlotTimeCell(slotNumber: Int, startTime: String, height: Float, back
         modifier = GlanceModifier
             .width(26.dp)
             .height(height.dp)
+            .padding(horizontal = 1.dp, vertical = 1.dp)
+            .cornerRadius(6.dp)
             .background(background)
             .clickable(actionStartActivity<MainActivity>()),
         contentAlignment = Alignment.Center
@@ -384,7 +399,7 @@ private fun SlotTimeCell(slotNumber: Int, startTime: String, height: Float, back
                 style = TextStyle(
                     fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = GlanceTheme.colors.onSurfaceVariant
+                    color = GlanceTheme.colors.onSurface
                 ),
                 maxLines = 1
             )
@@ -419,10 +434,6 @@ private fun WeekCell(
         modifier = GlanceModifier
             .fillMaxWidth()
             .height(height.dp)
-            .background(
-                if (courseBackground != null) ColorProvider(Color(courseBackground))
-                else emptyBackground
-            )
             .clickable(actionStartActivity<MainActivity>()),
         contentAlignment = Alignment.Center
     ) {
@@ -431,26 +442,31 @@ private fun WeekCell(
             val textColor = requireNotNull(courseTextColor)
 
             Row(
-                modifier = GlanceModifier.fillMaxSize(),
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .padding(horizontal = 1.dp, vertical = 1.dp)
+                    .cornerRadius(6.dp)
+                    .background(ColorProvider(Color(courseBackground)))
+                    .padding(horizontal = 2.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 左侧课程纯色微条 (2.5dp 宽度，与主页 CourseBlock 的左侧微条完全对应)
+                // 左侧课程纯色微条 (圆角 1.5dp，与主页 CourseBlock 的左侧微条完全对应)
                 Box(
                     modifier = GlanceModifier
                         .width(2.5.dp)
                         .fillMaxHeight()
-                        .cornerRadius(1.dp)
+                        .cornerRadius(1.5.dp)
                         .background(ColorProvider(Color(cell.color)))
                 ) {}
 
-                    Spacer(modifier = GlanceModifier.width(1.dp))
+                Spacer(modifier = GlanceModifier.width(1.5.dp))
 
-                // 课程内容文字: 主文本为 onSurface 粗体, 次文本为 onSurfaceVariant
+                // 课程内容文字: 主文本为粗体, 地点加 @ 前缀 (与主页 "@${course.classroom}" 保持一致)
                 Column(
                     modifier = GlanceModifier
                         .defaultWeight()
                         .fillMaxHeight()
-                        .padding(horizontal = 1.dp, vertical = 1.dp),
+                        .padding(horizontal = 0.5.dp, vertical = 0.5.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -464,19 +480,28 @@ private fun WeekCell(
                         maxLines = 2
                     )
                     if (cell.classroom.isNotBlank()) {
-                        Spacer(modifier = GlanceModifier.height(3.dp))
+                        Spacer(modifier = GlanceModifier.height(1.5.dp))
                         Text(
-                            text = cell.classroom.trim(),
+                            text = "@${cell.classroom.trim()}",
                             style = TextStyle(
-                                fontSize = 8.5.sp,
+                                fontSize = 8.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = ColorProvider(textColor.copy(alpha = 0.86f))
+                                color = ColorProvider(textColor.copy(alpha = 0.88f))
                             ),
                             maxLines = Int.MAX_VALUE
                         )
                     }
                 }
             }
+        } else {
+            // 空白网格单元: 圆角微底纹, 增强整体卡片化与呼吸感
+            Box(
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .padding(horizontal = 1.dp, vertical = 1.dp)
+                    .cornerRadius(4.dp)
+                    .background(emptyBackground)
+            ) {}
         }
     }
 }
@@ -499,7 +524,7 @@ private fun courseTextHeight(context: Context, cell: WeekGridBuilder.Cell, width
         return ceil(layout.height / metrics.density)
     }
     val title = if (cell.extraCount > 0) "${cell.name}+${cell.extraCount}" else cell.name
-    val location = cell.classroom.trim()
+    val location = if (cell.classroom.isNotBlank()) "@${cell.classroom.trim()}" else ""
     return measure(title, true, 2) +
         (if (location.isNotEmpty()) 3f + measure(location, false, Int.MAX_VALUE) else 0f) + 12f
 }

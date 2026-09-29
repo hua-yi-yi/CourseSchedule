@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="week_widget_canvas">#192638</color>
-    <color name="week_widget_time">#2A3B52</color>
-    <color name="week_widget_empty">#223147</color>
+    <!-- 与主页 DarkColorScheme 保持一致 -->
+    <color name="week_widget_canvas">#111417</color>
+    <color name="week_widget_header">#1D2125</color>
+    <color name="week_widget_time">#191C20</color>
+    <color name="week_widget_empty">#191C20</color>
 </resources>

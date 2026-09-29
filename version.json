@@ -1,10 +1,10 @@
 {
-  "versionName": "1.2.38",
-  "versionTag": "v1.2.38",
-  "title": "v1.2.38",
-  "publishedAt": "2026-09-23",
+  "versionName": "1.2.39",
+  "versionTag": "v1.2.39",
+  "title": "v1.2.39",
+  "publishedAt": "2026-09-29",
   "fileSizeBytes": 3072364,
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.38/CourseSchedule-v1.2.38.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.38",
-  "changelog": "- 4×4 周课表小组件移除外框、内底板及格子之间的留白，背景从边缘连续铺满。\n- 节次行随小组件高度伸展，消除课表下方的大块空白；深色模式切换时背景同步更新。"
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.39/CourseSchedule-v1.2.39.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.39",
+  "changelog": "- 桌面小组件全面统一为圆角设计：包含 16dp 外容器底板、12dp 课程卡片、8dp 表头圆角容器、6dp 星期/时间/课程卡片及 10dp 胶囊徽标。\n- 桌面小组件视觉风格与主页保持一致：采用主页晴空蓝主题配色，课程卡片动态应用柔和彩色浅底与左侧专属圆角色条，地点统一采用 @ 教室排版。"
 }
