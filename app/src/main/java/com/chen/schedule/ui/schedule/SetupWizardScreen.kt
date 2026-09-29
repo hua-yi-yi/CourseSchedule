@@ -119,14 +119,23 @@ class SetupWizardViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             runCatching { timeSchemeRepository.ensureBuiltInSchemes() }
-            val schemes = runCatching { timeSchemeRepository.getAllSchemesDirect() }.getOrDefault(emptyList())
+            val rawSchemes = runCatching { timeSchemeRepository.getAllSchemesDirect() }.getOrDefault(emptyList())
+            // 过滤无节次的方案(尤其是全新安装下空的「原有作息」), 避免向导展示空模板且点击后报错
+            val schemes = rawSchemes.filter { scheme ->
+                if (scheme.isLegacy) {
+                    runCatching { timeSchemeRepository.getSlotsOfSchemeDirect(scheme.id) }.getOrDefault(emptyList()).isNotEmpty()
+                } else true
+            }
             val suggestions = SemesterNameSuggestions.generate(LocalDate.now())
             // 默认选第一个内置模板,用户可直接一路「下一步」完成
             val first = schemes.firstOrNull { it.isBuiltIn } ?: schemes.firstOrNull()
+            // 默认预选「本周一」作为开学日期, 让用户可一路直接点击「下一步」快速完成向导
+            val defaultDateMillis = quickStartDateMillis(0)
             _state.update {
                 it.copy(
                     name = suggestions.firstOrNull().orEmpty(),
                     suggestions = suggestions,
+                    dateMillis = defaultDateMillis,
                     schemes = schemes,
                     selectedSchemeId = first?.id
                 )
@@ -146,8 +155,14 @@ class SetupWizardViewModel @Inject constructor(
     fun applyQuickStartDate(offsetWeeks: Int) =
         _state.update { it.copy(dateMillis = quickStartDateMillis(offsetWeeks), error = null) }
 
-    fun updateDate(millis: Long?) =
-        _state.update { it.copy(dateMillis = millis, error = null) }
+    fun updateDate(millis: Long?) {
+        val alignedMillis = millis?.let {
+            val date = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+            val monday = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            monday.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        }
+        _state.update { it.copy(dateMillis = alignedMillis, error = null) }
+    }
 
     fun selectScheme(schemeId: Long) {
         _state.update {

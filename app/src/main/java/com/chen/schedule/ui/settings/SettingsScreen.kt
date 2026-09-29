@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.settings
 
+import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.ContentValues
 import android.content.Intent
 import android.graphics.Bitmap
@@ -1242,14 +1244,17 @@ fun SettingsScreen(
                     ) {
                         FilledTonalButton(
                             modifier = Modifier.weight(1f),
-                            onClick = { saveQrCodeToGallery(context) }
+                            onClick = { saveQrCodeToGallery(context, showToast = true) }
                         ) {
                             Text("保存到相册", fontSize = 12.sp)
                         }
                         Button(
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                saveQrCodeToGallery(context)
+                                val saved = saveQrCodeToGallery(context, showToast = false)
+                                if (saved) {
+                                    Toast.makeText(context, "收款码已保存，正在调起微信扫一扫...", Toast.LENGTH_SHORT).show()
+                                }
                                 openWeChat(context)
                             }
                         ) {
@@ -1334,12 +1339,12 @@ private fun SettingsItem(
     )
 }
 
-private fun saveQrCodeToGallery(context: android.content.Context) {
+private fun saveQrCodeToGallery(context: android.content.Context, showToast: Boolean = true): Boolean {
     try {
         val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.qrcode_donation)
         if (bitmap == null) {
             Toast.makeText(context, "无法加载收款码图片", Toast.LENGTH_SHORT).show()
-            return
+            return false
         }
         val filename = "CourseSchedule_Donation_${System.currentTimeMillis()}.jpg"
         val contentValues = ContentValues().apply {
@@ -1361,25 +1366,41 @@ private fun saveQrCodeToGallery(context: android.content.Context) {
                 contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
                 resolver.update(uri, contentValues, null, null)
             }
-            Toast.makeText(context, "收款码已保存到相册，可在微信扫一扫中识别", Toast.LENGTH_LONG).show()
+            if (showToast) {
+                Toast.makeText(context, "收款码已保存到相册，可在微信扫一扫中识别", Toast.LENGTH_LONG).show()
+            }
+            return true
         } else {
             Toast.makeText(context, "保存图片失败", Toast.LENGTH_SHORT).show()
+            return false
         }
     } catch (e: Exception) {
         Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        return false
     }
 }
 
 private fun openWeChat(context: android.content.Context) {
     try {
-        val intent = context.packageManager.getLaunchIntentForPackage("com.tencent.mm")
-        if (intent != null) {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
-        } else {
-            Toast.makeText(context, "未检测到微信客户端，请手动打开微信识别", Toast.LENGTH_SHORT).show()
+        // 方案 1: 优先尝试通过微信 LauncherUI 携带「扫一扫」快捷标记直达扫一扫页面
+        val scanIntent = Intent().apply {
+            component = ComponentName("com.tencent.mm", "com.tencent.mm.ui.LauncherUI")
+            putExtra("LauncherUI.From.Scaner.Shortcut", true)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
+        context.startActivity(scanIntent)
     } catch (e: Exception) {
-        Toast.makeText(context, "打开微信失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        // 方案 2: 若直接启动扫一扫组件受限或报错，回退为常规启动微信客户端（依赖 AndroidManifest 中的 <queries> 声明）
+        try {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage("com.tencent.mm")
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(launchIntent)
+            } else {
+                Toast.makeText(context, "未检测到微信客户端，请安装微信或手动打开扫一扫识别", Toast.LENGTH_SHORT).show()
+            }
+        } catch (ex: Exception) {
+            Toast.makeText(context, "打开微信失败: ${ex.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 }

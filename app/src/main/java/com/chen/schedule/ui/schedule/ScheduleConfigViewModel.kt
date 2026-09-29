@@ -257,7 +257,12 @@ class ScheduleConfigViewModel @Inject constructor(
     }
 
     fun updateSemesterDate(millis: Long?) = _semesterForm.update {
-        it.copy(dateMillis = millis, dirty = true, error = null)
+        val aligned = millis?.let { m ->
+            val localDate = Instant.ofEpochMilli(m).atZone(ZoneId.systemDefault()).toLocalDate()
+            val monday = localDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            monday.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        }
+        it.copy(dateMillis = aligned, dirty = true, error = null)
     }
 
     fun updateSemesterWeeks(value: String) = _semesterForm.update {

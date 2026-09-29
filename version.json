@@ -1,10 +1,10 @@
 {
-  "versionName": "1.2.40",
-  "versionTag": "v1.2.40",
-  "title": "v1.2.40",
+  "versionName": "1.2.41",
+  "versionTag": "v1.2.41",
+  "title": "v1.2.41",
   "publishedAt": "2026-09-29",
   "fileSizeBytes": 3158000,
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.40/CourseSchedule-v1.2.40.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.40",
-  "changelog": "- 设置界面新增「打赏作者」入口，支持展示微信赞赏收款码。\n- 收款码弹窗采用圆角卡片设计，支持一键保存到系统相册及快捷调起微信客户端扫一扫。"
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.41/CourseSchedule-v1.2.41.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.41",
+  "changelog": "- 优化初始化设置向导：过滤全新安装下无节次的「原有作息」兼容模板，避免误选后报错。\n- 初始向导开学日期默认预选「本周一」，自定义选择自动对齐至该周周一。\n- 修复 Android 11+ 打赏时由于软件包可见性限制无法正确拉起微信的问题，并增加直达扫一扫支持。"
 }
