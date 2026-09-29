@@ -1,13 +1,20 @@
 package com.chen.schedule.ui.settings
 
+import android.content.ContentValues
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.provider.Settings
 import android.Manifest
 import android.net.Uri
-import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +29,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.chen.schedule.R
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -85,6 +97,7 @@ fun SettingsScreen(
     var showClearDialog by remember { mutableStateOf(false) }
     var showWidgetGuideDialog by remember { mutableStateOf(false) }
     var showMirrorDialog by remember { mutableStateOf(false) }
+    var showDonationDialog by remember { mutableStateOf(false) }
 
     val requestAddWidget: (Int) -> Unit = { widgetType ->
         scope.launch {
@@ -625,16 +638,48 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // ===== 联系开发者 =====
-            SettingsGroup(title = "联系开发者") {
+            // ===== 支持与交流 =====
+            SettingsGroup(title = "支持与交流") {
+                SettingsItem(
+                    title = "打赏作者",
+                    subtitle = "如果觉得软件好用，欢迎支持开发者的持续维护 ☕",
+                    trailing = {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                "❤️ 赞赏",
+                                color = MaterialTheme.colorScheme.error,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    },
+                    onClick = { showDonationDialog = true }
+                )
+                GroupDivider()
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clickable {
+                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                            clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("QQ", "3180635398"))
+                            Toast.makeText(context, "QQ 号已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                        }
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("QQ", style = MaterialTheme.typography.bodyMedium, fontSize = 14.sp)
-                    Spacer(Modifier.weight(1f))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("开发者 QQ", style = MaterialTheme.typography.bodyMedium, fontSize = 14.sp)
+                        Text(
+                            "点击可快速复制，欢迎反馈与交流",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Text(
                         "3180635398",
                         style = MaterialTheme.typography.bodyMedium,
@@ -1112,6 +1157,114 @@ fun SettingsScreen(
             }
         )
     }
+
+    // 打赏作者弹窗
+    if (showDonationDialog) {
+        AlertDialog(
+            onDismissRequest = { showDonationDialog = false },
+            shape = MaterialTheme.shapes.extraLarge,
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "打赏作者",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp
+                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            "微信赞赏",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "如果本应用为您的大学校园生活带来了便利，欢迎打赏支持作者一杯奶茶或咖啡 ☕\n您的认可与支持是项目持续维护和保持干净体验的最大动力！",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.qrcode_donation),
+                                contentDescription = "微信打赏收款码",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 320.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
+                                contentScale = ContentScale.Fit
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "微信扫一扫 · 赞赏作者",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilledTonalButton(
+                            modifier = Modifier.weight(1f),
+                            onClick = { saveQrCodeToGallery(context) }
+                        ) {
+                            Text("保存到相册", fontSize = 12.sp)
+                        }
+                        Button(
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                saveQrCodeToGallery(context)
+                                openWeChat(context)
+                            }
+                        ) {
+                            Text("保存并打开微信", fontSize = 12.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDonationDialog = false }) {
+                    Text("关闭", fontSize = 13.sp)
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -1153,6 +1306,7 @@ private fun SettingsItem(
     title: String,
     subtitle: String,
     isDanger: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
     onClick: () -> Unit
 ) {
     ListItem(
@@ -1175,6 +1329,57 @@ private fun SettingsItem(
                 fontSize = 11.5.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
+        },
+        trailingContent = trailing
     )
+}
+
+private fun saveQrCodeToGallery(context: android.content.Context) {
+    try {
+        val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.qrcode_donation)
+        if (bitmap == null) {
+            Toast.makeText(context, "无法加载收款码图片", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val filename = "CourseSchedule_Donation_${System.currentTimeMillis()}.jpg"
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/CourseSchedule")
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+        if (uri != null) {
+            resolver.openOutputStream(uri)?.use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                contentValues.clear()
+                contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                resolver.update(uri, contentValues, null, null)
+            }
+            Toast.makeText(context, "收款码已保存到相册，可在微信扫一扫中识别", Toast.LENGTH_LONG).show()
+        } else {
+            Toast.makeText(context, "保存图片失败", Toast.LENGTH_SHORT).show()
+        }
+    } catch (e: Exception) {
+        Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun openWeChat(context: android.content.Context) {
+    try {
+        val intent = context.packageManager.getLaunchIntentForPackage("com.tencent.mm")
+        if (intent != null) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        } else {
+            Toast.makeText(context, "未检测到微信客户端，请手动打开微信识别", Toast.LENGTH_SHORT).show()
+        }
+    } catch (e: Exception) {
+        Toast.makeText(context, "打开微信失败: ${e.message}", Toast.LENGTH_SHORT).show()
+    }
 }
