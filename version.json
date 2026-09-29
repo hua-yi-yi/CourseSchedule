@@ -1,10 +1,10 @@
 {
-  "versionName": "1.2.39",
-  "versionTag": "v1.2.39",
-  "title": "v1.2.39",
+  "versionName": "1.2.40",
+  "versionTag": "v1.2.40",
+  "title": "v1.2.40",
   "publishedAt": "2026-09-29",
-  "fileSizeBytes": 3072364,
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.39/CourseSchedule-v1.2.39.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.39",
-  "changelog": "- 桌面小组件全面统一为圆角设计：包含 16dp 外容器底板、12dp 课程卡片、8dp 表头圆角容器、6dp 星期/时间/课程卡片及 10dp 胶囊徽标。\n- 桌面小组件视觉风格与主页保持一致：采用主页晴空蓝主题配色，课程卡片动态应用柔和彩色浅底与左侧专属圆角色条，地点统一采用 @ 教室排版。"
+  "fileSizeBytes": 3158000,
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.40/CourseSchedule-v1.2.40.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.40",
+  "changelog": "- 设置界面新增「打赏作者」入口，支持展示微信赞赏收款码。\n- 收款码弹窗采用圆角卡片设计，支持一键保存到系统相册及快捷调起微信客户端扫一扫。"
 }
