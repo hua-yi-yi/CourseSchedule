@@ -1,10 +1,10 @@
 {
-  "versionName": "1.2.41",
-  "versionTag": "v1.2.41",
-  "title": "v1.2.41",
-  "publishedAt": "2026-09-29",
-  "fileSizeBytes": 3158000,
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.41/CourseSchedule-v1.2.41.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.41",
-  "changelog": "- 优化初始化设置向导：过滤全新安装下无节次的「原有作息」兼容模板，避免误选后报错。\n- 初始向导开学日期默认预选「本周一」，自定义选择自动对齐至该周周一。\n- 修复 Android 11+ 打赏时由于软件包可见性限制无法正确拉起微信的问题，并增加直达扫一扫支持。"
+  "versionName": "1.2.42",
+  "versionTag": "v1.2.42",
+  "title": "v1.2.42",
+  "publishedAt": "2026-10-01",
+  "fileSizeBytes": 3192856,
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.2.42/CourseSchedule-v1.2.42.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.2.42",
+  "changelog": "- 修复开学前及学期结束后仍显示首周或末周课程、继续发送上课提醒的问题，桌面组件与实际教学周保持一致。\n- 统一文件、经典正方和河科大课程导入：严格检查星期、周次、节次及作息范围，错误记录提供位置提示，整批失败时不会写入部分课程。\n- 导入时自动跳过已有及同批重复课程，保留课程配色；导入期间切换学期会阻止写入错误学期，成功后立即刷新桌面组件。\n- 完善 CSV 的中文及带引号表头、多行字段、转义引号和 BOM 支持，修复 JSON 示例省略默认字段的问题。\n- 修复教务登录 Cookie 被覆盖或匹配错误的问题，正确保留认证状态并处理过期 Cookie。\n- 加固提醒广播入口并串行处理提醒重排，避免外部广播触发通知及并发调度冲突。\n- 拆分设置与导入页面，修复跨平台构建入口，并新增针对性回归测试；216 项单元测试及 Android 14 的 7 项设备回归全部通过。"
 }

@@ -15,6 +15,7 @@ import com.chen.schedule.ui.settings.ScheduleBackupService
 import com.chen.schedule.util.ScheduleBackup
 import com.chen.schedule.util.update.AppUpdateDownloader
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
@@ -31,6 +32,8 @@ class RegressionInstrumentation : Instrumentation() {
             "migration2to3" to { migration(2) },
             "backupRoundTripAndRollback" to { backupRoundTrip() },
             "legacyBackupWithAndWithoutCourses" to { legacyBackup() },
+            "importValidationDeduplicationAndRollback" to { importValidation() },
+            "reminderBroadcastBoundaries" to { reminderBroadcastBoundaries() },
             "apkCacheIdentityAndCorruption" to { apkCacheValidation() }
         )
         var failures = 0
@@ -163,6 +166,54 @@ class RegressionInstrumentation : Instrumentation() {
             check(courses.getAllCourses().first().isEmpty())
             check(slots.getAllTimeSlots().first().single { it.schemeId == 0L }.startTime == "08:00")
         } finally { file.delete(); db.close() }
+    }
+
+    private fun importValidation() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(targetContext, AppDatabase::class.java).build()
+        try {
+            val courses = CourseRepository(db.courseDao())
+            val semesters = SemesterRepository(db.semesterDao())
+            val slots = TimeSlotRepository(db.timeSlotDao())
+            val service = CourseImportService(db, semesters, courses, slots)
+            val id = semesters.insert(Semester(name = "测试学期", startDate = 1, totalWeeks = 16, isCurrent = true))
+            slots.insertAll(listOf(TimeSlot(slotNumber = 1), TimeSlot(slotNumber = 2, startTime = "09:00", endTime = "09:45")))
+            val course = Course(name = "测试课程")
+            val first = service.importCourses(listOf(course, course), id)
+            check(first.added == 1 && first.skipped == 1)
+            val again = service.importCourses(listOf(course.copy(note = "新备注", color = 1)), id)
+            check(again.added == 0 && again.skipped == 1)
+            val roomChange = service.importCourses(listOf(course.copy(classroom = "101")), id)
+            check(roomChange.added == 1)
+            val concurrent = kotlinx.coroutines.coroutineScope {
+                val incoming = listOf(course.copy(classroom = "并发教室"))
+                val one = async { service.importCourses(incoming, id) }
+                val two = async { service.importCourses(incoming, id) }
+                listOf(one.await(), two.await())
+            }
+            check(concurrent.sumOf { it.added } == 1 && concurrent.sumOf { it.skipped } == 1)
+            val before = courses.getAllCourses().first()
+            check(runCatching { service.importCourses(listOf(course.copy(name = "不应写入"), course.copy(dayOfWeek = 8)), id) }.isFailure)
+            check(courses.getAllCourses().first() == before)
+            check(runCatching { service.importCourses(listOf(course.copy(endSlot = 3)), id) }.isFailure)
+            check(runCatching { service.importCourses(listOf(course.copy(endWeek = 17)), id) }.isFailure)
+            val other = semesters.insert(Semester(name = "另一学期", startDate = 1, totalWeeks = 16, isCurrent = false))
+            semesters.setCurrentSemester(other)
+            check(runCatching { service.importCourses(listOf(course), id) }.isFailure)
+            check(courses.getAllCourses().first() == before)
+        } finally { db.close() }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun reminderBroadcastBoundaries() {
+        val pm = targetContext.packageManager
+        val internal = pm.getReceiverInfo(android.content.ComponentName(targetContext,
+            com.chen.schedule.reminders.ClassReminderReceiver::class.java), 0)
+        val boot = pm.getReceiverInfo(android.content.ComponentName(targetContext,
+            com.chen.schedule.reminders.BootReceiver::class.java), 0)
+        check(!internal.exported && boot.exported)
+        // Unknown actions must return without consulting app data or posting a notification.
+        com.chen.schedule.reminders.ClassReminderReceiver().onReceive(targetContext, android.content.Intent("unknown"))
+        com.chen.schedule.reminders.BootReceiver().onReceive(targetContext, android.content.Intent("unknown"))
     }
 
     private fun apkCacheValidation() {

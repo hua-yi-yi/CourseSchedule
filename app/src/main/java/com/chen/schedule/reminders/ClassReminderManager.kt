@@ -18,6 +18,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -58,6 +60,7 @@ object ClassReminderManager {
     private const val WINDOW_MILLIS = 60_000L
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val rescheduleMutex = Mutex()
 
     /** 异步重排(数据变化 / 应用启动 / 开机时调用,不阻塞调用方)。 */
     fun rescheduleAsync(context: Context) {
@@ -66,25 +69,26 @@ object ClassReminderManager {
     }
 
     /** 读取当前学期数据,重排今天剩余的提醒闹钟、进行中看板与跨天闹钟。 */
-    suspend fun rescheduleNow(context: Context) {
+    suspend fun rescheduleNow(context: Context) = rescheduleMutex.withLock {
         val appContext = context.applicationContext
         ensureChannels(appContext)
         val prefs = ReminderPrefs(appContext)
         val alarmManager = appContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
         cancelAllClassAlarms(appContext)
+        clearOngoing(appContext)
         scheduleMidnightRollover(appContext, alarmManager)
         if (!prefs.enabled) {
             clearOngoing(appContext)
-            return
+            return@withLock
         }
 
         val entry = EntryPointAccessors.fromApplication(appContext, DatabaseEntryPoint::class.java)
-        val semester = entry.semesterRepository().getCurrentSemester() ?: return
+        val semester = entry.semesterRepository().getCurrentSemester() ?: return@withLock
         val courses = entry.courseRepository().getCoursesBySemester(semester.id).first()
         val slots = entry.timeSlotRepository().getTimeSlotsByScheme(semester.schemeId).first()
         val now = System.currentTimeMillis()
-        val currentWeek = WeekCalculator.currentWeek(semester.startDate, semester.totalWeeks)
+        val currentWeek = WeekCalculator.activeWeek(semester.startDate, semester.totalWeeks, now) ?: return@withLock
         val todayDow = LocalDate.now().dayOfWeek.value
 
         // 1. 课程前提前预警闹钟

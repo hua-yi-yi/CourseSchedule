@@ -61,7 +61,8 @@ object TodayWidgetDataLoader {
                 return@runCatching WidgetData("未设置学期", 0, "", dateLabel, emptyList())
             }
 
-            val week = WeekCalculator.currentWeek(sem.startDate, sem.totalWeeks)
+            val week = WeekCalculator.activeWeek(sem.startDate, sem.totalWeeks)
+                ?: return@runCatching WidgetData(sem.name, 0, "学期外", dateLabel, emptyList())
             val dayIndex = now.dayOfWeek.value
             val dayLabel = when (dayIndex) {
                 1 -> "周一"; 2 -> "周二"; 3 -> "周三"; 4 -> "周四"

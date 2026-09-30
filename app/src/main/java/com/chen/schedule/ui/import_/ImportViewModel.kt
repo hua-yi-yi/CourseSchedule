@@ -4,10 +4,11 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.chen.schedule.data.repository.CourseRepository
+import com.chen.schedule.data.repository.CourseImportService
 import com.chen.schedule.data.repository.SemesterRepository
+import com.chen.schedule.data.repository.TimeSlotRepository
 import com.chen.schedule.domain.model.Course
-import com.chen.schedule.domain.model.CoursePalette
+import com.chen.schedule.util.CourseImportRules
 import com.chen.schedule.util.CsvImporter
 import com.chen.schedule.util.JsonImporter
 import com.chen.schedule.widget.WidgetUpdater
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 
 data class ImportState(
@@ -29,14 +31,17 @@ data class ImportState(
     val isImporting: Boolean = false,
     /** 确认导入成功后置位,界面据此直接返回主页。 */
     val importDone: Boolean = false,
+    val previewSemesterId: Long? = null,
+    val previewSemesterName: String = "",
     val sampleJson: String = "",
     val sampleCsv: String = ""
 )
 
 @HiltViewModel
 class ImportViewModel @Inject constructor(
-    private val courseRepository: CourseRepository,
+    private val importService: CourseImportService,
     private val semesterRepository: SemesterRepository,
+    private val timeSlotRepository: TimeSlotRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -44,6 +49,7 @@ class ImportViewModel @Inject constructor(
     val state: StateFlow<ImportState> = _state.asStateFlow()
 
     fun importFromJsonUri(uri: Uri) {
+        if (_state.value.isImporting) return
         viewModelScope.launch {
             _state.update { it.copy(isImporting = true, message = "", isError = false, previewCourses = emptyList()) }
             try {
@@ -51,6 +57,8 @@ class ImportViewModel @Inject constructor(
                     val jsonString = requireNotNull(context.contentResolver.openInputStream(uri)).bufferedReader().use { it.readText() }
                     withContext(Dispatchers.Default) { parseJsonText(jsonString) }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.update { it.copy(message = "读取文件失败: ${e.message}", isError = true, isImporting = false) }
             }
@@ -58,6 +66,7 @@ class ImportViewModel @Inject constructor(
     }
 
     fun importFromCsvUri(uri: Uri) {
+        if (_state.value.isImporting) return
         viewModelScope.launch {
             _state.update { it.copy(isImporting = true, message = "", isError = false, previewCourses = emptyList()) }
             try {
@@ -65,6 +74,8 @@ class ImportViewModel @Inject constructor(
                     val csvString = requireNotNull(context.contentResolver.openInputStream(uri)).bufferedReader().use { it.readText() }
                     withContext(Dispatchers.Default) { parseCsvText(csvString) }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.update { it.copy(message = "读取文件失败: ${e.message}", isError = true, isImporting = false) }
             }
@@ -72,6 +83,7 @@ class ImportViewModel @Inject constructor(
     }
 
     fun importFromJsonText(jsonString: String) {
+        if (_state.value.isImporting) return
         viewModelScope.launch {
             _state.update { it.copy(isImporting = true, message = "", isError = false, previewCourses = emptyList()) }
             withContext(Dispatchers.Default) { parseJsonText(jsonString) }
@@ -79,64 +91,59 @@ class ImportViewModel @Inject constructor(
     }
 
     fun importFromCsvText(csvString: String) {
+        if (_state.value.isImporting) return
         viewModelScope.launch {
             _state.update { it.copy(isImporting = true, message = "", isError = false, previewCourses = emptyList()) }
             withContext(Dispatchers.Default) { parseCsvText(csvString) }
         }
     }
 
-    private fun parseJsonText(jsonString: String) {
-        val result = JsonImporter.parse(jsonString)
-        result.fold(
-            onSuccess = { courses ->
-                _state.update { it.copy(previewCourses = courses, isError = false, message = "解析成功，共 ${courses.size} 门课程", isImporting = false) }
-            },
-            onFailure = { e ->
-                _state.update { it.copy(message = "JSON 解析失败: ${e.message}", isError = true, isImporting = false) }
-            }
-        )
-    }
+    private suspend fun parseJsonText(jsonString: String) = preparePreview(JsonImporter.parse(jsonString))
 
-    private fun parseCsvText(csvString: String) {
-        val result = CsvImporter.parse(csvString)
-        result.fold(
-            onSuccess = { courses ->
-                _state.update { it.copy(previewCourses = courses, isError = false, message = "解析成功，共 ${courses.size} 门课程", isImporting = false) }
-            },
-            onFailure = { e ->
-                _state.update { it.copy(message = "CSV 解析失败: ${e.message}", isError = true, isImporting = false) }
-            }
-        )
+    private suspend fun parseCsvText(csvString: String) = preparePreview(CsvImporter.parse(csvString))
+
+    private suspend fun preparePreview(result: Result<List<Course>>) {
+        try {
+            val courses = result.getOrThrow()
+            val semester = semesterRepository.getCurrentSemester() ?: error("请先创建学期")
+            CourseImportRules.validateForSemester(courses, semester,
+                timeSlotRepository.getTimeSlotsBySchemeDirect(semester.schemeId))
+            _state.update { it.copy(previewCourses = courses, previewSemesterId = semester.id,
+                previewSemesterName = semester.name, isError = false,
+                message = "解析成功，共 ${courses.size} 条课程安排", isImporting = false) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            _state.update { it.copy(previewCourses = emptyList(), previewSemesterId = null,
+                message = "读取失败：${e.message}；未导入任何课程", isError = true, isImporting = false) }
+        }
     }
 
     fun confirmImport() {
         if (_state.value.isImporting || _state.value.previewCourses.isEmpty()) return
         val preview = _state.value.previewCourses
+        val target = _state.value.previewSemesterId ?: return
         _state.update { it.copy(isImporting = true) }
         viewModelScope.launch {
             try {
-                val currentSemester = semesterRepository.getCurrentSemester() ?: error("请先在设置中创建学期")
-                val courses = CoursePalette.assignColors(preview).map { it.copy(semesterId = currentSemester.id) }
-                courseRepository.insertAll(courses)
+                val result = importService.importCourses(preview, target)
+                WidgetUpdater.refreshAll(context)
                 _state.update {
                     it.copy(
                         previewCourses = emptyList(),
-                        message = "成功导入 ${courses.size} 门课程",
+                        message = result.message,
                         isError = false,
                         importDone = true
                     )
                 }
-                WidgetUpdater.refreshAll(context)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.update { it.copy(message = "导入失败: ${e.message}", isError = true) }
             } finally {
                 _state.update { it.copy(isImporting = false) }
             }
         }
-    }
-
-    fun setPreviewCourses(courses: List<Course>) {
-        _state.update { it.copy(previewCourses = courses) }
     }
 
     fun clearMessage() {

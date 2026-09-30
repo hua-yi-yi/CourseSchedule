@@ -53,7 +53,7 @@ else
     JAVACMD="java"
 fi
 
-if [ ! -x "$JAVACMD" ]; then
+if ! command -v "$JAVACMD" >/dev/null 2>&1; then
     die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH."
 fi
 

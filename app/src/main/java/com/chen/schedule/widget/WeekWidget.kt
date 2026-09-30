@@ -131,7 +131,8 @@ class WeekWidget : GlanceAppWidget() {
                 return@runCatching emptyWidgetData("未设置学期", 0)
             }
 
-            val week = WeekCalculator.currentWeek(sem.startDate, sem.totalWeeks)
+            val week = WeekCalculator.activeWeek(sem.startDate, sem.totalWeeks)
+                ?: return@runCatching emptyWidgetData("${sem.name} · 学期外", 0)
             val entities = entryPoint.courseDao().getCoursesBySemesterDirect(sem.id)
             val courses = entities.map { it.toDomain() }
             val slotEntities = entryPoint.timeSlotDao().getTimeSlotsBySchemeDirect(sem.schemeId)

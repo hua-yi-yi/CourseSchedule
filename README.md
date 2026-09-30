@@ -81,6 +81,16 @@ name,teacher,classroom,dayOfWeek,startSlot,endSlot,startWeek,endWeek,weekType,no
 
 ## 构建
 
+Windows 上也可复用 WSL 中已有的 JDK 17 和 Android SDK：
+
+```powershell
+.\scripts\build-wsl.ps1
+# 可指定发行版和任务
+.\scripts\build-wsl.ps1 -Distribution Ubuntu -Tasks ':app:testDebugUnitTest', ':app:assembleDebugAndroidTest'
+```
+
+此方式在 WSL 内构建，`local.properties` 的 `sdk.dir` 应指向该发行版中的 Android SDK。无需修改 Windows 全局 Java 环境。
+
 ```bash
 # 需要 JDK 17 与 Android SDK(compileSdk 34)
 ./gradlew :app:assembleDebug        # 构建 Debug APK
@@ -108,6 +118,13 @@ git push origin v1.0.2
 > 普通分支和 PR 构建在未配置签名时会生成 debug APK；版本标签发布必须配置全部签名密钥，否则构建失败且不会创建 Release。
 
 ## 测试
+
+- `JsonImporterTest` / `CsvImporterTest`：错误记录整体拒绝、记录位置提示、数字与范围校验、BOM、中英文／带引号表头、转义引号和多行字段。
+- `CourseImportRulesTest` / 设备导入回归：作息覆盖、学期周数上限、批内与重复导入去重、学期切换保护、失败时不写入任何课程。
+- `SafeCookieJarTest`：分步合并、同名替换、路径／域名／HTTPS 匹配、过期删除和退出清理。
+- `ActiveSemesterWeekTest`：开学前与学期结束后无有效教学周；提醒与桌面组件不重复显示第一周／末周课程。手动浏览仍可查看任意学期周。
+
+所有追加导入入口（文件、正方、河科大）共用课程校验与事务去重。导入失败会说明原因并保持原数据；成功显示新增及重复数量。请先配置目标学期与能覆盖课程的作息方案。
 
 - `ZhengfangPageParserTest`:周次解析、rowspan 列映射、重复课程合并、表头跳过
 - `ScheduleLogicTest`:周次计算、课程周匹配、颜色分配稳定性

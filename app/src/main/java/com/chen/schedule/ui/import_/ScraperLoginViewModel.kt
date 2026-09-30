@@ -3,14 +3,13 @@ package com.chen.schedule.ui.import_
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.chen.schedule.data.repository.CourseRepository
+import com.chen.schedule.data.repository.CourseImportService
 import com.chen.schedule.data.repository.SemesterRepository
 import com.chen.schedule.data.scraper.LoginResult
 import com.chen.schedule.data.scraper.ScraperAdapter
 import com.chen.schedule.data.scraper.ScraperException
 import com.chen.schedule.data.scraper.ScraperManager
 import com.chen.schedule.data.scraper.ZhengfangScraper
-import com.chen.schedule.domain.model.CoursePalette
 import com.chen.schedule.widget.WidgetUpdater
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -19,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 
 data class ScraperLoginState(
@@ -39,7 +39,7 @@ data class ScraperLoginState(
 @HiltViewModel
 class ScraperLoginViewModel @Inject constructor(
     private val scraperManager: ScraperManager,
-    private val courseRepository: CourseRepository,
+    private val importService: CourseImportService,
     private val semesterRepository: SemesterRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
@@ -84,6 +84,7 @@ class ScraperLoginViewModel @Inject constructor(
     }
 
     fun fetchCaptcha() {
+        if (_state.value.isLoading) return
         viewModelScope.launch {
             val configError = applyScraperConfig()
             if (configError != null) {
@@ -103,6 +104,8 @@ class ScraperLoginViewModel @Inject constructor(
                         it.copy(isLoading = false, captchaBytes = bytes, captchaCode = "")
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.update {
                     it.copy(isLoading = false, message = "获取验证码失败:${e.message}", isError = true)
@@ -113,6 +116,7 @@ class ScraperLoginViewModel @Inject constructor(
 
     fun loginAndImport() {
         val s = _state.value
+        if (s.isLoading) return
         if (s.url.isBlank() || s.username.isBlank() || s.password.isBlank()) {
             _state.update { it.copy(message = "请填写教务系统地址、账号和密码", isError = true) }
             return
@@ -125,6 +129,7 @@ class ScraperLoginViewModel @Inject constructor(
             }
             _state.update { it.copy(isLoading = true, message = "", isError = false) }
             try {
+                val destination = semesterRepository.getCurrentSemester() ?: error("请先创建学期")
                 val loginResult = scraper.login(
                     _state.value.username.trim(),
                     _state.value.password,
@@ -162,17 +167,17 @@ class ScraperLoginViewModel @Inject constructor(
                     return@launch
                 }
 
-                val courses = CoursePalette.assignColors(fetched.courses)
-                    .map { it.copy(semesterId = semester.id) }
-                courseRepository.insertAll(courses)
+                val result = importService.importCourses(fetched.courses, destination.id)
                 WidgetUpdater.refreshAll(context)
                 _state.update {
                     it.copy(
                         isLoading = false,
-                        message = "成功导入 ${courses.size} 门课程,可返回查看课程表",
+                        message = "${result.message}，可返回查看课程表",
                         isError = false
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: ScraperException) {
                 _state.update { it.copy(isLoading = false, message = e.message ?: "导入失败", isError = true) }
             } catch (e: Exception) {

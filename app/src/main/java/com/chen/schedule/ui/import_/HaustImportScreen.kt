@@ -23,9 +23,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.webkit.ProxyConfig
 import androidx.webkit.ProxyController
 import androidx.webkit.WebViewFeature
-import com.chen.schedule.data.local.AppDatabase
-import androidx.room.withTransaction
-import com.chen.schedule.data.repository.CourseRepository
+import com.chen.schedule.data.repository.CourseImportService
 import com.chen.schedule.data.repository.SemesterRepository
 import com.chen.schedule.data.scraper.HaustPageParser
 import com.chen.schedule.domain.model.Course
@@ -36,7 +34,7 @@ import com.chen.schedule.BuildConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -108,9 +106,8 @@ private fun adaptHaustPage(view: WebView, url: String) {
 
 @HiltViewModel
 class HaustImportViewModel @Inject constructor(
-    private val courses: CourseRepository,
     private val semesters: SemesterRepository,
-    private val db: AppDatabase,
+    private val importService: CourseImportService,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
     var preview by mutableStateOf<List<Course>>(emptyList()); private set
@@ -138,7 +135,8 @@ class HaustImportViewModel @Inject constructor(
                 sourceSemester = result.first
                 preview = CoursePalette.assignColors(result.second)
                 message = ""
-            } catch (e: Exception) { message = e.message ?: "读取失败" }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { message = e.message ?: "读取失败" }
             finally { busy = false }
         }
     }
@@ -149,23 +147,12 @@ class HaustImportViewModel @Inject constructor(
         busy = true
         viewModelScope.launch {
             try {
-                val added = db.withTransaction {
-                    require(semesters.getCurrentSemester()?.id == sem.id) { "当前学期已切换，请重新读取课表" }
-                    fun key(c: Course) = c.copy(id = 0, semesterId = 0, color = 0, note = "")
-                    val existing = courses.getCoursesBySemester(sem.id).first().map { key(it) }.toSet()
-                    val fresh = incoming.filter { key(it) !in existing }.map { it.copy(id = 0, semesterId = sem.id) }
-                    courses.insertAll(fresh)
-                    fresh.size
-                }
+                val result = importService.importCourses(incoming, sem.id)
                 preview = emptyList()
-                val skipped = incoming.size - added
-                successMessage = when {
-                    added > 0 && skipped > 0 -> "已导入 $added 条课程安排，跳过 $skipped 条重复安排"
-                    added > 0 -> "已导入 $added 条课程安排"
-                    else -> "没有新增课程安排，$skipped 条重复安排已跳过"
-                }
+                successMessage = result.message
                 WidgetUpdater.refreshAll(context)
-            } catch (e: Exception) { message = e.message ?: "导入失败" }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { message = e.message ?: "导入失败" }
             finally { busy = false }
         }
     }

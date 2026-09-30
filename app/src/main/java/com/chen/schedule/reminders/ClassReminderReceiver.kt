@@ -16,18 +16,16 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * 上课提醒广播:处理三种动作——
+ * 应用内部提醒广播；开机广播由 BootReceiver 单独处理。
  * 1. [ClassReminderManager.ACTION_CLASS_REMINDER]:发出提醒通知;
  * 2. [ClassReminderManager.ACTION_RESCHEDULE]:跨天闹钟,重排当天剩余提醒;
- * 3. 系统开机广播(BOOT_COMPLETED):重启后恢复提醒。
  */
 class ClassReminderReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val appContext = context.applicationContext
         when (intent.action) {
-            ClassReminderManager.ACTION_RESCHEDULE,
-            Intent.ACTION_BOOT_COMPLETED -> {
+            ClassReminderManager.ACTION_RESCHEDULE -> {
                 val pending = goAsync()
                 CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                     try {
@@ -69,7 +67,7 @@ class ClassReminderReceiver : BroadcastReceiver() {
                 // 下课后异步触发一次重排以检查后续状态与小组件刷新
                 ClassReminderManager.rescheduleAsync(appContext)
             }
-            else -> notifyClass(appContext, intent)
+            ClassReminderManager.ACTION_CLASS_REMINDER -> notifyClass(appContext, intent)
         }
     }
 

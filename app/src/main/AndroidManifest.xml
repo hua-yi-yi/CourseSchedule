@@ -78,6 +78,9 @@
         <!-- 上课提醒:开机恢复 + 跨天重排 + 提醒通知(显式 Intent) -->
         <receiver
             android:name=".reminders.ClassReminderReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".reminders.BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

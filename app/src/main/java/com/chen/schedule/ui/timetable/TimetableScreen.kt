@@ -200,7 +200,7 @@ fun TimetableScreen(
                                     showWeekend = state.showWeekend
                                 )
                                 DayView(
-                                    isToday = week == actualWeek && state.selectedDay == LocalDate.now().dayOfWeek.value,
+                                    isToday = week == WeekCalculator.activeWeek(semester.startDate, semester.totalWeeks) && state.selectedDay == LocalDate.now().dayOfWeek.value,
                                     clusters = viewModel.getCourseClusters(week),
                                     timeSlots = state.timeSlots,
                                     onCourseClick = { primary, cluster ->
