@@ -54,8 +54,9 @@ import com.chen.schedule.domain.model.DayOfWeek
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ImportScreen(
+    initialMode: Int = 0,
     onHaustImport: () -> Unit,
-    onScraperLogin: () -> Unit,
+    onScraperLogin: (String) -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: ImportViewModel = hiltViewModel()
 ) {
@@ -64,7 +65,7 @@ fun ImportScreen(
     var showJsonGuide by remember { mutableStateOf(false) }
     var showCsvGuide by remember { mutableStateOf(false) }
     // 导入方式二选一:0 = 高校教务系统导入, 1 = 文件与文本导入
-    var importMode by remember { mutableStateOf(0) }
+    var importMode by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initialMode) }
     var schoolSearchQuery by remember { mutableStateOf("") }
     val matchedPresets = remember(schoolSearchQuery) { SchoolRegistry.search(schoolSearchQuery) }
 
@@ -119,6 +120,7 @@ fun ImportScreen(
                 .padding(16.dp)
         ) {
 
+            if (state.isImporting) item { Text("正在读取 / 导入，请稍候…", color = MaterialTheme.colorScheme.primary) }
             // ===== 导入方式二选一 =====
             item {
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -141,65 +143,15 @@ fun ImportScreen(
             } else {
                 fileImportItems(viewModel, context, clipboard, showJsonGuide, showCsvGuide,
                     { showJsonGuide = !showJsonGuide }, { showCsvGuide = !showCsvGuide },
-                    onScraperLogin,
+                    { onScraperLogin("") },
                     { jsonLauncher.launch(it) }, { csvLauncher.launch(it) })
 
-            // ===== 预览区域(其他方式导入后) =====
-            if (state.previewCourses.isNotEmpty()) {
-                item {
-                    Spacer(Modifier.height(16.dp))
-                    HorizontalDivider()
-                    Spacer(Modifier.height(12.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("预览 (${state.previewCourses.size} 门课程)", style = MaterialTheme.typography.titleMedium)
-                        Button(enabled = !state.isImporting, onClick = viewModel::confirmImport) {
-                            Text("确认导入")
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text("导入到：${state.previewSemesterName}", style = MaterialTheme.typography.bodySmall)
-                }
-
-                items(state.previewCourses) { course ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(course.name, fontWeight = FontWeight.Bold)
-                            Row {
-                                if (course.teacher.isNotBlank()) {
-                                    Text(course.teacher, style = MaterialTheme.typography.bodySmall)
-                                    Text(" · ", style = MaterialTheme.typography.bodySmall)
-                                }
-                                Text(
-                                    "${DayOfWeek.entries.find { it.index == course.dayOfWeek }?.label ?: ""} ${course.startSlot}-${course.endSlot}节",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            Text(
-                                "${course.startWeek}-${course.endWeek}周 ${course.weekType.label}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-
-                item { Spacer(Modifier.height(8.dp)) }
-            }
             }
 
         }
+    }
+    state.review?.takeIf { state.previewCourses.isNotEmpty() }?.let { review ->
+        ImportReviewDialog(state.previewCourses, review, state.isImporting, viewModel::dismissPreview, viewModel::confirmImport)
     }
 }

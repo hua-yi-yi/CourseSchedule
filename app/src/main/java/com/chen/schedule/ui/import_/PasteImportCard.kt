@@ -46,7 +46,7 @@ internal fun PasteImportCard(
     clipboard: ClipboardManager,
     context: Context
 ) {
-    var pasteText by remember { mutableStateOf("") }
+    var pasteText by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     var showPasteArea by remember { mutableStateOf(false) }
 
     Card(

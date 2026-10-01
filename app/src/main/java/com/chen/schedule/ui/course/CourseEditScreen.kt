@@ -68,6 +68,14 @@ fun CourseEditScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
+    var scope by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(com.chen.schedule.util.ChangeScope.ALL) }
+    var showDiscard by remember { mutableStateOf(false) }
+    val requestBack: () -> Unit = { if (!state.isSaving) { if (state.dirty) showDiscard = true else onNavigateBack() } }
+    androidx.activity.compose.BackHandler { requestBack() }
+    if (showDiscard) androidx.compose.material3.AlertDialog(onDismissRequest = { showDiscard = false },
+        title = { Text("放弃未保存的课程修改？") }, text = { Text("返回会丢弃本次输入。") },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = onNavigateBack) { Text("放弃") } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = { showDiscard = false }) { Text("继续编辑") } })
     LaunchedEffect(semesterId, courseId) {
         viewModel.loadConfiguration(semesterId)
         if (courseId != null) {
@@ -89,7 +97,7 @@ fun CourseEditScreen(
                     Text(if (state.isEditing) "编辑课程" else "添加课程", fontWeight = FontWeight.Bold)
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = requestBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     }
                 },
@@ -97,7 +105,7 @@ fun CourseEditScreen(
                     IconButton(
                         onClick = {
                             if (state.name.isNotBlank()) {
-                                viewModel.save(semesterId, courseId)
+                                viewModel.save(semesterId, courseId, scope, prefillWeek ?: 1)
                             }
                         },
                         enabled = state.name.isNotBlank() && !state.isSaving
@@ -122,6 +130,35 @@ fun CourseEditScreen(
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
+            if (!state.isEditing && prefillWeek != null) {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    androidx.compose.material3.Checkbox(checked = scope == com.chen.schedule.util.ChangeScope.ONCE,
+                        onCheckedChange = { once ->
+                            scope = if (once) com.chen.schedule.util.ChangeScope.ONCE else com.chen.schedule.util.ChangeScope.ALL
+                            viewModel.updateStartWeek(prefillWeek)
+                            viewModel.updateEndWeek(if (once) prefillWeek else state.totalWeeks)
+                            if (once) viewModel.updateWeekType(com.chen.schedule.domain.model.WeekType.ALL)
+                        })
+                    Text("仅第 $prefillWeek 周补课")
+                }
+            }
+            if (state.isEditing) {
+                Text("修改影响范围", style = MaterialTheme.typography.titleMedium)
+                com.chen.schedule.util.ChangeScope.entries.forEach { option ->
+                    val available = option == com.chen.schedule.util.ChangeScope.ALL ||
+                        (prefillWeek != null && prefillWeek in state.startWeek..state.endWeek && when(state.weekType) {
+                            com.chen.schedule.domain.model.WeekType.ALL -> true
+                            com.chen.schedule.domain.model.WeekType.ODD -> prefillWeek % 2 == 1
+                            com.chen.schedule.domain.model.WeekType.EVEN -> prefillWeek % 2 == 0
+                        })
+                    Row(modifier = Modifier.clickable(enabled = available) { scope = option }, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        androidx.compose.material3.RadioButton(selected = scope == option, enabled = available,
+                            onClick = { scope = option })
+                        Text(option.label + if (option != com.chen.schedule.util.ChangeScope.ALL) "（第${prefillWeek ?: 1}周）" else "（${state.startWeek}–${state.endWeek}周）")
+                    }
+                }
+                Text("临时调课或换教室请选择仅本周；其他周会保留。", style = MaterialTheme.typography.bodySmall)
+            }
             state.error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.height(8.dp))
@@ -217,7 +254,8 @@ fun CourseEditScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // Week range
+            // Week ranges only apply when editing the whole recurring arrangement.
+            if (scope == com.chen.schedule.util.ChangeScope.ALL) {
             Row(modifier = Modifier.fillMaxWidth()) {
                 NumberPicker(
                     label = "起始周",
@@ -238,6 +276,7 @@ fun CourseEditScreen(
 
             Spacer(Modifier.height(12.dp))
 
+            }
             // Week type
             Text("周类型", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(6.dp))
@@ -253,7 +292,7 @@ fun CourseEditScreen(
                                 if (selected) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.surfaceContainerHighest
                             )
-                            .clickable { viewModel.updateWeekType(wt) }
+                            .clickable(enabled = scope != com.chen.schedule.util.ChangeScope.ONCE) { viewModel.updateWeekType(wt) }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {

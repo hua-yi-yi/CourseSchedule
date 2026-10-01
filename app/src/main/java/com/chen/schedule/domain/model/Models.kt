@@ -14,7 +14,8 @@ data class Course(
     val weekType: WeekType = WeekType.ALL,
     val color: Long = 0xFF4CAF50,
     val semesterId: Long = 0,
-    val note: String = ""
+    val note: String = "",
+    val importSource: String = ""
 ) {
     /** 判断该课程在第 [week] 周是否有课(按周类型与周次范围) */
     fun appliesToWeek(week: Int): Boolean {

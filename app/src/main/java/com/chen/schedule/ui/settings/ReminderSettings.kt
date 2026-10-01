@@ -25,6 +25,22 @@ import androidx.compose.ui.unit.sp
 internal fun ReminderSettings(viewModel: SettingsViewModel, requestNotificationPermission: () -> Unit) {
     // ===== 上课提醒 =====
     SettingsGroup(title = "上课提醒") {
+        Text(viewModel.reminderStatus, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.primary)
+        Text(viewModel.nextReminder, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall)
+        val context = androidx.compose.ui.platform.LocalContext.current
+        Row(Modifier.fillMaxWidth()) {
+            androidx.compose.material3.TextButton(onClick = {
+                val intent = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                context.startActivity(intent)
+            }) { Text("通知设置") }
+            if (android.os.Build.VERSION.SDK_INT >= 31 && !com.chen.schedule.reminders.ReminderStatus.exactAllowed(context))
+                androidx.compose.material3.TextButton(onClick = {
+                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                        android.net.Uri.parse("package:" + context.packageName)))
+                }) { Text("闹钟授权") }
+            androidx.compose.material3.TextButton(onClick = viewModel::testReminder) { Text("测试通知") }
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -47,10 +63,9 @@ internal fun ReminderSettings(viewModel: SettingsViewModel, requestNotificationP
             Switch(
                 checked = viewModel.reminderEnabled,
                 onCheckedChange = { enabled ->
-                    if (enabled && Build.VERSION.SDK_INT >= 33) {
+                    if (enabled && Build.VERSION.SDK_INT >= 33 && !androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()) {
                         requestNotificationPermission()
-                    }
-                    viewModel.updateReminderEnabled(enabled)
+                    } else viewModel.updateReminderEnabled(enabled)
                 }
             )
         }

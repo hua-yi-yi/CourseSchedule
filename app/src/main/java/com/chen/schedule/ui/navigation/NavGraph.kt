@@ -25,7 +25,7 @@ import com.chen.schedule.ui.timetable.TimetableScreen
 
 sealed class Screen(val route: String) {
     object Timetable : Screen("timetable")
-    object Import : Screen("import")
+    object Import : Screen("import?mode={mode}") { fun createRoute(mode: Int = 0) = "import?mode=$mode" }
     object Settings : Screen("settings")
 
     object CourseEdit :
@@ -56,7 +56,7 @@ sealed class Screen(val route: String) {
     }
 
     object HaustImport : Screen("haust_import")
-    object ScraperLogin : Screen("scraper_login")
+    object ScraperLogin : Screen("scraper_login?school={school}") { fun createRoute(school: String = "") = "scraper_login?school=${android.net.Uri.encode(school)}" }
 }
 
 @Composable
@@ -81,8 +81,8 @@ fun AppNavHost() {
                         )
                     )
                 },
-                onEditCourse = { courseId, semesterId ->
-                    navController.navigate(Screen.CourseEdit.createRoute(courseId, semesterId))
+                onEditCourse = { courseId, semesterId, week ->
+                    navController.navigate(Screen.CourseEdit.createRoute(courseId, semesterId, week = week))
                 },
                 onNavigateToScheduleConfig = {
                     navController.navigate(Screen.ScheduleConfig.route)
@@ -91,13 +91,13 @@ fun AppNavHost() {
                     navController.navigate(Screen.SetupWizard.route)
                 },
                 onNavigateToSemesterSettings = {
-                    navController.navigate(Screen.SemesterMenu.route)
+                    navController.navigate(Screen.SemesterList.route)
                 },
                 onNavigateToSchemeSettings = {
                     navController.navigate(Screen.SchemeMenu.route)
                 },
                 onNavigateToImport = {
-                    navController.navigate(Screen.Import.route)
+                    navController.navigate(Screen.Import.createRoute())
                 },
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
@@ -105,10 +105,10 @@ fun AppNavHost() {
             )
         }
 
-        composable(Screen.Import.route) {
-            ImportScreen(
+        composable(Screen.Import.route, arguments = listOf(navArgument("mode") { type = NavType.IntType; defaultValue = 0 })) { entry ->
+            ImportScreen(initialMode = entry.arguments?.getInt("mode") ?: 0,
                 onHaustImport = { navController.navigate(Screen.HaustImport.route) },
-                onScraperLogin = { navController.navigate(Screen.ScraperLogin.route) },
+                onScraperLogin = { school -> navController.navigate(Screen.ScraperLogin.createRoute(school)) },
                 onNavigateBack = { navController.popBackStack() }
             )
         }
@@ -161,9 +161,9 @@ fun AppNavHost() {
         composable(Screen.SetupWizard.route) {
             SetupWizardScreen(
                 onDone = { navController.popBackStack() },
-                onGoImport = {
+                onGoImport = { mode ->
                     navController.popBackStack()
-                    navController.navigate(Screen.Import.route)
+                    navController.navigate(Screen.Import.createRoute(mode))
                 },
                 onGoHaustImport = {
                     navController.popBackStack()
@@ -238,8 +238,8 @@ fun AppNavHost() {
             com.chen.schedule.ui.import_.HaustImportScreen(onNavigateBack = { navController.popBackStack() })
         }
 
-        composable(Screen.ScraperLogin.route) {
-            ScraperLoginScreen(
+        composable(Screen.ScraperLogin.route, arguments = listOf(navArgument("school") { defaultValue = "" })) { entry ->
+            ScraperLoginScreen(initialSchool = entry.arguments?.getString("school").orEmpty(),
                 onHaustImport = { navController.navigate(Screen.HaustImport.route) },
                 onNavigateBack = { navController.popBackStack() }
             )

@@ -84,7 +84,7 @@ import java.time.format.DateTimeFormatter
 fun TimetableScreen(
     /** (semesterId, 预填位置) —— 位置为 null 表示从 FAB 进入的空白新增。 */
     onAddCourse: (Long, BlankClickTarget?) -> Unit,
-    onEditCourse: (Long, Long) -> Unit,
+    onEditCourse: (Long, Long, Int) -> Unit,
     onNavigateToScheduleConfig: () -> Unit,
     onNavigateToSetupWizard: () -> Unit,
     onNavigateToSemesterSettings: () -> Unit,
@@ -96,6 +96,8 @@ fun TimetableScreen(
     val state by viewModel.state.collectAsState()
     var selectedCluster by remember { mutableStateOf<List<Course>?>(null) }
     var activeCourseIndex by remember { mutableStateOf(0) }
+    var pendingCancel by remember { mutableStateOf<Course?>(null) }
+    val snackbar = remember { androidx.compose.material3.SnackbarHostState() }
     var pendingDelete by remember { mutableStateOf<Course?>(null) }
 
     /** 统一的「点击空白格」入口:返回非 null 表示配置完整,可直接进入新增课程。 */
@@ -107,7 +109,22 @@ fun TimetableScreen(
         }
     }
 
+    LaunchedEffect(state.message) {
+        if (state.message.isNotBlank()) {
+            val deleted = state.undoCourse
+            val result = snackbar.showSnackbar(state.message, actionLabel = if (deleted != null) "撤销" else null,
+                duration = androidx.compose.material3.SnackbarDuration.Long)
+            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed && deleted != null) viewModel.undoDelete(deleted)
+            else viewModel.clearMessage()
+        }
+    }
+    pendingCancel?.let { course -> AlertDialog(onDismissRequest = { pendingCancel = null },
+        title = { Text("第 ${state.currentWeek} 周停课？") },
+        text = { Text("仅取消这次「${course.name}」，其他周保留。修改前会自动保存恢复点。") },
+        confirmButton = { TextButton(onClick = { viewModel.cancelOnce(course, state.currentWeek); pendingCancel = null }) { Text("确认停课") } },
+        dismissButton = { TextButton(onClick = { pendingCancel = null }) { Text("保留") } }) }
     Scaffold(
+        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbar) },
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             if (state.currentSemester != null) FloatingActionButton(
@@ -136,15 +153,12 @@ fun TimetableScreen(
                     onNavigateToScheduleConfig = onNavigateToScheduleConfig
                 )
             } else {
-                // 整页统一滚动:上滑时头部随内容一起向上滑出屏幕
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                ) {
+                // 顶栏与今日摘要固定，课程网格独立滚动。
+                Column(modifier = Modifier.fillMaxSize()) {
                     // ===== 极简紧凑顶栏: 菜单+学期名 | ‹ 第 N 周 › 回本周 | 周末 | 视图切换 =====
                     val actualWeek = WeekCalculator.currentWeek(semester.startDate, semester.totalWeeks)
                     CompactTopBar(
+                        onSelectSemester = onNavigateToSemesterSettings,
                         semesterName = semester.name,
                         currentWeek = state.currentWeek,
                         totalWeeks = semester.totalWeeks,
@@ -153,13 +167,35 @@ fun TimetableScreen(
                         showWeekend = state.showWeekend,
                         onPrevWeek = viewModel::prevWeek,
                         onNextWeek = viewModel::nextWeek,
-                        onBackToToday = { viewModel.setWeek(actualWeek) },
+                        onBackToToday = viewModel::openToday,
                         onToggleWeekend = viewModel::toggleWeekend,
                         onToggleView = viewModel::toggleView,
                         onNavigateToImport = onNavigateToImport,
                         onNavigateToSettings = onNavigateToSettings
                     )
 
+                    var clockTick by remember { mutableStateOf(System.currentTimeMillis()) }
+                    LaunchedEffect(Unit) { while (true) { clockTick = System.currentTimeMillis(); kotlinx.coroutines.delay(30_000) } }
+                    val now = java.time.Instant.ofEpochMilli(clockTick).atZone(java.time.ZoneId.systemDefault())
+                    val todayWeek = WeekCalculator.activeWeek(semester.startDate, semester.totalWeeks, clockTick)
+                    val todayCourses = state.courses.filter { todayWeek != null && it.appliesToWeek(todayWeek) && it.dayOfWeek == now.dayOfWeek.value }
+                    val active = com.chen.schedule.reminders.ClassReminderPlanner.findCurrentOngoingCourse(clockTick, state.timeSlots, state.courses, todayWeek ?: 0, now.dayOfWeek.value)
+                    val nextCourse = todayCourses.filter { course -> state.timeSlots.find { it.slotNumber == course.startSlot }?.let { slot ->
+                        runCatching { LocalTime.parse(slot.startTime).isAfter(now.toLocalTime()) }.getOrDefault(false) } == true }.minByOrNull { it.startSlot }
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(when {
+                            todayWeek == null -> "当前不在教学期内，正在浏览课表"
+                            active != null -> "正在上课：${active.courseName} · ${active.classroom} · ${active.endTime}下课"
+                            nextCourse != null -> {
+                                val time = state.timeSlots.first { it.slotNumber == nextCourse.startSlot }.startTime
+                                val minutes = java.time.Duration.between(now.toLocalTime(), LocalTime.parse(time)).toMinutes()
+                                "下一节：${nextCourse.name} · ${nextCourse.classroom.ifBlank { "教室未填" }} · $time（约${minutes}分钟后）"
+                            }
+                            todayCourses.isEmpty() -> "今天没有课程"
+                            else -> "今日课程已结束"
+                        }, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        TextButton(onClick = viewModel::openToday) { Text("今天") }
+                    }
                     // ===== 极度跟手的真实左右滑动切周 (HorizontalPager 实时跟随手指、惯性滑动与边缘回弹) =====
                     val pagerState = rememberPagerState(
                         initialPage = (state.currentWeek - 1).coerceIn(0, (semester.totalWeeks - 1).coerceAtLeast(0))
@@ -188,12 +224,12 @@ fun TimetableScreen(
 
                     HorizontalPager(
                         state = pagerState,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
                         key = { page -> page }
                     ) { page ->
                         val week = page + 1
                         if (state.isDayView) {
-                            Column(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                                 DaySelector(
                                     selectedDay = state.selectedDay,
                                     onDaySelected = viewModel::selectDay,
@@ -213,6 +249,7 @@ fun TimetableScreen(
                                 )
                             }
                         } else {
+                            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                             WeekView(
                                 clusters = viewModel.getCourseClusters(week),
                                 timeSlots = state.timeSlots,
@@ -227,6 +264,7 @@ fun TimetableScreen(
                                     handleBlankClick(dayOfWeek, slotNumber)
                                 }
                             )
+                            }
                         }
                     }
                 } // 整页滚动结束
@@ -267,7 +305,7 @@ fun TimetableScreen(
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
             title = { Text("删除课程？") },
-            text = { Text("将删除「${course.name}」的这条上课安排，此操作无法撤销。") },
+            text = { Text("将删除「${course.name}」的这条上课安排，删除后可撤销，也会保存自动恢复点。") },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteCourse(course)
@@ -290,10 +328,11 @@ fun TimetableScreen(
             onEdit = { course ->
                 state.currentSemester?.let { sem ->
                     viewModel.setPreferredCourse(course, cluster)
-                    onEditCourse(course.id, sem.id)
+                    onEditCourse(course.id, sem.id, state.currentWeek)
                     selectedCluster = null
                 }
             },
+            onCancelOnce = { course -> pendingCancel = course; selectedCluster = null },
             onDelete = { course ->
                 viewModel.setPreferredCourse(course, cluster)
                 pendingDelete = course
@@ -313,7 +352,7 @@ private fun TopMenu(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(34.dp)) {
+        IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(44.dp)) {
             Icon(
                 Icons.Default.Menu,
                 contentDescription = "菜单",
@@ -343,6 +382,7 @@ private fun TopMenu(
 
 @Composable
 private fun CompactTopBar(
+    onSelectSemester: () -> Unit,
     semesterName: String,
     currentWeek: Int,
     totalWeeks: Int,
@@ -357,107 +397,27 @@ private fun CompactTopBar(
     onNavigateToImport: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 4.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // 1. 菜单 + 学期名(极简)
-        TopMenu(
-            onNavigateToImport = onNavigateToImport,
-            onNavigateToSettings = onNavigateToSettings
-        )
-        Text(
-            semesterName,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .weight(1f, fill = false)
-                .padding(end = 4.dp)
-        )
-
-        Spacer(Modifier.weight(1f))
-
-        // 2. 中间: 周切换 ‹ 第 N 周 › (+ 回本周微胶囊)
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onPrevWeek,
-                enabled = currentWeek > 1,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    Icons.Default.ChevronLeft, "上一周",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek > 1) 1f else 0.25f),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Text(
-                "第$currentWeek",
-                fontSize = 13.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                "/$totalWeeks",
-                fontSize = 10.5.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            IconButton(
-                onClick = onNextWeek,
-                enabled = currentWeek < totalWeeks,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    Icons.Default.ChevronRight, "下一周",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek < totalWeeks) 1f else 0.25f),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            if (!isCurrentWeek) {
-                Text(
-                    "本周",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                        .clickable(onClick = onBackToToday)
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
-                )
-            }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            TopMenu(onNavigateToImport = onNavigateToImport, onNavigateToSettings = onNavigateToSettings)
+            Text(semesterName + " ▾", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).clickable(onClick = onSelectSemester).padding(vertical = 12.dp))
         }
-
-        Spacer(Modifier.weight(1f))
-
-        // 3. 右侧: 周末开关微按钮 + 视图切换微按钮
-        Text(
-            text = if (showWeekend) "周末" else "五天",
-            fontSize = 10.5.sp,
-            fontWeight = FontWeight.Medium,
-            color = if (showWeekend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
-                .background(if (showWeekend) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent)
-                .clickable(onClick = onToggleWeekend)
-                .padding(horizontal = 5.dp, vertical = 2.5.dp)
-        )
-
-        Spacer(Modifier.width(2.dp))
-
-        IconButton(onClick = onToggleView, modifier = Modifier.size(34.dp)) {
-            Icon(
-                if (isDayView) Icons.AutoMirrored.Filled.Notes else Icons.Default.DateRange,
-                contentDescription = if (isDayView) "切换周视图" else "切换日视图",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onPrevWeek, enabled = currentWeek > 1, modifier = Modifier.size(44.dp)) {
+                Icon(Icons.Default.ChevronLeft, "上一周")
+            }
+            Text("第 $currentWeek / $totalWeeks 周", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            IconButton(onClick = onNextWeek, enabled = currentWeek < totalWeeks, modifier = Modifier.size(44.dp)) {
+                Icon(Icons.Default.ChevronRight, "下一周")
+            }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onToggleWeekend) { Text(if (showWeekend) "显示周末" else "仅工作日") }
+            IconButton(onClick = onToggleView, modifier = Modifier.size(44.dp)) {
+                Icon(if (isDayView) Icons.AutoMirrored.Filled.Notes else Icons.Default.DateRange,
+                    contentDescription = if (isDayView) "切换周视图" else "切换日视图")
+            }
         }
     }
 }
@@ -571,6 +531,7 @@ private fun CourseDetailDialog(
     initialIndex: Int = 0,
     onDismiss: (Course) -> Unit,
     onEdit: (Course) -> Unit,
+    onCancelOnce: (Course) -> Unit,
     onDelete: (Course) -> Unit
 ) {
     val pagerState = rememberPagerState(
@@ -600,7 +561,7 @@ private fun CourseDetailDialog(
                             }
                         },
                         enabled = pagerState.currentPage > 0,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Icon(Icons.Default.ChevronLeft, contentDescription = "上一门")
                     }
@@ -628,7 +589,7 @@ private fun CourseDetailDialog(
                             }
                         },
                         enabled = pagerState.currentPage < cluster.size - 1,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Icon(Icons.Default.ChevronRight, contentDescription = "下一门")
                     }
@@ -702,7 +663,8 @@ private fun CourseDetailDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onEdit(currentCourse) }) { Text("编辑") }
+            Button(onClick = { onEdit(currentCourse) }) { Text("调课 / 换教室 / 编辑") }
+            TextButton(onClick = { onCancelOnce(currentCourse) }) { Text("本周停课") }
         },
         dismissButton = {
             Row {

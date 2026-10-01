@@ -111,6 +111,7 @@ class HaustImportViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
     var preview by mutableStateOf<List<Course>>(emptyList()); private set
+    var review by mutableStateOf<com.chen.schedule.util.ImportReviewContext?>(null); private set
     var destination by mutableStateOf<Semester?>(null); private set
     var sourceSemester by mutableStateOf(""); private set
     var message by mutableStateOf(""); private set
@@ -134,20 +135,21 @@ class HaustImportViewModel @Inject constructor(
                 destination = semesters.getCurrentSemester() ?: error("请先在设置中创建学期，再返回导入")
                 sourceSemester = result.first
                 preview = CoursePalette.assignColors(result.second)
+                review = importService.review(preview, "haust")
                 message = ""
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { message = e.message ?: "读取失败" }
             finally { busy = false }
         }
     }
-    fun confirm() {
+    fun confirm(selection: com.chen.schedule.util.ImportSelection) {
         val sem = destination ?: return
         if (busy || preview.isEmpty()) return
         val incoming = preview
         busy = true
         viewModelScope.launch {
             try {
-                val result = importService.importCourses(incoming, sem.id)
+                val result = importService.applyReviewed(selection, requireNotNull(review))
                 preview = emptyList()
                 successMessage = result.message
                 WidgetUpdater.refreshAll(context)
@@ -275,17 +277,8 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
             }
         )
     }
-    if (viewModel.preview.isNotEmpty()) AlertDialog(
-        onDismissRequest = viewModel::clearPreview,
-        title = { Text("确认导入 ${viewModel.preview.size} 条安排") },
-        text = {
-            Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
-                Text("网页学期：${viewModel.sourceSemester.ifBlank { "未识别" }}\n导入到：${viewModel.destination?.name}\n同一课程的不同周次或教室分别保留；不会删除已有课程。")
-                Spacer(Modifier.height(8.dp))
-                viewModel.preview.forEach { c -> Text("${c.name} · 周${c.dayOfWeek} 第${c.startSlot}-${c.endSlot}节 · ${c.startWeek}-${c.endWeek}周 ${c.weekType.label}\n${c.classroom}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 4.dp)) }
-            }
-        },
-        confirmButton = { TextButton(enabled = !viewModel.busy, onClick = viewModel::confirm) { Text("确认导入") } },
-        dismissButton = { TextButton(enabled = !viewModel.busy, onClick = viewModel::clearPreview) { Text("取消") } }
-    )
+    viewModel.review?.takeIf { viewModel.preview.isNotEmpty() }?.let { review ->
+        ImportReviewDialog(viewModel.preview, review, viewModel.busy, viewModel::clearPreview, viewModel::confirm)
+    }
+
 }

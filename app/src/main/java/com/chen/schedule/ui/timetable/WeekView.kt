@@ -58,6 +58,7 @@ fun WeekView(
     val allCourses = clusters.flatMap { it.allCourses }
     val visibleSlots = com.chen.schedule.util.TimetableSlots.rows(timeSlots, allCourses)
     val density = LocalDensity.current
+    val slotHeight = (SLOT_H * density.fontScale.coerceAtLeast(1f)).dp
 
     val semesterMonday = semesterStartDate?.let {
         com.chen.schedule.util.WeekCalculator.semesterMonday(it)
@@ -83,7 +84,7 @@ fun WeekView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                    .height(32.dp)
+                    .height((36 * density.fontScale.coerceAtLeast(1f)).dp)
             ) {
                 Box(
                     modifier = Modifier.width(TIME_COL.dp).fillMaxHeight(),
@@ -140,7 +141,7 @@ fun WeekView(
             }
 
             // ===== Grid + 课程卡片 =====
-            // 垂直滚动由主页统一接管:上滑时头部与周切换随内容一起滑出屏幕
+            // 网格独立滚动，主页顶部和周切换保持可见
             BoxWithConstraints(
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -151,7 +152,7 @@ fun WeekView(
                 with(density) {
                     cellWidthPx = cellWidthDp.toPx()
                     timeColPx = TIME_COL.dp.toPx()
-                    slotHPx = SLOT_H.dp.toPx()
+                    slotHPx = slotHeight.toPx()
                 }
 
                 // 空白格点击:按内容坐标反推星期与节次。
@@ -160,7 +161,7 @@ fun WeekView(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .pointerInput(days, visibleSlots, onBlankCellClick) {
+                        .pointerInput(days, visibleSlots, slotHPx, cellWidthPx, onBlankCellClick) {
                             detectTapGestures { offset ->
                                 val relativeX = offset.x - timeColPx
                                 if (relativeX < 0f) return@detectTapGestures
@@ -176,7 +177,7 @@ fun WeekView(
                     // Layer 1: 背景网格
                     Column {
                         visibleSlots.forEach { slot ->
-                            Row(modifier = Modifier.fillMaxWidth().height(SLOT_H.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth().height(slotHeight)) {
                                 // 时间列
                                 Box(
                                     modifier = Modifier
@@ -247,7 +248,7 @@ fun WeekView(
                                 modifier = Modifier
                                     .offset { IntOffset(xPx + 2, yPx + 2) }
                                     .width(cellWidthDp)
-                                    .height((SLOT_H * span).dp)
+                                    .height(slotHeight * span)
                                     .padding(1.5.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(accent.copy(alpha = 0.12f))
@@ -262,7 +263,7 @@ fun WeekView(
                             modifier = Modifier
                                 .offset { IntOffset(xPx, yPx) }
                                 .width(cellWidthDp)
-                                .height((SLOT_H * span).dp)
+                                .height(slotHeight * span)
                                 .padding(1.5.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(accent.copy(alpha = 0.16f))

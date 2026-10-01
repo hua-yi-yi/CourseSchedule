@@ -54,6 +54,9 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        viewModel.refreshReminderStatus(); viewModel.refreshRecoveryPoints()
+    }
     val scope = rememberCoroutineScope()
     val downloadState by viewModel.downloadState.collectAsState()
     var pendingRestore by remember { mutableStateOf<Uri?>(null) }
@@ -101,25 +104,36 @@ fun SettingsScreen(
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
-        pendingRestore = uri
+        uri?.let(viewModel::previewRestore)
     }
 
     // 通知权限(Android 13+):开启上课提醒时申请
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
+        viewModel.updateReminderEnabled(granted)
         if (!granted) {
             Toast.makeText(context, "未授予通知权限,将收不到上课提醒", Toast.LENGTH_LONG).show()
         }
     }
 
-    pendingRestore?.let { uri ->
-        AlertDialog(onDismissRequest = { pendingRestore = null },
-            title = { Text("恢复备份", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
-            text = { Text("完整备份会替换本机全部学期、课程与作息方案(含其他学期);仅课程 JSON 只替换当前学期课程。建议先备份现有数据。", fontSize = 13.sp) },
-            confirmButton = { TextButton(onClick = { viewModel.importData(uri); pendingRestore = null }) { Text("恢复", fontSize = 13.sp) } },
-            dismissButton = { TextButton(onClick = { pendingRestore = null }) { Text("取消", fontSize = 13.sp) } })
+    var showRecovery by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refreshRecoveryPoints() }
+    viewModel.restorePreview?.let { preview ->
+        AlertDialog(onDismissRequest = viewModel::dismissRestore, title = { Text("确认恢复范围") },
+            text = { Column { Text(preview.summary); if (viewModel.dataMessage.isNotBlank()) Text(viewModel.dataMessage) } },
+            confirmButton = { TextButton(enabled = !viewModel.dataBusy, onClick = viewModel::confirmRestore) { Text(if (viewModel.dataBusy) "正在恢复…" else "确认恢复") } },
+            dismissButton = { TextButton(enabled = !viewModel.dataBusy, onClick = viewModel::dismissRestore) { Text("取消") } })
     }
+    if (showRecovery) AlertDialog(onDismissRequest = { showRecovery = false }, title = { Text("自动恢复点（最近 10 次）") },
+        text = { Column(Modifier.verticalScroll(rememberScrollState())) {
+            if (viewModel.recoveryFiles.isEmpty()) Text("暂无恢复点；修改、删除、导入、清空及恢复前会自动保存。")
+            viewModel.recoveryFiles.forEach { file ->
+                TextButton(enabled = !viewModel.dataBusy, onClick = { showRecovery = false; viewModel.previewRestore(Uri.fromFile(file)) }) {
+                    Text(java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(file.lastModified())) + " · " + file.name.substringAfter('-').substringBefore('-'))
+                }
+            }
+        } }, confirmButton = { TextButton(onClick = { showRecovery = false }) { Text("关闭") } })
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -159,8 +173,13 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(16.dp))
 
+            if (viewModel.dataBusy) Text("正在处理数据…")
+            if (viewModel.dataMessage.isNotBlank()) Text(viewModel.dataMessage)
             // ===== 数据管理 =====
             SettingsGroup(title = "数据管理") {
+                SettingsItem(title = "自动恢复点", subtitle = "最近 10 次修改前的数据，可预览后恢复",
+                    onClick = { viewModel.refreshRecoveryPoints(); showRecovery = true })
+                GroupDivider()
                 SettingsItem(
                     title = "导出为日历 (.ics)",
                     subtitle = "导出为日历事件，支持导入手机系统日历与手表",
@@ -180,7 +199,7 @@ fun SettingsScreen(
                 )
                 GroupDivider()
                 SettingsItem(
-                    title = "清空数据",
+                    title = "清空当前学期课程",
                     subtitle = "删除当前学期的所有课程数据",
                     isDanger = true,
                     onClick = { showClearDialog = true }

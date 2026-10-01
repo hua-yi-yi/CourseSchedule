@@ -16,7 +16,7 @@ internal fun ClearCoursesDialog(viewModel: SettingsViewModel, onDismiss: () -> U
             onDismissRequest = { onDismiss() },
             shape = MaterialTheme.shapes.extraLarge,
             title = { Text("确认清空", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
-            text = { Text("确定要删除当前学期的所有课程数据吗？此操作不可撤销。\n\n建议先备份数据。", fontSize = 13.sp) },
+            text = { Text("确定要删除当前学期的所有课程数据吗？操作前会自动保存恢复点，可在「自动恢复点」中找回。", fontSize = 13.sp) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.clearAllData()

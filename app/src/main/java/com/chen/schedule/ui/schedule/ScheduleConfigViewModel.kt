@@ -54,7 +54,7 @@ data class SemesterFormState(
     val editingId: Long? = null,
     val name: String = "",
     val dateMillis: Long? = null,
-    val totalWeeks: String = ScheduleStatus.MAX_WEEKS.toString(),
+    val totalWeeks: String = "20",
     val saving: Boolean = false,
     val error: String? = null,
     val saved: Boolean = false,
@@ -325,6 +325,10 @@ class ScheduleConfigViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val existing = form.editingId?.let { semesterRepository.getSemesterById(it) }
+                form.editingId?.let { id ->
+                    val used = courseRepository.getCoursesBySemester(id).first()
+                    require(used.none { it.endWeek > weeks!! }) { "已有课程超过所选总周数，请先调整课程周次" }
+                }
                 val semester = Semester(
                     id = form.editingId ?: 0,
                     name = name,

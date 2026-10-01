@@ -59,7 +59,7 @@ class CourseRepository @Inject constructor(
         dayOfWeek = dayOfWeek, startSlot = startSlot, endSlot = endSlot,
         startWeek = startWeek, endWeek = endWeek,
         weekType = when (weekType) { "odd" -> WeekType.ODD; "even" -> WeekType.EVEN; else -> WeekType.ALL },
-        color = color, semesterId = semesterId, note = note
+        color = color, semesterId = semesterId, note = note, importSource = importSource
     )
 
     private fun Course.toEntity() = CourseEntity(
@@ -67,6 +67,6 @@ class CourseRepository @Inject constructor(
         dayOfWeek = dayOfWeek, startSlot = startSlot, endSlot = endSlot,
         startWeek = startWeek, endWeek = endWeek,
         weekType = when (weekType) { WeekType.ODD -> "odd"; WeekType.EVEN -> "even"; else -> "all" },
-        color = color, semesterId = semesterId, note = note
+        color = color, semesterId = semesterId, note = note, importSource = importSource
     )
 }

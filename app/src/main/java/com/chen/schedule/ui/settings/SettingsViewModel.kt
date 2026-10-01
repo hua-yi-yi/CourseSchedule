@@ -52,6 +52,35 @@ class SettingsViewModel @Inject constructor(
 
     val themeConfig: StateFlow<ThemeConfig> = ThemePrefs.state
 
+    var reminderStatus by mutableStateOf(""); private set
+    var nextReminder by mutableStateOf(""); private set
+    fun refreshReminderStatus() {
+        reminderStatus = com.chen.schedule.reminders.ReminderStatus.describe(context, reminderEnabled)
+        viewModelScope.launch {
+            val sem = semesterRepository.getCurrentSemester()
+            if (sem == null || !reminderEnabled) { nextReminder = "暂无预计提醒"; return@launch }
+            val courses = courseRepository.getCoursesBySemester(sem.id).first()
+            val slots = timeSlotRepository.getTimeSlotsBySchemeDirect(sem.schemeId)
+            val now = System.currentTimeMillis()
+            val zone = java.time.ZoneId.systemDefault()
+            val today = java.time.LocalDate.now()
+            var next: com.chen.schedule.reminders.ClassReminderPlanner.ReminderPlan? = null
+            for (offset in 0..(sem.totalWeeks * 7)) {
+                val date = today.plusDays(offset.toLong())
+                val millis = if (offset == 0) now else date.atStartOfDay(zone).toInstant().toEpochMilli()
+                val week = com.chen.schedule.util.WeekCalculator.activeWeek(sem.startDate, sem.totalWeeks, millis) ?: continue
+                next = com.chen.schedule.reminders.ClassReminderPlanner.planForToday(millis, slots, courses, week, date.dayOfWeek.value, reminderLead).firstOrNull()
+                if (next != null) break
+            }
+            nextReminder = next?.let { "预计下一次：" + java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(it.triggerAtMillis)) + " · " + it.courseName }
+                ?: "本学期没有待提醒的课程"
+        }
+    }
+    fun testReminder() {
+        try { com.chen.schedule.reminders.ReminderStatus.test(context); dataMessage = "已发送测试通知，请检查通知栏" }
+        catch (e: Exception) { dataMessage = e.message.orEmpty() }
+        refreshReminderStatus()
+    }
     var reminderEnabled by androidx.compose.runtime.mutableStateOf(false); private set
     var reminderLead by androidx.compose.runtime.mutableStateOf(ReminderPrefs.DEFAULT_LEAD_MINUTES); private set
     var reminderOngoing by androidx.compose.runtime.mutableStateOf(true); private set
@@ -217,6 +246,7 @@ class SettingsViewModel @Inject constructor(
         reminderPrefs.enabled = enabled
         reminderEnabled = enabled
         ClassReminderManager.rescheduleAsync(context)
+        refreshReminderStatus()
     }
 
     /** 修改提前量:立即按新提前量重排今天的提醒。 */
@@ -224,6 +254,7 @@ class SettingsViewModel @Inject constructor(
         reminderPrefs.leadMinutes = minutes
         reminderLead = minutes
         ClassReminderManager.rescheduleAsync(context)
+        refreshReminderStatus()
     }
 
     /** 开关上课中常驻看板:立即更新偏好并重排看板与闹钟。 */
@@ -231,6 +262,7 @@ class SettingsViewModel @Inject constructor(
         reminderPrefs.ongoingClassEnabled = enabled
         reminderOngoing = enabled
         ClassReminderManager.rescheduleAsync(context)
+        refreshReminderStatus()
     }
 
     fun exportToUri(uri: Uri) {
@@ -246,19 +278,43 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun importData(uri: Uri) {
+    var restorePreview by mutableStateOf<ScheduleBackupService.RestorePreview?>(null); private set
+    var dataBusy by mutableStateOf(false); private set
+    var dataMessage by mutableStateOf(""); private set
+    var recoveryFiles by mutableStateOf<List<java.io.File>>(emptyList()); private set
+    fun refreshRecoveryPoints() { recoveryFiles = backupService.recoveryPoints() }
+    fun dismissRestore() { if (!dataBusy) restorePreview = null }
+    fun previewRestore(uri: Uri) {
+        if (dataBusy) return
+        dataBusy = true; dataMessage = ""
+        viewModelScope.launch {
+            try { restorePreview = backupService.previewRestore(uri) }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { dataMessage = "读取失败：${e.message}" }
+            finally { dataBusy = false }
+        }
+    }
+    fun confirmRestore() {
+        val preview = restorePreview ?: return
+        importData(preview.uri, preview.digest)
+    }
+    fun importData(uri: Uri, digest: String? = null) {
+        if (dataBusy) return
+        dataBusy = true
         viewModelScope.launch {
             try {
-                val result = backupService.importData(uri)
+                val result = backupService.importData(uri, digest)
                 WidgetUpdater.refreshAll(context)
                 val message = if (result.fullRestore) "成功恢复 ${result.count} 门课程(含全部学期)"
                     else "成功恢复 ${result.count} 门课程(当前学期)"
+                dataMessage = message; restorePreview = null; refreshRecoveryPoints()
                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Toast.makeText(context, "导入失败: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+                dataMessage = "恢复失败：${e.message}"
+                Toast.makeText(context, dataMessage, Toast.LENGTH_SHORT).show()
+            } finally { dataBusy = false; refreshRecoveryPoints() }
         }
     }
     fun exportIcsToUri(uri: Uri) {
@@ -286,15 +342,19 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun clearAllData() {
+        if (dataBusy) return
+        dataBusy = true
         viewModelScope.launch {
             try {
                 val sem = semesterRepository.getCurrentSemester() ?: error("没有当前学期")
-                courseRepository.deleteAllBySemester(sem.id)
+                backupService.clearSemester(sem.id)
                 WidgetUpdater.refreshAll(context)
-                Toast.makeText(context, "数据已清空", Toast.LENGTH_SHORT).show()
+                dataMessage = "当前学期已清空，可从自动恢复点找回"
+                Toast.makeText(context, dataMessage, Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                Toast.makeText(context, "清空失败: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+                dataMessage = "清空失败：${e.message}"
+                Toast.makeText(context, dataMessage, Toast.LENGTH_SHORT).show()
+            } finally { dataBusy = false; refreshRecoveryPoints() }
         }
     }
 

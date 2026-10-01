@@ -28,8 +28,10 @@ class RegressionInstrumentation : Instrumentation() {
 
     override fun onStart() {
         val tests = listOf<Pair<String, () -> Unit>>(
-            "migration1to3" to { migration(1) },
-            "migration2to3" to { migration(2) },
+            "migration1to4" to { migration(1) },
+            "migration2to4" to { migration(2) },
+            "migration3to4" to { migration(3) },
+            "reviewedUpdatesScopesAndRecovery" to { reviewedUpdates() },
             "backupRoundTripAndRollback" to { backupRoundTrip() },
             "legacyBackupWithAndWithoutCourses" to { legacyBackup() },
             "importValidationDeduplicationAndRollback" to { importValidation() },
@@ -76,7 +78,7 @@ class RegressionInstrumentation : Instrumentation() {
                 val setup = schema.getJSONArray("setupQueries")
                 for (i in 0 until setup.length()) old.execSQL(setup.getString(i))
                 old.execSQL("INSERT INTO semesters (id,name,startDate,totalWeeks,isCurrent) VALUES (1,'原学期',1725235200000,20,1)")
-                old.execSQL("INSERT INTO courses VALUES (1,'原课程','教师','原地点',1,1,2,1,20,'all',4283215696,1,'备注')")
+                old.execSQL("INSERT INTO courses (id,name,teacher,classroom,dayOfWeek,startSlot,endSlot,startWeek,endWeek,weekType,color,semesterId,note) VALUES (1,'原课程','教师','原地点',1,1,2,1,20,'all',4283215696,1,'备注')")
                 old.execSQL("INSERT INTO time_slots (id,slotNumber,startTime,endTime,name) VALUES (1,1,'08:00','08:45','第一节')")
                 old.version = version
             }
@@ -86,9 +88,54 @@ class RegressionInstrumentation : Instrumentation() {
                 check(db.courseDao().getCoursesBySemesterDirect(1).single().classroom == "原地点")
                 check(db.semesterDao().getCurrentSemester()!!.schemeId == 0L)
                 check(db.timeSlotDao().getTimeSlotsBySchemeDirect(0).single().startTime == "08:00")
-                check(db.openHelper.writableDatabase.version == 3)
+                check(db.openHelper.writableDatabase.version == 4)
+                check(db.courseDao().getCoursesBySemesterDirect(1).single().importSource.isEmpty())
             } finally { db.close() }
         } finally { targetContext.deleteDatabase(name) }
+    }
+
+    private fun reviewedUpdates() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(targetContext, AppDatabase::class.java).build()
+        try {
+            val courses = CourseRepository(db.courseDao())
+            val semesters = SemesterRepository(db.semesterDao())
+            val slots = TimeSlotRepository(db.timeSlotDao())
+            val schemes = TimeSchemeRepository(db, db.timeSchemeDao(), db.timeSlotDao(), db.semesterDao(), db.courseDao())
+            val backup = ScheduleBackupService(db, courses, semesters, slots, schemes, targetContext)
+            val imports = CourseImportService(db, semesters, courses, slots, backup)
+            val changes = CourseChangeService(db, courses, backup)
+            val schemeId = schemes.createCustomScheme("作息", listOf(com.chen.schedule.domain.model.TimeSlot(slotNumber = 1)), false)
+            val sem = semesters.insert(Semester(name = "更新测试", schemeId = schemeId, totalWeeks = 20))
+            semesters.setCurrentSemester(sem)
+            val oldId = courses.insert(Course(name = "数学", classroom = "A101", endSlot = 1, semesterId = sem, importSource = "file"))
+            val manualId = courses.insert(Course(name = "手动课程", endSlot = 1, semesterId = sem))
+            val newCourse = Course(name = "数学", classroom = "A102", endSlot = 1)
+            val review = imports.review(listOf(newCourse), "file")
+            val selection = com.chen.schedule.util.ImportSelection(listOf(newCourse), mapOf(0 to oldId))
+            val result = imports.applyReviewed(selection, review)
+            check(result.replaced == 1)
+            check(courses.getCourseById(manualId) != null)
+            val updated = courses.getCoursesBySemester(sem).first().single { it.name == "数学" }
+            check(updated.classroom == "A102")
+            check(backup.recoveryPoints().isNotEmpty())
+            check(runCatching { imports.applyReviewed(selection, review) }.isFailure)
+            changes.change(updated, updated.copy(dayOfWeek = 5), com.chen.schedule.util.ChangeScope.ONCE, 6)
+            val split = courses.getCoursesBySemester(sem).first().filter { it.name == "数学" }
+            check(split.single { it.appliesToWeek(6) }.dayOfWeek == 5)
+            check(split.single { it.appliesToWeek(5) }.dayOfWeek == 1)
+            check(split.single { it.appliesToWeek(7) }.dayOfWeek == 1)
+            check(split.all { it.importSource.isEmpty() })
+            val snapshot = backup.createRecoveryPoint("测试快照")!!
+            val preview = backup.previewRestore(Uri.fromFile(snapshot))
+            check("更新测试" in preview.summary)
+            val before = courses.getAllCourses().first()
+            snapshot.appendText(" ")
+            check(runCatching { backup.importData(Uri.fromFile(snapshot), preview.digest) }.isFailure)
+            check(courses.getAllCourses().first() == before)
+            val stale = imports.review(listOf(newCourse), "file")
+            courses.insert(Course(name = "后来新增", endSlot = 1, semesterId = sem))
+            check(runCatching { imports.applyReviewed(com.chen.schedule.util.ImportSelection(listOf(newCourse)), stale) }.isFailure)
+        } finally { db.close() }
     }
 
     private fun backupRoundTrip() = runBlocking {
@@ -174,7 +221,9 @@ class RegressionInstrumentation : Instrumentation() {
             val courses = CourseRepository(db.courseDao())
             val semesters = SemesterRepository(db.semesterDao())
             val slots = TimeSlotRepository(db.timeSlotDao())
-            val service = CourseImportService(db, semesters, courses, slots)
+            val schemes = TimeSchemeRepository(db, db.timeSchemeDao(), db.timeSlotDao(), db.semesterDao(), db.courseDao())
+            val backup = ScheduleBackupService(db, courses, semesters, slots, schemes, targetContext)
+            val service = CourseImportService(db, semesters, courses, slots, backup)
             val id = semesters.insert(Semester(name = "测试学期", startDate = 1, totalWeeks = 16, isCurrent = true))
             slots.insertAll(listOf(TimeSlot(slotNumber = 1), TimeSlot(slotNumber = 2, startTime = "09:00", endTime = "09:45")))
             val course = Course(name = "测试课程")

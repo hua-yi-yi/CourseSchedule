@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.horizontalScroll
+import com.chen.schedule.util.WeekCalculator
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -87,17 +89,19 @@ import javax.inject.Inject
 
 /**
  * 首启「初始设置」向导状态:分页式,每页一项任务。
- * 总周数不做选择,固定取上限([ScheduleStatus.MAX_WEEKS])。
+ * 确认实际学期周数与当前教学周。
  */
 data class SetupWizardState(
     val name: String = "",
     val suggestions: List<String> = emptyList(),
     val dateMillis: Long? = null,
-    val totalWeeks: Int = ScheduleStatus.MAX_WEEKS,
+    val totalWeeks: Int = 20,
+    val weeksInput: String = "20",
     val schemes: List<TimeScheme> = emptyList(),
     val selectedSchemeId: Long? = null,
     /** 选中方案的节次预览(异步加载)。 */
     val schemeSlots: List<TimeSlot> = emptyList(),
+    val customSlots: Boolean = false,
     val schemeSlotsLoaded: Boolean = false,
     val saving: Boolean = false,
     val saved: Boolean = false,
@@ -128,14 +132,15 @@ class SetupWizardViewModel @Inject constructor(
             }
             val suggestions = SemesterNameSuggestions.generate(LocalDate.now())
             // 默认选第一个内置模板,用户可直接一路「下一步」完成
-            val first = schemes.firstOrNull { it.isBuiltIn } ?: schemes.firstOrNull()
+            val season = if (LocalDate.now().monthValue in 5..9) 1 else 2
+            val first = schemes.firstOrNull { it.isBuiltIn && it.season == season } ?: schemes.firstOrNull()
             // 默认预选「本周一」作为开学日期, 让用户可一路直接点击「下一步」快速完成向导
             val defaultDateMillis = quickStartDateMillis(0)
             _state.update {
                 it.copy(
                     name = suggestions.firstOrNull().orEmpty(),
                     suggestions = suggestions,
-                    dateMillis = defaultDateMillis,
+                    dateMillis = null,
                     schemes = schemes,
                     selectedSchemeId = first?.id
                 )
@@ -144,6 +149,14 @@ class SetupWizardViewModel @Inject constructor(
         }
     }
 
+    fun updateWeeks(value: String) {
+        val text = value.filter(Char::isDigit).take(2)
+        _state.update { it.copy(weeksInput = text, totalWeeks = text.toIntOrNull()?.takeIf { weeks -> weeks in 1..53 } ?: it.totalWeeks) }
+    }
+    fun calibrateWeek(week: Int) {
+        val date = LocalDate.now().with(DayOfWeek.MONDAY).minusWeeks((week - 1).toLong())
+        updateDate(date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli())
+    }
     fun updateName(value: String) = _state.update { it.copy(name = value, error = null) }
 
     fun quickStartDateMillis(offsetWeeks: Int): Long {
@@ -164,10 +177,16 @@ class SetupWizardViewModel @Inject constructor(
         _state.update { it.copy(dateMillis = alignedMillis, error = null) }
     }
 
+    fun updateSlot(number: Int, start: String? = null, end: String? = null) {
+        _state.update { state -> state.copy(customSlots = true, schemeSlots = state.schemeSlots.map {
+            if (it.slotNumber == number) it.copy(startTime = start ?: it.startTime, endTime = end ?: it.endTime) else it
+        }) }
+    }
     fun selectScheme(schemeId: Long) {
         _state.update {
             it.copy(
                 selectedSchemeId = schemeId,
+                customSlots = false,
                 schemeSlots = emptyList(),
                 schemeSlotsLoaded = false,
                 error = null
@@ -199,6 +218,7 @@ class SetupWizardViewModel @Inject constructor(
         val name = s.name.trim()
         val error = when {
             name.isBlank() -> "请选择或填写学期名称"
+            s.weeksInput.toIntOrNull()?.let { it in 1..53 } != true -> "请填写 1–53 的学期总周数"
             s.dateMillis == null || s.dateMillis <= 0L -> "请选择开学日期"
             else -> null
         }
@@ -212,8 +232,9 @@ class SetupWizardViewModel @Inject constructor(
         _state.update { it.copy(saving = true, error = null) }
         viewModelScope.launch {
             try {
-                val slots = runCatching { timeSchemeRepository.getSlotsOfSchemeDirect(schemeId) }
-                    .getOrDefault(emptyList())
+                val slots = if (s.customSlots) s.schemeSlots else timeSchemeRepository.getSlotsOfSchemeDirect(schemeId)
+                require(ScheduleStatus.isSlotsValid(slots)) { "请核对作息时间，结束时间须晚于开始时间且节次不能重叠" }
+                val actualSchemeId = if (s.customSlots) timeSchemeRepository.createCustomScheme("${s.name}作息", slots, setCurrent = false) else schemeId
                 if (slots.isEmpty()) {
                     _state.update { it.copy(saving = false, error = "所选作息没有节次,请换一个方案") }
                     return@launch
@@ -225,7 +246,7 @@ class SetupWizardViewModel @Inject constructor(
                         startDate = dateMillis,
                         totalWeeks = totalWeeks,
                         isCurrent = false,
-                        schemeId = schemeId
+                        schemeId = actualSchemeId
                     )
                 )
                 semesterRepository.setCurrentSemester(newId)
@@ -250,17 +271,17 @@ class SetupWizardViewModel @Inject constructor(
 @Composable
 fun SetupWizardScreen(
     onDone: () -> Unit,
-    onGoImport: () -> Unit,
+    onGoImport: (Int) -> Unit,
     onGoHaustImport: () -> Unit,
     onCancel: () -> Unit,
     viewModel: SetupWizardViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    var step by remember { mutableIntStateOf(0) }
+    var step by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showCustomName by remember { mutableStateOf(false) }
     // 第 4 页的导入方式(与主页导入页一致):0 = 河南科技大学教务导入,1 = 其他方式
-    var importMode by remember { mutableIntStateOf(0) }
+    var importMode by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(1) }
     /** 选择「先不导入」:完成设置后仅返回课表。 */
     var skipImport by remember { mutableStateOf(false) }
 
@@ -269,7 +290,7 @@ fun SetupWizardScreen(
             when {
                 skipImport -> onDone()
                 importMode == 0 -> onGoHaustImport()
-                else -> onGoImport()
+                else -> onGoImport(if (importMode == 2) 1 else 0)
             }
         }
     }
@@ -277,7 +298,7 @@ fun SetupWizardScreen(
     val stepTitles = remember { listOf("学期名称", "开学日期", "作息方案", "导入课表") }
 
     // 第一步按返回退出向导,其余步骤先回上一页
-    BackHandler { if (step > 0) step-- else onCancel() }
+    BackHandler { if (!state.saving) { if (step > 0) step-- else onCancel() } }
 
     if (showDatePicker) {
         val initial = state.dateMillis ?: System.currentTimeMillis()
@@ -305,7 +326,7 @@ fun SetupWizardScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { if (step > 0) step-- else onCancel() }) {
+                    IconButton(enabled = !state.saving, onClick = { if (step > 0) step-- else onCancel() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     }
                 }
@@ -363,6 +384,8 @@ fun SetupWizardScreen(
                         onCustomNameChange = viewModel::updateName
                     )
                     1 -> DateStep(
+                        onWeeks = viewModel::updateWeeks,
+                        onCalibrate = viewModel::calibrateWeek,
                         state = state,
                         onQuickPick = viewModel::applyQuickStartDate,
                         onOpenDatePicker = { showDatePicker = true },
@@ -379,11 +402,24 @@ fun SetupWizardScreen(
                             state = state,
                             onSelectScheme = viewModel::selectScheme
                         )
+                        var adjusting by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                        TextButton(onClick = { adjusting = !adjusting }) { Text(if (adjusting) "收起作息调整" else "在这里调整作息时间") }
+                        if (adjusting) state.schemeSlots.forEach { slot ->
+                            Text("第 ${slot.slotNumber} 节")
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(slot.startTime, { viewModel.updateSlot(slot.slotNumber, start = it) }, label = { Text("开始 HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
+                                OutlinedTextField(slot.endTime, { viewModel.updateSlot(slot.slotNumber, end = it) }, label = { Text("结束 HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
+                            }
+                        }
                     }
-                    else -> ImportStep(
+                    else -> Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                        Text("${state.name} · ${viewModel.formatDate(state.dateMillis)}起 · ${state.totalWeeks}周")
+                        Text(state.dateMillis?.let { WeekCalculator.activeWeek(it, state.totalWeeks) }?.let { "今天为第 $it 周" } ?: "今天不在教学期内")
+                        ImportStep(
                         importMode = importMode,
                         onPickMode = { importMode = it }
                     )
+                    }
                 }
             }
 
@@ -409,7 +445,7 @@ fun SetupWizardScreen(
                     onClick = { if (step < stepTitles.lastIndex) step++ else viewModel.complete() },
                     enabled = when (step) {
                         0 -> state.name.isNotBlank()
-                        1 -> pickedDate != null && pickedDate > 0L
+                        1 -> pickedDate != null && pickedDate > 0L && state.weeksInput.toIntOrNull()?.let { it in 1..53 } == true
                         else -> state.selectedSchemeId != null
                     } && !state.saving,
                     modifier = Modifier.weight(1f)
@@ -534,17 +570,32 @@ private fun NameStep(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DateStep(
+    onWeeks: (String) -> Unit,
+    onCalibrate: (Int) -> Unit,
     state: SetupWizardState,
     onQuickPick: (Int) -> Unit,
     onOpenDatePicker: () -> Unit,
     formatDate: (Long?) -> String,
     quickStartMillis: (Int) -> Long
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+        OutlinedTextField(value = state.weeksInput, onValueChange = onWeeks,
+            label = { Text("学期总周数（1–53）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        Text("今天是第几教学周？点选后自动推算开学日期", style = MaterialTheme.typography.bodySmall)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+            (1..state.totalWeeks).forEach { week ->
+                FilterChip(selected = state.dateMillis?.let { WeekCalculator.activeWeek(it, state.totalWeeks) } == week,
+                    onClick = { onCalibrate(week) }, label = { Text("第${week}周") })
+            }
+        }
+        state.dateMillis?.let { date ->
+            Text(WeekCalculator.activeWeek(date, state.totalWeeks)?.let { "今天对应第 $it 教学周" }
+                ?: "今天不在教学期内", color = MaterialTheme.colorScheme.primary)
+        }
         Text("选择开学日期", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
         Text(
-            "学期从周一开始;不确定就选「本周一」,之后可再调整。",
+            "请选择第 1 教学周的周一。中途安装可用下方教学周校准。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -602,6 +653,7 @@ private fun DateStep(
         Spacer(Modifier.height(6.dp))
         Text(
             "也可以点开日历,选择第 1 周的具体周一。",
+
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -617,7 +669,7 @@ private fun SchemeStep(
     Text("选择作息方案", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
     Spacer(Modifier.height(4.dp))
     Text(
-        "两套内置模板按执行日期区分;完成后可在「学期与作息」中修改。",
+        "内置模板供参考；季节变更需手动切换。请核对下午及晚间时间，完成后可修改。",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -660,13 +712,15 @@ private fun ImportStep(
             SegmentedButton(
                 selected = importMode == 0,
                 onClick = { onPickMode(0) },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-            ) { Text("河南科技大学导入", fontSize = 13.sp) }
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3)
+            ) { Text("河科大", fontSize = 13.sp) }
             SegmentedButton(
                 selected = importMode == 1,
                 onClick = { onPickMode(1) },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-            ) { Text("其他方式", fontSize = 13.sp) }
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3)
+            ) { Text("其他高校", fontSize = 13.sp) }
+            SegmentedButton(selected = importMode == 2, onClick = { onPickMode(2) },
+                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3)) { Text("截图 / 文件", fontSize = 13.sp) }
         }
         Spacer(Modifier.height(10.dp))
         Card(
@@ -686,9 +740,9 @@ private fun ImportStep(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     if (importMode == 0) {
-                        "完成设置后进入 VPN 教务,登录并读取课表,自动导入当前学期。"
+                        "完成设置后进入 VPN 教务，登录并读取课表，核对教室、周次和目标学期后确认导入。"
                     } else {
-                        "完成设置后前往导入页:AI 截图识别、粘贴文本、JSON/CSV 文件或正方教务系统。"
+                        if (importMode == 1) "搜索学校并进入对应教务系统；读取后统一核对再导入。" else "发送截图给外部 AI，或粘贴 JSON/CSV、选择文件；核对后确认导入。"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -745,7 +799,7 @@ private fun WizardSchemeRow(
                         )
                     } else {
                         val preview = slots.sortedBy { it.slotNumber }
-                            .take(3)
+                            .filter { it.slotNumber in listOf(1, 5, 10) }
                             .joinToString("  ") { "第${it.slotNumber}节 ${it.startTime}" } +
                             if (slots.size > 3) " …共${slots.size}节" else ""
                         Text(

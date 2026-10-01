@@ -61,6 +61,7 @@ fun DayView(
     val allCourses = clusters.flatMap { it.allCourses }
     val visibleSlots = com.chen.schedule.util.TimetableSlots.rows(timeSlots, allCourses)
     val density = LocalDensity.current
+    val slotHeight = (DSLOT_H * density.fontScale.coerceAtLeast(1f)).dp
 
     val now = LocalTime.now()
     val currentSlot = visibleSlots.takeIf { isToday }?.find { slot ->
@@ -116,7 +117,7 @@ fun DayView(
             }
 
             BoxWithConstraints(
-                // 垂直滚动由主页统一接管:上滑时头部与周切换随内容一起滑出屏幕
+                // 网格独立滚动，主页顶部和周切换保持可见
                 modifier = Modifier.fillMaxWidth()
             ) {
                 val contentWidthDp = maxWidth - DTIME_COL.dp
@@ -124,7 +125,7 @@ fun DayView(
                 val slotHPx: Float
                 with(density) {
                     timeColPx = DTIME_COL.dp.toPx()
-                    slotHPx = DSLOT_H.dp.toPx()
+                    slotHPx = slotHeight.toPx()
                 }
 
                 // 空白格点击:按内容坐标反推节次。课程卡片自带 clickable,会先消费点击。
@@ -132,7 +133,7 @@ fun DayView(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .pointerInput(visibleSlots, onBlankCellClick) {
+                        .pointerInput(visibleSlots, slotHPx, onBlankCellClick) {
                             detectTapGestures { offset ->
                                 if (offset.x < timeColPx) return@detectTapGestures
                                 val slotIndex = (offset.y / slotHPx).toInt()
@@ -146,7 +147,7 @@ fun DayView(
                     Column {
                     visibleSlots.forEach { slot ->
                         val isCurrent = currentSlot?.slotNumber == slot.slotNumber
-                        Row(modifier = Modifier.fillMaxWidth().height(DSLOT_H.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth().height(slotHeight)) {
                             // 时间列: 节次号胶囊 + 时间
                             Column(
                                 modifier = Modifier
@@ -229,7 +230,7 @@ fun DayView(
                             modifier = Modifier
                                 .offset { IntOffset(xPx + 3, yPx + 3) }
                                 .width(contentWidthDp)
-                                .height((DSLOT_H * span).dp)
+                                .height(slotHeight * span)
                                 .padding(3.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(accent.copy(alpha = 0.10f))
@@ -241,7 +242,7 @@ fun DayView(
                         modifier = Modifier
                             .offset { IntOffset(xPx, yPx) }
                             .width(contentWidthDp)
-                            .height((DSLOT_H * span).dp)
+                            .height(slotHeight * span)
                             .padding(3.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(accent.copy(alpha = 0.15f))

@@ -79,7 +79,7 @@ object CourseImportRules {
     }
 
     fun identity(course: Course): Course = course.copy(
-        id = 0, semesterId = 0, color = 0, note = "",
+        id = 0, semesterId = 0, color = 0, note = "", importSource = "",
         name = course.name.trim(), teacher = course.teacher.trim(), classroom = course.classroom.trim()
     )
 

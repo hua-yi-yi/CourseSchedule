@@ -48,6 +48,8 @@ data class TimetableState(
     /** 引导面板:null = 不显示。 */
     val guide: ScheduleGuide? = null,
     /** 用户选中的同时间优选展示课程 ID 集合 */
+    val undoCourse: Course? = null,
+    val message: String = "",
     val preferredCourseIds: Set<Long> = emptySet()
 ) {
     /** 学期与作息是否都已有效配置。 */
@@ -80,6 +82,8 @@ data class ScheduleGuide(
 @HiltViewModel
 class TimetableViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
+    private val changeService: com.chen.schedule.data.repository.CourseChangeService,
+    private val backupService: com.chen.schedule.ui.settings.ScheduleBackupService,
     private val semesterRepository: SemesterRepository,
     private val timeSlotRepository: TimeSlotRepository,
     @ApplicationContext private val context: Context
@@ -92,7 +96,7 @@ class TimetableViewModel @Inject constructor(
     private val prefs = context.getSharedPreferences("timetable_prefs", Context.MODE_PRIVATE)
 
     init {
-        _state.update { it.copy(preferredCourseIds = loadPreferredCourseIds()) }
+        _state.update { it.copy(preferredCourseIds = loadPreferredCourseIds(), isDayView = prefs.getBoolean("day_view", false), showWeekend = prefs.getBoolean("weekend", true)) }
         observeSemesterAndCourses()
     }
 
@@ -162,9 +166,11 @@ class TimetableViewModel @Inject constructor(
 
     fun toggleView() {
         _state.update { it.copy(isDayView = !it.isDayView) }
+        prefs.edit().putBoolean("day_view", _state.value.isDayView).apply()
     }
 
     fun toggleWeekend() {
+        prefs.edit().putBoolean("weekend", !_state.value.showWeekend).apply()
         _state.update {
             it.copy(
                 showWeekend = !it.showWeekend,
@@ -314,8 +320,24 @@ class TimetableViewModel @Inject constructor(
 
     fun deleteCourse(course: Course) {
         viewModelScope.launch {
-            courseRepository.delete(course)
-            WidgetUpdater.refreshAll(context)
+            try {
+                backupService.deleteCourse(course)
+                _state.update { it.copy(undoCourse = course, message = "已删除「${course.name}」") }
+                WidgetUpdater.refreshAll(context)
+            } catch (e: Exception) { _state.update { it.copy(message = "删除失败：${e.message}") } }
         }
     }
+
+    fun cancelOnce(course: Course, week: Int) { viewModelScope.launch {
+        try { changeService.change(course, null, com.chen.schedule.util.ChangeScope.ONCE, week)
+            WidgetUpdater.refreshAll(context); _state.update { it.copy(message = "第 $week 周已停课，其他周保留；可从自动恢复点找回") }
+        } catch (e: Exception) { _state.update { it.copy(message = e.message.orEmpty()) } }
+    } }
+    fun undoDelete(course: Course) { viewModelScope.launch {
+        try {
+            backupService.undoDelete(course); WidgetUpdater.refreshAll(context)
+            _state.update { it.copy(undoCourse = null, message = "课程已恢复") }
+        } catch (e: Exception) { _state.update { it.copy(undoCourse = null, message = e.message.orEmpty()) } }
+    } }
+    fun clearMessage() { _state.update { it.copy(message = "", undoCourse = null) } }
 }

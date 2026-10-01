@@ -56,11 +56,20 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScraperLoginScreen(
+    initialSchool: String = "",
     onNavigateBack: () -> Unit,
     onHaustImport: () -> Unit,
     viewModel: ScraperLoginViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(initialSchool) {
+        viewModel.presets().find { it.id == initialSchool }?.let(viewModel::selectPreset)
+    }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(state.done) {
+        if (state.done) { android.widget.Toast.makeText(context, state.message, android.widget.Toast.LENGTH_LONG).show(); onNavigateBack() }
+    }
+    state.review?.let { ImportReviewDialog(state.preview, it, state.isLoading, viewModel::dismissPreview, viewModel::confirm) }
     var passwordVisible by remember { mutableStateOf(false) }
 
     val captchaBitmap = state.captchaBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }

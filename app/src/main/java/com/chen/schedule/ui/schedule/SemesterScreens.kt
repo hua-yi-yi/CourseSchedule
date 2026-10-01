@@ -209,7 +209,7 @@ private fun SemesterPickRow(
 /**
  * 新建 / 编辑学期。
  * 以点选为主:学期名称给推荐 chips、开学日期给快捷周 chips + 日期选择器;
- * 总周数不做选择,新建默认取上限(53 周);「根据当前周推算开学日期」改为点选周数。
+ * 总周数可编辑；可根据当前教学周推算开学日期。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -331,6 +331,13 @@ fun SemesterEditScreen(
 
             Spacer(Modifier.height(12.dp))
 
+            OutlinedTextField(value = form.totalWeeks, onValueChange = viewModel::updateSemesterWeeks,
+                label = { Text("学期总周数（1–53）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            form.dateMillis?.let { date ->
+                Text(com.chen.schedule.util.WeekCalculator.activeWeek(date, form.totalWeeksValue ?: 20)
+                    ?.let { "今天对应第 $it 教学周" } ?: "今天不在教学期内")
+            }
+            Spacer(Modifier.height(12.dp))
             // 开学日期:快捷周 chips + 完整日期选择器
             Text("开学日期", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(6.dp))
@@ -421,7 +428,7 @@ fun SemesterEditScreen(
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        (1..24).forEach { week ->
+                        (1..(form.totalWeeksValue ?: 20).coerceIn(1, 53)).forEach { week ->
                             FilterChip(
                                 selected = viewModel.currentWeekFromFormDate() == week,
                                 onClick = { viewModel.applyWeekChip(week) },

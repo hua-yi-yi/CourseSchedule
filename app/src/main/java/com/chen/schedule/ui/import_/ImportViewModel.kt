@@ -31,6 +31,7 @@ data class ImportState(
     val isImporting: Boolean = false,
     /** 确认导入成功后置位,界面据此直接返回主页。 */
     val importDone: Boolean = false,
+    val review: com.chen.schedule.util.ImportReviewContext? = null,
     val previewSemesterId: Long? = null,
     val previewSemesterName: String = "",
     val sampleJson: String = "",
@@ -106,9 +107,8 @@ class ImportViewModel @Inject constructor(
         try {
             val courses = result.getOrThrow()
             val semester = semesterRepository.getCurrentSemester() ?: error("请先创建学期")
-            CourseImportRules.validateForSemester(courses, semester,
-                timeSlotRepository.getTimeSlotsBySchemeDirect(semester.schemeId))
-            _state.update { it.copy(previewCourses = courses, previewSemesterId = semester.id,
+            val review = importService.review(courses, "file")
+            _state.update { it.copy(review = review, previewCourses = courses, previewSemesterId = semester.id,
                 previewSemesterName = semester.name, isError = false,
                 message = "解析成功，共 ${courses.size} 条课程安排", isImporting = false) }
         } catch (e: CancellationException) {
@@ -119,14 +119,15 @@ class ImportViewModel @Inject constructor(
         }
     }
 
-    fun confirmImport() {
+    fun dismissPreview() { if (!_state.value.isImporting) _state.update { it.copy(previewCourses = emptyList(), review = null) } }
+    fun confirmImport(selection: com.chen.schedule.util.ImportSelection) {
         if (_state.value.isImporting || _state.value.previewCourses.isEmpty()) return
         val preview = _state.value.previewCourses
-        val target = _state.value.previewSemesterId ?: return
+        val review = _state.value.review ?: return
         _state.update { it.copy(isImporting = true) }
         viewModelScope.launch {
             try {
-                val result = importService.importCourses(preview, target)
+                val result = importService.applyReviewed(selection, review)
                 WidgetUpdater.refreshAll(context)
                 _state.update {
                     it.copy(

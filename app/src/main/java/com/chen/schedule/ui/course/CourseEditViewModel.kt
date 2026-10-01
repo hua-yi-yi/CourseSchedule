@@ -34,12 +34,14 @@ data class CourseEditState(
     val slotNumbers: List<Int> = (1..12).toList(),
     val totalWeeks: Int = 16,
     val saved: Boolean = false,
+    val dirty: Boolean = false,
     val conflicts: List<CourseConflictDetector.CourseConflict> = emptyList()
 )
 
 @HiltViewModel
 class CourseEditViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
+    private val changeService: com.chen.schedule.data.repository.CourseChangeService,
     private val semesterRepository: com.chen.schedule.data.repository.SemesterRepository,
     private val timeSlotRepository: com.chen.schedule.data.repository.TimeSlotRepository,
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
@@ -50,12 +52,16 @@ class CourseEditViewModel @Inject constructor(
 
     private var existingCourses: List<Course> = emptyList()
     private var currentCourseId: Long? = null
+    private var original: Course? = null
+    private var configuredSemester: Long? = null
 
     init {
         _state.update { it.copy(color = courseColors.random()) }
     }
 
     suspend fun loadConfiguration(semesterId: Long) {
+        if (configuredSemester == semesterId) return
+        configuredSemester = semesterId
         val semester = semesterRepository.getSemesterById(semesterId) ?: return
         val slots = timeSlotRepository.getTimeSlotsBySchemeDirect(semester.schemeId)
             .map { it.slotNumber }.distinct().sorted()
@@ -71,9 +77,11 @@ class CourseEditViewModel @Inject constructor(
     }
 
     fun loadCourse(courseId: Long) {
+        if (original?.id == courseId) return
         currentCourseId = courseId
         viewModelScope.launch {
             courseRepository.getCourseById(courseId)?.let { course ->
+                original = course
                 _state.update {
                     it.copy(
                         name = course.name,
@@ -135,37 +143,37 @@ class CourseEditViewModel @Inject constructor(
         _state.update { it.copy(conflicts = conflicts) }
     }
 
-    fun updateName(name: String) = _state.update { it.copy(name = name) }
-    fun updateTeacher(teacher: String) = _state.update { it.copy(teacher = teacher) }
-    fun updateClassroom(classroom: String) = _state.update { it.copy(classroom = classroom) }
+    fun updateName(name: String) = _state.update { it.copy(dirty = true, error = null, name = name) }
+    fun updateTeacher(teacher: String) = _state.update { it.copy(dirty = true, error = null, teacher = teacher) }
+    fun updateClassroom(classroom: String) = _state.update { it.copy(dirty = true, error = null, classroom = classroom) }
     fun updateDayOfWeek(day: Int) {
-        _state.update { it.copy(dayOfWeek = day) }
+        _state.update { it.copy(dirty = true, error = null, dayOfWeek = day) }
         recomputeConflicts()
     }
     fun updateStartSlot(slot: Int) {
-        _state.update { it.copy(startSlot = slot, endSlot = maxOf(slot, it.endSlot)) }
+        _state.update { it.copy(dirty = true, error = null, startSlot = slot, endSlot = maxOf(slot, it.endSlot)) }
         recomputeConflicts()
     }
     fun updateEndSlot(slot: Int) {
-        _state.update { it.copy(endSlot = slot, startSlot = minOf(slot, it.startSlot)) }
+        _state.update { it.copy(dirty = true, error = null, endSlot = slot, startSlot = minOf(slot, it.startSlot)) }
         recomputeConflicts()
     }
     fun updateStartWeek(week: Int) {
-        _state.update { it.copy(startWeek = week, endWeek = maxOf(week, it.endWeek)) }
+        _state.update { it.copy(dirty = true, error = null, startWeek = week, endWeek = maxOf(week, it.endWeek)) }
         recomputeConflicts()
     }
     fun updateEndWeek(week: Int) {
-        _state.update { it.copy(endWeek = week, startWeek = minOf(week, it.startWeek)) }
+        _state.update { it.copy(dirty = true, error = null, endWeek = week, startWeek = minOf(week, it.startWeek)) }
         recomputeConflicts()
     }
     fun updateWeekType(weekType: WeekType) {
-        _state.update { it.copy(weekType = weekType) }
+        _state.update { it.copy(dirty = true, error = null, weekType = weekType) }
         recomputeConflicts()
     }
-    fun updateColor(color: Long) = _state.update { it.copy(color = color) }
-    fun updateNote(note: String) = _state.update { it.copy(note = note) }
+    fun updateColor(color: Long) = _state.update { it.copy(dirty = true, error = null, color = color) }
+    fun updateNote(note: String) = _state.update { it.copy(dirty = true, error = null, note = note) }
 
-    fun save(semesterId: Long, courseId: Long? = null) {
+    fun save(semesterId: Long, courseId: Long? = null, scope: com.chen.schedule.util.ChangeScope = com.chen.schedule.util.ChangeScope.ALL, week: Int = 1) {
         val s = _state.value
         if (s.isSaving || s.saved) return
         if (s.name.isBlank() || s.startSlot < 1 || s.endSlot < s.startSlot ||
@@ -185,16 +193,15 @@ class CourseEditViewModel @Inject constructor(
                     dayOfWeek = s.dayOfWeek,
                     startSlot = s.startSlot,
                     endSlot = s.endSlot,
-                    startWeek = s.startWeek,
-                    endWeek = s.endWeek,
-                    weekType = s.weekType,
+                    startWeek = if (courseId == null && scope == com.chen.schedule.util.ChangeScope.ONCE) week else s.startWeek,
+                    endWeek = if (courseId == null && scope == com.chen.schedule.util.ChangeScope.ONCE) week else s.endWeek,
+                    weekType = if (courseId == null && scope == com.chen.schedule.util.ChangeScope.ONCE) WeekType.ALL else s.weekType,
                     color = s.color,
                     semesterId = semesterId,
                     note = s.note
                 )
                 if (courseId != null) {
-                    courseRepository.update(course)
-                    courseRepository.updateColorByNameAndSemester(course.name, semesterId, course.color)
+                    changeService.change(requireNotNull(original), course, scope, week)
                 } else {
                     courseRepository.insert(course)
                 }
@@ -203,7 +210,7 @@ class CourseEditViewModel @Inject constructor(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update { it.copy(isSaving = false, error = "保存失败，请重试") }
+                _state.update { it.copy(isSaving = false, error = "保存失败：${e.message ?: "请重试"}") }
             }
         }
     }

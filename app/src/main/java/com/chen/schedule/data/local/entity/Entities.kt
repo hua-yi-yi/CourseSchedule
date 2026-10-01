@@ -40,7 +40,8 @@ data class CourseEntity(
     val weekType: String = "all",
     val color: Long = 0xFF4CAF50,
     val semesterId: Long,
-    val note: String = ""
+    val note: String = "",
+    @ColumnInfo(defaultValue = "''") val importSource: String = ""
 )
 
 @Entity(tableName = "time_slots")

@@ -62,7 +62,7 @@ internal fun WidgetGuideDialog(onDismiss: () -> Unit) {
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(
-                                "方法一：手机桌面长按添加（推荐 · 100% 成功）",
+                                "方法一：手机桌面长按添加（推荐）",
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,

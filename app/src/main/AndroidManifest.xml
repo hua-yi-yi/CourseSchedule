@@ -7,9 +7,7 @@
         android:maxSdkVersion="32" />
     <!-- 上课提醒:系统通知 + 精确闹钟 + 开机恢复 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
-        android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- 应用内静默更新:下载完成后调用系统安装器安装更新包 -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />

@@ -53,9 +53,25 @@ internal fun LazyListScope.fileImportItems(
     // AI 截图识别(折叠,小字)
     item {
         OtherMethodCard(
-            title = "AI 截图识别",
-            subtitle = "复制格式说明发给 AI,再把返回内容导入"
+            title = "截图转课表（使用外部 AI）",
+            subtitle = "本应用不直接识图；复制说明、发送截图、返回粘贴后核对"
         ) {
+            val shareImage = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
+                uri?.let {
+                    val share = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "image/*"; putExtra(android.content.Intent.EXTRA_STREAM, it)
+                        putExtra(android.content.Intent.EXTRA_TEXT, buildJsonPrompt())
+                        clipData = ClipData.newUri(context.contentResolver, "课表截图", it)
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(android.content.Intent.createChooser(share, "发送截图和说明给 AI"))
+                }
+            }
+            OutlinedButton(onClick = { shareImage.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
+                Text("选择截图并发送给 AI")
+            }
+            Text("识别后返回本页粘贴结果；请在核对页修正教室和周次。", style = MaterialTheme.typography.bodySmall)
             StepRow("1", "对课程表截图(教务系统、Excel 课表、纸质课表都可以)")
             StepRow("2", "点击下方按钮复制「格式说明」,发给任意 AI(ChatGPT / Kimi / 豆包 等)")
             StepRow("3", "把截图也一起发给 AI,AI 会生成对应内容")

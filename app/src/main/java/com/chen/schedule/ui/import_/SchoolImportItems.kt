@@ -37,7 +37,7 @@ internal fun LazyListScope.schoolImportItems(
     onSearchQueryChange: (String) -> Unit,
     matchedPresets: List<SchoolPreset>,
     onHaustImport: () -> Unit,
-    onScraperLogin: () -> Unit
+    onScraperLogin: (String) -> Unit
 ) {
     // 高校搜索栏
     item {
@@ -81,7 +81,7 @@ internal fun LazyListScope.schoolImportItems(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(10.dp))
-                    Button(onClick = onScraperLogin, modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = { onScraperLogin("") }, modifier = Modifier.fillMaxWidth()) {
                         Text("使用正方经典版教务登录")
                     }
                 }
@@ -137,7 +137,7 @@ internal fun LazyListScope.schoolImportItems(
                             if (preset.systemType == SchoolSystemType.WEB_VPN_EAMS) {
                                 onHaustImport()
                             } else {
-                                onScraperLogin()
+                                onScraperLogin(preset.id)
                             }
                         },
                         modifier = Modifier.fillMaxWidth()

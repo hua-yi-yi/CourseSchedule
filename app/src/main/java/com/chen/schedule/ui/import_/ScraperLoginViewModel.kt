@@ -22,6 +22,9 @@ import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 
 data class ScraperLoginState(
+    val preview: List<com.chen.schedule.domain.model.Course> = emptyList(),
+    val review: com.chen.schedule.util.ImportReviewContext? = null,
+    val done: Boolean = false,
     val url: String = "",
     val username: String = "",
     val password: String = "",
@@ -167,15 +170,10 @@ class ScraperLoginViewModel @Inject constructor(
                     return@launch
                 }
 
-                val result = importService.importCourses(fetched.courses, destination.id)
-                WidgetUpdater.refreshAll(context)
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        message = "${result.message}，可返回查看课程表",
-                        isError = false
-                    )
-                }
+                val source = "zhengfang:" + android.net.Uri.parse(_state.value.url).host.orEmpty()
+                val review = importService.review(fetched.courses, source)
+                require(review.semester.id == destination.id) { "当前学期已切换，请重新读取" }
+                _state.update { it.copy(isLoading = false, preview = fetched.courses, review = review, message = "请核对后确认导入") }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: ScraperException) {
@@ -185,6 +183,22 @@ class ScraperLoginViewModel @Inject constructor(
                     it.copy(isLoading = false, message = "连接失败:${e.message}", isError = true)
                 }
             }
+        }
+    }
+
+    fun dismissPreview() { if (!_state.value.isLoading) _state.update { it.copy(preview = emptyList(), review = null) } }
+    fun confirm(selection: com.chen.schedule.util.ImportSelection) {
+        val review = _state.value.review ?: return
+        if (_state.value.isLoading) return
+        _state.update { it.copy(isLoading = true) }
+        viewModelScope.launch {
+            try {
+                val result = importService.applyReviewed(selection, review)
+                WidgetUpdater.refreshAll(context)
+                _state.update { it.copy(preview = emptyList(), review = null, message = result.message, done = true, isError = false) }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { _state.update { it.copy(message = e.message.orEmpty(), isError = true) } }
+            finally { _state.update { it.copy(isLoading = false) } }
         }
     }
 }

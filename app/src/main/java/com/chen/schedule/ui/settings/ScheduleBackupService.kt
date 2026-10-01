@@ -59,10 +59,71 @@ class ScheduleBackupService @Inject constructor(
         }
     }
 
-    suspend fun importData(uri: Uri): RestoreResult {
+    data class RestorePreview(val uri: Uri, val digest: String, val summary: String)
+    private val recoveryDir get() = java.io.File(context.filesDir, "recovery")
+    fun recoveryPoints(): List<java.io.File> = recoveryDir.listFiles()?.filter { it.extension == "json" }
+        ?.sortedByDescending { it.lastModified() }.orEmpty()
+
+    suspend fun createRecoveryPoint(reason: String): java.io.File? = withContext(Dispatchers.IO) {
+        if (semesterRepository.getCurrentSemester() == null) return@withContext null
+        recoveryDir.mkdirs()
+        val safeReason = reason.replace(Regex("[^\\p{L}\\p{N}-]"), "-")
+        val file = java.io.File(recoveryDir, "${System.currentTimeMillis()}-$safeReason-${java.util.UUID.randomUUID()}.json")
+        val temp = java.io.File(recoveryDir, file.name + ".tmp")
+        try {
+            exportToUri(Uri.fromFile(temp))
+            check(temp.renameTo(file)) { "无法保存恢复点，未执行数据修改" }
+            recoveryPoints().drop(10).forEach { it.delete() }
+            file
+        } finally { temp.delete() }
+    }
+
+    suspend fun clearSemester(semesterId: Long) = database.withTransaction {
+        require(semesterRepository.getCurrentSemester()?.id == semesterId) { "当前学期已切换，请重试" }
+        createRecoveryPoint("清空前")
+        courseRepository.deleteAllBySemester(semesterId)
+    }
+    suspend fun deleteCourse(course: com.chen.schedule.domain.model.Course) = database.withTransaction {
+        require(courseRepository.getCourseById(course.id) == course) { "课程已变化，请重新打开" }
+        createRecoveryPoint("课程删除前")
+        courseRepository.delete(course)
+    }
+    suspend fun undoDelete(course: com.chen.schedule.domain.model.Course) = database.withTransaction {
+        require(semesterRepository.getSemesterById(course.semesterId) != null) { "原学期已不存在，请使用恢复点" }
+        require(courseRepository.getCourseById(course.id) == null) { "课表已变化，请使用恢复点" }
+        val existing = courseRepository.getCoursesBySemester(course.semesterId).first()
+        require(existing.none { CourseImportRules.identity(it) == CourseImportRules.identity(course) }) { "相同课程已经恢复" }
+        courseRepository.insert(course)
+    }
+    private fun digest(text: String): String = java.security.MessageDigest.getInstance("SHA-256")
+        .digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+
+    suspend fun previewRestore(uri: Uri): RestorePreview = withContext(Dispatchers.IO) {
+        val text = requireNotNull(context.contentResolver.openInputStream(uri)).bufferedReader().use { it.readText() }
+        val format = Json { ignoreUnknownKeys = true }
+        val element = format.parseToJsonElement(text)
+        val summary = if (ScheduleBackupFormat.isFullBackup(element)) {
+            val data = format.decodeFromString(ScheduleBackup.serializer(), text)
+            require(data.backupVersion in ScheduleBackup.LEGACY_VERSION..ScheduleBackup.CURRENT_VERSION) { "不支持此备份版本" }
+            BackupRestorePlanner.validateReferences(data)
+            val semesters = data.semesters.ifEmpty { listOf(data.semester) }
+            val courses = data.allCourses.ifEmpty { data.courses }
+            "完整恢复：${semesters.size} 个学期、${courses.size} 条课程安排、${data.schemes.size} 套作息。\n学期：${semesters.joinToString { it.name }}\n恢复后当前学期：${data.semester.name}\n将替换本机全部学期、课程与作息。"
+        } else {
+            val courses = JsonImporter.parse(text).getOrThrow()
+            require(courses.isNotEmpty()) { "没有课程" }
+            val current = semesterRepository.getCurrentSemester() ?: error("请先创建学期")
+            CourseImportRules.validateForSemester(courses, current, timeSlotRepository.getTimeSlotsBySchemeDirect(current.schemeId))
+            "仅课程恢复：${courses.size} 条安排，将替换当前学期「${current.name}」的课程。"
+        }
+        RestorePreview(uri, digest(text), summary + "\n操作前将自动保存恢复点。")
+    }
+
+    suspend fun importData(uri: Uri, expectedDigest: String? = null): RestoreResult {
         // Pair(实际写入课程数, 是否完整恢复);仅课程 JSON 只替换当前学期
         return withContext(Dispatchers.IO) {
             val jsonString = requireNotNull(context.contentResolver.openInputStream(uri)).bufferedReader().use { it.readText() }
+            require(expectedDigest == null || digest(jsonString) == expectedDigest) { "文件已变化，请重新预览" }
             val format = Json { ignoreUnknownKeys = true }
             val element = format.parseToJsonElement(jsonString)
             val backup = if (ScheduleBackupFormat.isFullBackup(element))
@@ -107,6 +168,11 @@ class ScheduleBackupService @Inject constructor(
                 }
             }
             database.withTransaction {
+                if (backup == null) {
+                    val current = semesterRepository.getCurrentSemester() ?: error("请先创建学期")
+                    CourseImportRules.validateForSemester(courses, current, timeSlotRepository.getTimeSlotsBySchemeDirect(current.schemeId))
+                }
+                createRecoveryPoint("恢复前")
                 val data = backup
                 if (data == null) {
                     // 仅课程 JSON(旧格式):替换当前学期课程,行为不变
