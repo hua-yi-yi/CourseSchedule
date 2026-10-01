@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -52,7 +53,8 @@ fun WeekView(
     semesterStartDate: Long?,
     currentWeek: Int,
     onCourseClick: (primaryCourse: Course, cluster: List<Course>) -> Unit,
-    onBlankCellClick: (dayOfWeek: Int, slotNumber: Int) -> Unit = { _, _ -> }
+    onBlankCellClick: (dayOfWeek: Int, slotNumber: Int, positionInCell: Offset) -> Unit = { _, _, _ -> },
+    pendingCell: PendingBlankCell? = null
 ) {
     val days = DayOfWeek.entries.filter { showWeekend || it.index <= 5 }
     val allCourses = clusters.flatMap { it.allCourses }
@@ -170,7 +172,11 @@ fun WeekView(
                                 val slotIndex = (offset.y / slotHPx).toInt()
                                 val slot = visibleSlots.getOrNull(slotIndex)
                                     ?: return@detectTapGestures
-                                onBlankCellClick(days[dayIndex].index, slot.slotNumber)
+                                val positionInCell = Offset(
+                                    x = ((relativeX - dayIndex * cellWidthPx) / cellWidthPx).coerceIn(0f, 1f),
+                                    y = ((offset.y - slotIndex * slotHPx) / slotHPx).coerceIn(0f, 1f)
+                                )
+                                onBlankCellClick(days[dayIndex].index, slot.slotNumber, positionInCell)
                             }
                         }
                 ) {
@@ -275,6 +281,24 @@ fun WeekView(
                             overlapCount = cluster.overlapCount
                         )
                     }
+
+                    // Layer 3: 首次点选位置的添加提示,随网格内容一起滚动。
+                    pendingCell?.takeIf { it.week == currentWeek }?.let { pending ->
+                        val dayIndex = days.indexOfFirst { it.index == pending.dayOfWeek }
+                        val rowIndex = visibleSlots.indexOfFirst { it.slotNumber == pending.slotNumber }
+                        if (dayIndex >= 0 && rowIndex >= 0) {
+                            BlankCellAddHint(
+                                cellWidth = cellWidthDp,
+                                cellHeight = slotHeight,
+                                cellLeftPx = timeColPx + dayIndex * cellWidthPx,
+                                cellTopPx = rowIndex * slotHPx,
+                                positionInCell = pending.positionInCell,
+                                onConfirm = {
+                                    onBlankCellClick(pending.dayOfWeek, pending.slotNumber, pending.positionInCell)
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -290,7 +314,8 @@ fun WeekView(
     semesterStartDate: Long?,
     currentWeek: Int,
     onCourseClick: (Course) -> Unit,
-    onBlankCellClick: (dayOfWeek: Int, slotNumber: Int) -> Unit = { _, _ -> }
+    onBlankCellClick: (dayOfWeek: Int, slotNumber: Int) -> Unit = { _, _ -> },
+    pendingCell: PendingBlankCell? = null
 ) {
     val clusters = com.chen.schedule.util.CourseConflictDetector.resolveClusters(courses)
     WeekView(
@@ -300,7 +325,8 @@ fun WeekView(
         semesterStartDate = semesterStartDate,
         currentWeek = currentWeek,
         onCourseClick = { primary, _ -> onCourseClick(primary) },
-        onBlankCellClick = onBlankCellClick
+        onBlankCellClick = { day, slot, _ -> onBlankCellClick(day, slot) },
+        pendingCell = pendingCell
     )
 }
 

@@ -60,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -95,14 +96,27 @@ fun TimetableScreen(
     val snackbar = remember { androidx.compose.material3.SnackbarHostState() }
     var pendingDelete by remember { mutableStateOf<Course?>(null) }
 
-    /** 统一的「点击空白格」入口:返回非 null 表示配置完整,可直接进入新增课程。 */
-    val handleBlankClick: (dayOfWeek: Int, slotNumber: Int) -> Unit = { day, slot ->
-        val target = viewModel.onBlankCellClick(day, slot)
-        val semester = viewModel.state.value.currentSemester
-        if (target != null && semester != null) {
-            onAddCourse(semester.id, target)
+    // 切换课表上下文或数据变化时重新预选，不让旧位置直接触发添加。
+    var pendingBlankCell by remember(
+        state.currentSemester, state.currentWeek, state.selectedDay,
+        state.isDayView, state.showWeekend, state.courses, state.timeSlots
+    ) { mutableStateOf<PendingBlankCell?>(null) }
+
+    val handleBlankClick: (Int, Int, Int, Offset) -> Unit = { week, day, slot, position ->
+        val pending = pendingBlankCell
+        if (pending != null && pending.week == week && pending.dayOfWeek == day && pending.slotNumber == slot) {
+            pendingBlankCell = null
+            viewModel.setWeek(week)
+            val target = viewModel.onBlankCellClick(day, slot)
+            val semester = viewModel.state.value.currentSemester
+            if (target != null && semester != null) {
+                onAddCourse(semester.id, target)
+            }
+        } else {
+            pendingBlankCell = PendingBlankCell(week, day, slot, position)
         }
     }
+    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { pendingBlankCell = null }
 
     LaunchedEffect(state.message) {
         if (state.message.isNotBlank()) {
@@ -123,7 +137,10 @@ fun TimetableScreen(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             if (state.currentSemester != null) FloatingActionButton(
-                onClick = { state.currentSemester?.let { onAddCourse(it.id, null) } },
+                onClick = {
+                    pendingBlankCell = null
+                    state.currentSemester?.let { onAddCourse(it.id, null) }
+                },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(Icons.Default.Add, contentDescription = "添加课程", tint = MaterialTheme.colorScheme.onPrimary)
@@ -216,12 +233,14 @@ fun TimetableScreen(
                                     isToday = week == WeekCalculator.activeWeek(semester.startDate, semester.totalWeeks) && state.selectedDay == LocalDate.now().dayOfWeek.value,
                                     clusters = viewModel.getCourseClusters(week),
                                     timeSlots = state.timeSlots,
+                                    pendingCell = pendingBlankCell?.takeIf { it.week == week && it.dayOfWeek == state.selectedDay },
                                     onCourseClick = { primary, cluster ->
+                                        pendingBlankCell = null
                                         selectedCluster = cluster
                                         activeCourseIndex = cluster.indexOfFirst { it.id == primary.id }.coerceAtLeast(0)
                                     },
-                                    onBlankCellClick = { slotNumber ->
-                                        handleBlankClick(state.selectedDay, slotNumber)
+                                    onBlankCellClick = { slotNumber, position ->
+                                        handleBlankClick(week, state.selectedDay, slotNumber, position)
                                     }
                                 )
                             }
@@ -232,12 +251,14 @@ fun TimetableScreen(
                                 showWeekend = state.showWeekend,
                                 semesterStartDate = semester.startDate,
                                 currentWeek = week,
+                                pendingCell = pendingBlankCell,
                                 onCourseClick = { primary, cluster ->
+                                    pendingBlankCell = null
                                     selectedCluster = cluster
                                     activeCourseIndex = cluster.indexOfFirst { it.id == primary.id }.coerceAtLeast(0)
                                 },
-                                onBlankCellClick = { dayOfWeek, slotNumber ->
-                                    handleBlankClick(dayOfWeek, slotNumber)
+                                onBlankCellClick = { dayOfWeek, slotNumber, position ->
+                                    handleBlankClick(week, dayOfWeek, slotNumber, position)
                                 }
                             )
                         }

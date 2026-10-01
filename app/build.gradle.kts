@@ -28,8 +28,8 @@ android {
         applicationId = "com.chen.schedule"
         minSdk = 26
         targetSdk = 34
-        versionCode = 50
-        versionName = "1.3.1"
+        versionCode = 51
+        versionName = "1.3.2"
 
         testInstrumentationRunner = "com.chen.schedule.RegressionInstrumentation"
         vectorDrawables {

@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -56,7 +57,8 @@ fun DayView(
     timeSlots: List<TimeSlot>,
     isToday: Boolean = true,
     onCourseClick: (primaryCourse: Course, cluster: List<Course>) -> Unit,
-    onBlankCellClick: (slotNumber: Int) -> Unit = {}
+    onBlankCellClick: (slotNumber: Int, positionInCell: Offset) -> Unit = { _, _ -> },
+    pendingCell: PendingBlankCell? = null
 ) {
     val allCourses = clusters.flatMap { it.allCourses }
     val visibleSlots = com.chen.schedule.util.TimetableSlots.rows(timeSlots, allCourses)
@@ -121,9 +123,11 @@ fun DayView(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 val contentWidthDp = maxWidth - DTIME_COL.dp
+                val contentWidthPx: Float
                 val timeColPx: Float
                 val slotHPx: Float
                 with(density) {
+                    contentWidthPx = contentWidthDp.toPx()
                     timeColPx = DTIME_COL.dp.toPx()
                     slotHPx = slotHeight.toPx()
                 }
@@ -133,13 +137,17 @@ fun DayView(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .pointerInput(visibleSlots, slotHPx, onBlankCellClick) {
+                        .pointerInput(visibleSlots, slotHPx, contentWidthPx, onBlankCellClick) {
                             detectTapGestures { offset ->
                                 if (offset.x < timeColPx) return@detectTapGestures
                                 val slotIndex = (offset.y / slotHPx).toInt()
                                 val slot = visibleSlots.getOrNull(slotIndex)
                                     ?: return@detectTapGestures
-                                onBlankCellClick(slot.slotNumber)
+                                val positionInCell = Offset(
+                                    x = ((offset.x - timeColPx) / contentWidthPx).coerceIn(0f, 1f),
+                                    y = ((offset.y - slotIndex * slotHPx) / slotHPx).coerceIn(0f, 1f)
+                                )
+                                onBlankCellClick(slot.slotNumber, positionInCell)
                             }
                         }
                 ) {
@@ -314,6 +322,21 @@ fun DayView(
                         }
                     }
                 }
+
+                // Layer 3: 首次点选位置的添加提示,坐标相对于当前节次。
+                pendingCell?.let { pending ->
+                    val rowIndex = visibleSlots.indexOfFirst { it.slotNumber == pending.slotNumber }
+                    if (rowIndex >= 0) {
+                        BlankCellAddHint(
+                            cellWidth = contentWidthDp,
+                            cellHeight = slotHeight,
+                            cellLeftPx = timeColPx,
+                            cellTopPx = rowIndex * slotHPx,
+                            positionInCell = pending.positionInCell,
+                            onConfirm = { onBlankCellClick(pending.slotNumber, pending.positionInCell) }
+                        )
+                    }
+                }
                 }
             }
         }
@@ -327,7 +350,8 @@ fun DayView(
     timeSlots: List<TimeSlot>,
     isToday: Boolean = true,
     onCourseClick: (Course) -> Unit,
-    onBlankCellClick: (slotNumber: Int) -> Unit = {}
+    onBlankCellClick: (slotNumber: Int) -> Unit = {},
+    pendingCell: PendingBlankCell? = null
 ) {
     val clusters = com.chen.schedule.util.CourseConflictDetector.resolveClusters(courses)
     DayView(
@@ -335,6 +359,7 @@ fun DayView(
         timeSlots = timeSlots,
         isToday = isToday,
         onCourseClick = { primary, _ -> onCourseClick(primary) },
-        onBlankCellClick = onBlankCellClick
+        onBlankCellClick = { slot, _ -> onBlankCellClick(slot) },
+        pendingCell = pendingCell
     )
 }
