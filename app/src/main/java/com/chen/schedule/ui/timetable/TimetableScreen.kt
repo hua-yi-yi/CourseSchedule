@@ -34,7 +34,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -61,7 +60,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,13 +69,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.chen.schedule.domain.model.Course
 import com.chen.schedule.domain.model.DayOfWeek
-import com.chen.schedule.domain.model.TimeSlot
 import com.chen.schedule.util.WeekCalculator
 import com.chen.schedule.ui.schedule.StatusAmber
 import com.chen.schedule.ui.schedule.StatusBadge
 import java.time.LocalDate
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -153,8 +148,12 @@ fun TimetableScreen(
                     onNavigateToScheduleConfig = onNavigateToScheduleConfig
                 )
             } else {
-                // 顶栏与今日摘要固定，课程网格独立滚动。
-                Column(modifier = Modifier.fillMaxSize()) {
+                // 整页统一滚动，紧凑顶栏随课表一起滑出屏幕。
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                ) {
                     // ===== 极简紧凑顶栏: 菜单+学期名 | ‹ 第 N 周 › 回本周 | 周末 | 视图切换 =====
                     val actualWeek = WeekCalculator.currentWeek(semester.startDate, semester.totalWeeks)
                     CompactTopBar(
@@ -167,35 +166,13 @@ fun TimetableScreen(
                         showWeekend = state.showWeekend,
                         onPrevWeek = viewModel::prevWeek,
                         onNextWeek = viewModel::nextWeek,
-                        onBackToToday = viewModel::openToday,
+                        onBackToToday = { viewModel.setWeek(actualWeek) },
                         onToggleWeekend = viewModel::toggleWeekend,
                         onToggleView = viewModel::toggleView,
                         onNavigateToImport = onNavigateToImport,
                         onNavigateToSettings = onNavigateToSettings
                     )
 
-                    var clockTick by remember { mutableStateOf(System.currentTimeMillis()) }
-                    LaunchedEffect(Unit) { while (true) { clockTick = System.currentTimeMillis(); kotlinx.coroutines.delay(30_000) } }
-                    val now = java.time.Instant.ofEpochMilli(clockTick).atZone(java.time.ZoneId.systemDefault())
-                    val todayWeek = WeekCalculator.activeWeek(semester.startDate, semester.totalWeeks, clockTick)
-                    val todayCourses = state.courses.filter { todayWeek != null && it.appliesToWeek(todayWeek) && it.dayOfWeek == now.dayOfWeek.value }
-                    val active = com.chen.schedule.reminders.ClassReminderPlanner.findCurrentOngoingCourse(clockTick, state.timeSlots, state.courses, todayWeek ?: 0, now.dayOfWeek.value)
-                    val nextCourse = todayCourses.filter { course -> state.timeSlots.find { it.slotNumber == course.startSlot }?.let { slot ->
-                        runCatching { LocalTime.parse(slot.startTime).isAfter(now.toLocalTime()) }.getOrDefault(false) } == true }.minByOrNull { it.startSlot }
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(when {
-                            todayWeek == null -> "当前不在教学期内，正在浏览课表"
-                            active != null -> "正在上课：${active.courseName} · ${active.classroom} · ${active.endTime}下课"
-                            nextCourse != null -> {
-                                val time = state.timeSlots.first { it.slotNumber == nextCourse.startSlot }.startTime
-                                val minutes = java.time.Duration.between(now.toLocalTime(), LocalTime.parse(time)).toMinutes()
-                                "下一节：${nextCourse.name} · ${nextCourse.classroom.ifBlank { "教室未填" }} · $time（约${minutes}分钟后）"
-                            }
-                            todayCourses.isEmpty() -> "今天没有课程"
-                            else -> "今日课程已结束"
-                        }, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        TextButton(onClick = viewModel::openToday) { Text("今天") }
-                    }
                     // ===== 极度跟手的真实左右滑动切周 (HorizontalPager 实时跟随手指、惯性滑动与边缘回弹) =====
                     val pagerState = rememberPagerState(
                         initialPage = (state.currentWeek - 1).coerceIn(0, (semester.totalWeeks - 1).coerceAtLeast(0))
@@ -224,12 +201,12 @@ fun TimetableScreen(
 
                     HorizontalPager(
                         state = pagerState,
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth(),
                         key = { page -> page }
                     ) { page ->
                         val week = page + 1
                         if (state.isDayView) {
-                            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
                                 DaySelector(
                                     selectedDay = state.selectedDay,
                                     onDaySelected = viewModel::selectDay,
@@ -249,7 +226,6 @@ fun TimetableScreen(
                                 )
                             }
                         } else {
-                            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                             WeekView(
                                 clusters = viewModel.getCourseClusters(week),
                                 timeSlots = state.timeSlots,
@@ -264,7 +240,6 @@ fun TimetableScreen(
                                     handleBlankClick(dayOfWeek, slotNumber)
                                 }
                             )
-                            }
                         }
                     }
                 } // 整页滚动结束
@@ -352,7 +327,7 @@ private fun TopMenu(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(44.dp)) {
+        IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(34.dp)) {
             Icon(
                 Icons.Default.Menu,
                 contentDescription = "菜单",
@@ -397,27 +372,108 @@ private fun CompactTopBar(
     onNavigateToImport: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TopMenu(onNavigateToImport = onNavigateToImport, onNavigateToSettings = onNavigateToSettings)
-            Text(semesterName + " ▾", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).clickable(onClick = onSelectSemester).padding(vertical = 12.dp))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 1. 菜单 + 学期名(极简)
+        TopMenu(
+            onNavigateToImport = onNavigateToImport,
+            onNavigateToSettings = onNavigateToSettings
+        )
+        Text(
+            semesterName,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .clickable(onClick = onSelectSemester)
+                .padding(end = 4.dp)
+        )
+
+        Spacer(Modifier.weight(1f))
+
+        // 2. 中间: 周切换 ‹ 第 N 周 › (+ 回本周微胶囊)
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onPrevWeek,
+                enabled = currentWeek > 1,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Default.ChevronLeft, "上一周",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek > 1) 1f else 0.25f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Text(
+                "第$currentWeek",
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                "/$totalWeeks",
+                fontSize = 10.5.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            IconButton(
+                onClick = onNextWeek,
+                enabled = currentWeek < totalWeeks,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Default.ChevronRight, "下一周",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (currentWeek < totalWeeks) 1f else 0.25f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            if (!isCurrentWeek) {
+                Text(
+                    "本周",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .clickable(onClick = onBackToToday)
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                )
+            }
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onPrevWeek, enabled = currentWeek > 1, modifier = Modifier.size(44.dp)) {
-                Icon(Icons.Default.ChevronLeft, "上一周")
-            }
-            Text("第 $currentWeek / $totalWeeks 周", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            IconButton(onClick = onNextWeek, enabled = currentWeek < totalWeeks, modifier = Modifier.size(44.dp)) {
-                Icon(Icons.Default.ChevronRight, "下一周")
-            }
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onToggleWeekend) { Text(if (showWeekend) "显示周末" else "仅工作日") }
-            IconButton(onClick = onToggleView, modifier = Modifier.size(44.dp)) {
-                Icon(if (isDayView) Icons.AutoMirrored.Filled.Notes else Icons.Default.DateRange,
-                    contentDescription = if (isDayView) "切换周视图" else "切换日视图")
-            }
+
+        Spacer(Modifier.weight(1f))
+
+        // 3. 右侧: 周末开关微按钮 + 视图切换微按钮
+        Text(
+            text = if (showWeekend) "周末" else "五天",
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Medium,
+            color = if (showWeekend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(if (showWeekend) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent)
+                .clickable(onClick = onToggleWeekend)
+                .padding(horizontal = 5.dp, vertical = 2.5.dp)
+        )
+
+        Spacer(Modifier.width(2.dp))
+
+        IconButton(onClick = onToggleView, modifier = Modifier.size(34.dp)) {
+            Icon(
+                if (isDayView) Icons.AutoMirrored.Filled.Notes else Icons.Default.DateRange,
+                contentDescription = if (isDayView) "切换周视图" else "切换日视图",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }

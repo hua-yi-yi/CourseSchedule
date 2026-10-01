@@ -117,7 +117,7 @@ fun DayView(
             }
 
             BoxWithConstraints(
-                // 网格独立滚动，主页顶部和周切换保持可见
+                // 垂直滚动由主页统一接管，紧凑顶栏随课表一起滑出屏幕
                 modifier = Modifier.fillMaxWidth()
             ) {
                 val contentWidthDp = maxWidth - DTIME_COL.dp
