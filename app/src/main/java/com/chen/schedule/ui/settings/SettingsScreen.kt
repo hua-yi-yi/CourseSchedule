@@ -64,6 +64,7 @@ fun SettingsScreen(
     var showWidgetGuideDialog by remember { mutableStateOf(false) }
     var showMirrorDialog by remember { mutableStateOf(false) }
     var showDonationDialog by remember { mutableStateOf(false) }
+    var showCalendarSyncDialog by remember { mutableStateOf(false) }
 
     val requestAddWidget: (Int) -> Unit = { widgetType ->
         scope.launch {
@@ -179,6 +180,15 @@ fun SettingsScreen(
             SettingsGroup(title = "数据管理") {
                 SettingsItem(title = "自动恢复点", subtitle = "最近 10 次修改前的数据，可预览后恢复",
                     onClick = { viewModel.refreshRecoveryPoints(); showRecovery = true })
+                GroupDivider()
+                SettingsItem(
+                    title = "同步到系统日历",
+                    subtitle = "直接写入手机系统日历，支持华为/小米/vivo/OPPO与手表",
+                    onClick = {
+                        viewModel.prepareCalendarSyncPreview()
+                        showCalendarSyncDialog = true
+                    }
+                )
                 GroupDivider()
                 SettingsItem(
                     title = "导出为日历 (.ics)",
@@ -298,6 +308,7 @@ fun SettingsScreen(
     }
 
     if (showClearDialog) ClearCoursesDialog(viewModel) { showClearDialog = false }
+    if (showCalendarSyncDialog) CalendarSyncDialog(viewModel) { showCalendarSyncDialog = false }
     if (showWidgetGuideDialog) WidgetGuideDialog { showWidgetGuideDialog = false }
     AppUpdateDialog(viewModel, downloadState)
     if (showMirrorDialog) MirrorSelectionDialog(viewModel) { showMirrorDialog = false }

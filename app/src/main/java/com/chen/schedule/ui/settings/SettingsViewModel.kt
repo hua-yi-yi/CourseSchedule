@@ -370,4 +370,90 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    // ===== 系统日历直接同步 =====
+    data class CalendarSyncPreview(
+        val semesterName: String,
+        val courseCount: Int,
+        val totalEvents: Int,
+        val syncedCount: Int
+    )
+
+    var calendarSyncPreview by mutableStateOf<CalendarSyncPreview?>(null); private set
+    var isCalendarSyncing by mutableStateOf(false); private set
+
+    fun prepareCalendarSyncPreview() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val sem = semesterRepository.getCurrentSemester()
+                if (sem == null) {
+                    calendarSyncPreview = null
+                    return@withContext
+                }
+                val courses = courseRepository.getCoursesBySemester(sem.id).first()
+                val slots = timeSlotRepository.getTimeSlotsBySchemeDirect(sem.schemeId)
+                val planned = com.chen.schedule.calendar.CalendarPlanner.planEvents(sem, courses, slots)
+                val syncedCount = if (com.chen.schedule.calendar.CalendarSyncManager.hasCalendarPermissions(context)) {
+                    com.chen.schedule.calendar.CalendarSyncManager.querySyncedEventCount(context, sem.id)
+                } else 0
+
+                calendarSyncPreview = CalendarSyncPreview(
+                    semesterName = sem.name,
+                    courseCount = courses.size,
+                    totalEvents = planned.size,
+                    syncedCount = syncedCount
+                )
+            }
+        }
+    }
+
+    fun syncToCalendar(reminderMinutes: Int, onComplete: (Boolean, String) -> Unit) {
+        if (isCalendarSyncing) return
+        isCalendarSyncing = true
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val sem = semesterRepository.getCurrentSemester() ?: error("未找到当前学期")
+                    val courses = courseRepository.getCoursesBySemester(sem.id).first()
+                    val slots = timeSlotRepository.getTimeSlotsBySchemeDirect(sem.schemeId)
+                    val planned = com.chen.schedule.calendar.CalendarPlanner.planEvents(sem, courses, slots)
+                    com.chen.schedule.calendar.CalendarSyncManager.syncSemesterEvents(
+                        context = context,
+                        semester = sem,
+                        events = planned,
+                        reminderMinutes = reminderMinutes
+                    ).getOrThrow()
+                }
+            }
+            isCalendarSyncing = false
+            if (result.isSuccess) {
+                val count = result.getOrDefault(0)
+                prepareCalendarSyncPreview()
+                onComplete(true, "成功将 $count 条课程日程同步至系统日历")
+            } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "同步失败"
+                onComplete(false, "同步失败: $errorMsg")
+            }
+        }
+    }
+
+    fun clearSyncedCalendar(onComplete: (Boolean, String) -> Unit) {
+        if (isCalendarSyncing) return
+        isCalendarSyncing = true
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val sem = semesterRepository.getCurrentSemester() ?: error("未找到当前学期")
+                    com.chen.schedule.calendar.CalendarSyncManager.deleteCalendar(context, sem.id)
+                }
+            }
+            isCalendarSyncing = false
+            if (result.isSuccess) {
+                prepareCalendarSyncPreview()
+                onComplete(true, "已清除系统日历中的课表日程")
+            } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "清除失败"
+                onComplete(false, "清除日历失败: $errorMsg")
+            }
+        }
+    }
 }
