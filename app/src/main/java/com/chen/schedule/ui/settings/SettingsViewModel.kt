@@ -31,7 +31,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chen.schedule.widget.WidgetUpdater
 import com.chen.schedule.reminders.ClassReminderManager
+import com.chen.schedule.reminders.ExactAlarmPermissionObserver
 import com.chen.schedule.reminders.ReminderPrefs
+import com.chen.schedule.reminders.ReminderStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 
 
@@ -49,11 +51,21 @@ class SettingsViewModel @Inject constructor(
     private val reminderPrefs by lazy { ReminderPrefs(context) }
     private val themePrefs by lazy { ThemePrefs(context) }
     private val updatePrefs by lazy { UpdatePrefs(context) }
+    private val exactAlarmPermissionObserver = ExactAlarmPermissionObserver(
+        isAllowed = { ReminderStatus.exactAllowed(context) },
+        onGranted = { ClassReminderManager.rescheduleAsync(context) }
+    )
 
     val themeConfig: StateFlow<ThemeConfig> = ThemePrefs.state
 
     var reminderStatus by mutableStateOf(""); private set
     var nextReminder by mutableStateOf(""); private set
+    fun onSettingsResume() {
+        exactAlarmPermissionObserver.onResume()
+        refreshReminderStatus()
+        refreshRecoveryPoints()
+    }
+
     fun refreshReminderStatus() {
         reminderStatus = com.chen.schedule.reminders.ReminderStatus.describe(context, reminderEnabled)
         viewModelScope.launch {

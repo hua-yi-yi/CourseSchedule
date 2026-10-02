@@ -15,7 +15,7 @@ import org.jsoup.nodes.Element
  *  - 单元格内 <br> / <div> / <p> 分隔多行信息(课程名/教师/教室/周次)
  *  - rowspan 跨行大节(如 1-2 节连排)
  *  - 周次文本如 "1-16周" / "1-8周(单)" / "2-16周（双）" / "第3周"
- *  - 同一单元格内多门课程按 3 行一组识别
+ *  - 同一单元格内多门课程分别关联各自的周次信息
  *  - 无 rowspan 且相邻行重复同一课程时自动合并
  */
 object ZhengfangPageParser {
@@ -133,32 +133,23 @@ object ZhengfangPageParser {
         }
 
         return CoursePalette.assignColors(
-            mergeAdjacentDuplicates(courses)
-                .sortedWith(compareBy({ it.dayOfWeek }, { it.startSlot }))
+            mergeAdjacentDuplicates(courses.sortedWith(compareBy({ it.dayOfWeek }, { it.startSlot })))
         )
     }
 
     /**
-     * 解析单个单元格,支持其中包含多门课程(每 3 行一组:<br> 分隔)。
+     * 解析单个单元格,周次信息只属于所在的课程块。
      */
     private fun parseCell(td: Element, day: Int, slot: Int): List<Course> {
         val lines = parseCellLines(td.html())
         if (lines.isEmpty()) return emptyList()
 
-        // 分离周次行与信息行,避免"1-16周"被当作教师/教室
-        val weekLines = lines.mapNotNull { parseWeekInfo(it) }
-        val infoLines = lines.filter { parseWeekInfo(it) == null }
-        val weekInfo = weekLines.firstOrNull() ?: DEFAULT_WEEK
-
         val rowSpan = td.attr("rowspan").toIntOrNull()?.coerceAtLeast(1) ?: 1
         val endSlot = (slot + rowSpan - 1).coerceAtLeast(slot)
 
-        // 多门课程:信息行数为 3 的倍数且 > 3 时按 3 行一组切分
-        val groups: List<List<String>> =
-            if (infoLines.size > 3 && infoLines.size % 3 == 0) infoLines.chunked(3)
-            else listOf(infoLines)
-
-        return groups.mapNotNull { info ->
+        return courseBlocks(lines).mapNotNull { block ->
+            val weekInfo = block.mapNotNull(::parseWeekInfo).singleOrNull() ?: DEFAULT_WEEK
+            val info = block.filter { parseWeekInfo(it) == null }
             val name = info.getOrNull(0) ?: return@mapNotNull null
             if (name.isBlank()) return@mapNotNull null
             Course(
@@ -173,6 +164,45 @@ object ZhengfangPageParser {
                 weekType = weekInfo.weekType
             )
         }
+    }
+
+    private fun courseBlocks(lines: List<String>): List<List<String>> {
+        val weekCount = lines.count { parseWeekInfo(it) != null }
+        val infoCount = lines.size - weekCount
+        // 单门课程兼容缺教师/教室,以及周次出现在信息行之间。
+        if (weekCount <= 1 && infoCount <= 3) return listOf(lines)
+        // 未提供周次的旧格式仍按课程名、教师、教室分组。
+        if (weekCount == 0 && infoCount % 3 == 0) return lines.chunked(3)
+
+        fun valid(blocks: List<List<String>>) = blocks.isNotEmpty() && blocks.all { block ->
+            block.count { parseWeekInfo(it) != null } == 1 &&
+                block.count { parseWeekInfo(it) == null } in 1..3
+        }
+
+        // 常见格式:每门课程以自己的周次行结束,字段缺失也不会串到下一门。
+        val endingBlocks = mutableListOf<List<String>>()
+        var start = 0
+        lines.forEachIndexed { index, line ->
+            if (parseWeekInfo(line) != null) {
+                endingBlocks += lines.subList(start, index + 1)
+                start = index + 1
+            }
+        }
+        if (start == lines.size && valid(endingBlocks)) return endingBlocks
+
+        // 也兼容周次在每个课程块开头的格式。
+        if (parseWeekInfo(lines.first()) != null) {
+            val starts = lines.indices.filter { parseWeekInfo(lines[it]) != null } + lines.size
+            val startingBlocks = starts.zipWithNext { from, to -> lines.subList(from, to) }
+            if (valid(startingBlocks)) return startingBlocks
+        }
+
+        // 完整四行块允许周次夹在课程名、教师和教室之间。
+        if (lines.size % 4 == 0) {
+            val blocks = lines.chunked(4)
+            if (valid(blocks)) return blocks
+        }
+        throw IllegalArgumentException("同一单元格的多门课程无法分别关联周次，请检查课表格式")
     }
 
     /** 合并无 rowspan 时相邻行重复出现的同一课程(如 1、2 节重复渲染) */

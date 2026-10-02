@@ -31,7 +31,7 @@ object ScheduleStatus {
     data class SchemeCheck(
         val done: Boolean,
         val issues: List<Issue>,
-        /** 课程用到但方案缺失的节次编号(升序)。 */
+        /** 课程用到但方案缺失的节次编号(升序);异常大的范围只列边界。 */
         val missingSlots: List<Int>
     )
 
@@ -116,12 +116,15 @@ object ScheduleStatus {
 
         // 覆盖课程使用的节次
         val availableNumbers = slots.map { it.slotNumber }.toSet()
-        val usedNumbers = courses.flatMap { course ->
-            if (course.endSlot < course.startSlot) emptyList()
-            else (course.startSlot..course.endSlot).toList()
-        }.filter { it > 0 }
+        val usedNumbers = courses.flatMap(TimetableSlots::courseNumbers)
         missingSlots = usedNumbers.filterNot { it in availableNumbers }.distinct().sorted()
-        if (missingSlots.isNotEmpty()) issues += Issue.SLOT_COVERAGE_MISSING
+        // Compare counts for the full range, even when only its boundaries are shown above.
+        val coverageMissing = courses.any { course ->
+            val start = course.startSlot.coerceAtLeast(1)
+            val count = course.endSlot.toLong() - start + 1
+            count > 0 && availableNumbers.count { it in start..course.endSlot }.toLong() != count
+        }
+        if (coverageMissing) issues += Issue.SLOT_COVERAGE_MISSING
 
         return SchemeCheck(issues.isEmpty(), issues, missingSlots)
     }

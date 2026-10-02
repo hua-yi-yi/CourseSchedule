@@ -1,9 +1,9 @@
 {
-  "versionName": "1.3.2",
-  "versionTag": "v1.3.2",
-  "title": "v1.3.2 · 添加课程防误触",
-  "publishedAt": "2026-10-01",
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.2/CourseSchedule-v1.3.2.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.2",
-  "changelog": "- 课表空白格改为两次确认：第一次在点击位置显示加号，再点同格才进入添加课程；点击其他空格只移动加号，减少误触。\n- 周视图和日视图都支持该交互，加号跟随课表滚动，并按实际查看的星期、节次和周次预填课程。\n- 切周、切日、切视图、切换学期或作息，以及离开主页或查看已有课程时清除预选，避免旧位置误触。"
+  "versionName": "1.3.3",
+  "versionTag": "v1.3.3",
+  "title": "v1.3.3 · 导入、恢复与提醒修复",
+  "publishedAt": "2026-10-03",
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.3/CourseSchedule-v1.3.3.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.3",
+  "changelog": "- 正方导入的每门课程分别保留周次与单双周，修复连续课程合并。\n- 完整备份在预览和恢复前按各学期作息校验课程范围，保留旧备份和空课程学期兼容。\n- 防止异常大的节次范围导致课表内存耗尽。\n- 更新服务器返回无效版本信息时自动尝试备用来源，避免误报最新版本。\n- 获得精确闹钟授权后立即重新安排提醒。"
 }

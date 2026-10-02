@@ -22,4 +22,16 @@ class TimetableSlotsTest {
             startWeek = 1, endWeek = 18)
         assertEquals(listOf(1, 2, 3, 4), TimetableSlots.rows(slots(1, 4), listOf(course)).map { it.slotNumber })
     }
+
+    @Test(timeout = 1000) fun hugeLegacyRangeKeepsBoundariesWithoutAllocatingEveryRow() {
+        val course = Course(name = "异常旧数据", startSlot = 1, endSlot = Int.MAX_VALUE)
+        assertEquals(listOf(1, 2, Int.MAX_VALUE),
+            TimetableSlots.rows(slots(1, 2), listOf(course)).map { it.slotNumber })
+    }
+
+    @Test fun sparseHighSlotNumbersWithShortRangeRemainVisible() {
+        val course = Course(name = "自定义编号", startSlot = 10000, endSlot = 10002)
+        assertEquals(listOf(10000, 10001, 10002),
+            TimetableSlots.rows(emptyList(), listOf(course)).map { it.slotNumber })
+    }
 }

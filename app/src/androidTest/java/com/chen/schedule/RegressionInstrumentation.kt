@@ -34,8 +34,10 @@ class RegressionInstrumentation : Instrumentation() {
             "reviewedUpdatesScopesAndRecovery" to { reviewedUpdates() },
             "backupRoundTripAndRollback" to { backupRoundTrip() },
             "legacyBackupWithAndWithoutCourses" to { legacyBackup() },
+            "invalidFullBackupRejectedBeforeWrites" to { invalidFullBackup() },
             "importValidationDeduplicationAndRollback" to { importValidation() },
             "reminderBroadcastBoundaries" to { reminderBroadcastBoundaries() },
+            "exactAlarmPermissionReceiver" to { com.chen.schedule.reminders.exactAlarmPermissionReceiverRegression(targetContext) },
             "apkCacheIdentityAndCorruption" to { apkCacheValidation() }
         )
         var failures = 0
@@ -193,7 +195,7 @@ class RegressionInstrumentation : Instrumentation() {
             val legacySemester = Semester(id = 42, name = "备份学期", startDate = 1725235200000,
                 totalWeeks = 20, isCurrent = true)
             val legacySlot = TimeSlot(slotNumber = 1, startTime = "08:00", endTime = "08:45")
-            val legacyCourse = Course(name = "备份课程", semesterId = 42)
+            val legacyCourse = Course(name = "备份课程", semesterId = 42, endSlot = 1)
             val backup = ScheduleBackup(semester = legacySemester, courses = listOf(legacyCourse),
                 timeSlots = listOf(legacySlot))
             val content = Json.encodeToString(ScheduleBackup.serializer(), backup)
@@ -212,6 +214,53 @@ class RegressionInstrumentation : Instrumentation() {
             check(semesters.getAllSemesters().first().single().name == "备份学期")
             check(courses.getAllCourses().first().isEmpty())
             check(slots.getAllTimeSlots().first().single { it.schemeId == 0L }.startTime == "08:00")
+        } finally { file.delete(); db.close() }
+    }
+
+    private fun invalidFullBackup() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(targetContext, AppDatabase::class.java).build()
+        val file = File.createTempFile("invalid-full-backup", ".json", targetContext.cacheDir)
+        try {
+            val courses = CourseRepository(db.courseDao())
+            val semesters = SemesterRepository(db.semesterDao())
+            val slots = TimeSlotRepository(db.timeSlotDao())
+            val schemes = TimeSchemeRepository(db, db.timeSchemeDao(), db.timeSlotDao(), db.semesterDao(), db.courseDao())
+            val service = ScheduleBackupService(db, courses, semesters, slots, schemes, targetContext)
+            val id = semesters.insert(Semester(name = "保留学期", startDate = 1725235200000, totalWeeks = 16))
+            semesters.setCurrentSemester(id)
+            slots.insertAll(listOf(
+                TimeSlot(slotNumber = 1, startTime = "08:00", endTime = "08:45"),
+                TimeSlot(slotNumber = 2, startTime = "08:55", endTime = "09:40")
+            ))
+            courses.insert(Course(name = "保留课程", semesterId = id))
+            service.exportToUri(Uri.fromFile(file))
+            val valid = Json.decodeFromString(ScheduleBackup.serializer(), file.readText())
+            val originalCourse = valid.allCourses.single()
+            val beforeSemesters = semesters.getAllSemesters().first()
+            val beforeCourses = courses.getAllCourses().first()
+            val beforeSchemes = schemes.getAllSchemesDirect()
+            val beforeSlots = slots.getAllTimeSlots().first()
+            val beforeRecoveryPoints = service.recoveryPoints()
+            val invalidCourses = listOf(
+                originalCourse.copy(endSlot = 3),
+                originalCourse.copy(endSlot = Int.MAX_VALUE),
+                originalCourse.copy(endWeek = 17),
+                originalCourse.copy(endWeek = 54)
+            )
+            for (invalid in invalidCourses) {
+                file.writeText(Json.encodeToString(ScheduleBackup.serializer(), valid.copy(allCourses = listOf(invalid))))
+                check(runCatching { service.previewRestore(Uri.fromFile(file)) }.isFailure)
+                check(runCatching { service.importData(Uri.fromFile(file)) }.isFailure)
+                check(semesters.getAllSemesters().first() == beforeSemesters)
+                check(courses.getAllCourses().first() == beforeCourses)
+                check(schemes.getAllSchemesDirect() == beforeSchemes)
+                check(slots.getAllTimeSlots().first() == beforeSlots)
+                check(service.recoveryPoints() == beforeRecoveryPoints)
+            }
+            file.writeText(Json.encodeToString(ScheduleBackup.serializer(), valid))
+            val preview = service.previewRestore(Uri.fromFile(file))
+            check(service.importData(Uri.fromFile(file), preview.digest).count == 1)
+            check(courses.getAllCourses().first().single().name == "保留课程")
         } finally { file.delete(); db.close() }
     }
 

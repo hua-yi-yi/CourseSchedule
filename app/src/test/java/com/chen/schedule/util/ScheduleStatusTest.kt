@@ -119,6 +119,20 @@ class ScheduleStatusTest {
         assertTrue(check.issues.contains(ScheduleStatus.Issue.SLOT_COVERAGE_MISSING))
     }
 
+    @Test(timeout = 1000) fun hugeRangeIsIncompleteEvenWhenBothBoundariesAreConfigured() {
+        val check = ScheduleStatus.checkScheme(
+            semester(),
+            listOf(
+                TimeSlot(slotNumber = 1, startTime = "08:00", endTime = "08:45"),
+                TimeSlot(slotNumber = Int.MAX_VALUE, startTime = "09:00", endTime = "09:45")
+            ),
+            listOf(course(1, Int.MAX_VALUE))
+        )
+        assertFalse(check.done)
+        assertTrue(check.issues.contains(ScheduleStatus.Issue.SLOT_COVERAGE_MISSING))
+        assertTrue(check.missingSlots.isEmpty())
+    }
+
     @Test fun isSlotsValidMatchesCheckRules() {
         assertTrue(ScheduleStatus.isSlotsValid(slots("08:00" to "08:45", "08:55" to "09:40")))
         assertFalse(ScheduleStatus.isSlotsValid(emptyList()))

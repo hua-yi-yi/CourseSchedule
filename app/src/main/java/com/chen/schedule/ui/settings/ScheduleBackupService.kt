@@ -98,14 +98,23 @@ class ScheduleBackupService @Inject constructor(
     private fun digest(text: String): String = java.security.MessageDigest.getInstance("SHA-256")
         .digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 
+    private suspend fun validateFullBackup(data: ScheduleBackup) {
+        val builtInSlots = TimeSchemeTemplates.builtIns.associate {
+            it.name to TimeSchemeTemplates.slotsOf(it.startTimes)
+        }.toMutableMap()
+        timeSchemeRepository.getAllSchemesDirect().filter { it.isBuiltIn }.forEach { scheme ->
+            builtInSlots[scheme.name] = timeSlotRepository.getTimeSlotsBySchemeDirect(scheme.id)
+        }
+        ScheduleBackupValidator.validate(data, builtInSlots)
+    }
+
     suspend fun previewRestore(uri: Uri): RestorePreview = withContext(Dispatchers.IO) {
         val text = requireNotNull(context.contentResolver.openInputStream(uri)).bufferedReader().use { it.readText() }
         val format = Json { ignoreUnknownKeys = true }
         val element = format.parseToJsonElement(text)
         val summary = if (ScheduleBackupFormat.isFullBackup(element)) {
             val data = format.decodeFromString(ScheduleBackup.serializer(), text)
-            require(data.backupVersion in ScheduleBackup.LEGACY_VERSION..ScheduleBackup.CURRENT_VERSION) { "不支持此备份版本" }
-            BackupRestorePlanner.validateReferences(data)
+            database.withTransaction { validateFullBackup(data) }
             val semesters = data.semesters.ifEmpty { listOf(data.semester) }
             val courses = data.allCourses.ifEmpty { data.courses }
             "完整恢复：${semesters.size} 个学期、${courses.size} 条课程安排、${data.schemes.size} 套作息。\n学期：${semesters.joinToString { it.name }}\n恢复后当前学期：${data.semester.name}\n将替换本机全部学期、课程与作息。"
@@ -128,47 +137,13 @@ class ScheduleBackupService @Inject constructor(
             val element = format.parseToJsonElement(jsonString)
             val backup = if (ScheduleBackupFormat.isFullBackup(element))
                 format.decodeFromString(ScheduleBackup.serializer(), jsonString) else null
-            require(backup == null || backup.backupVersion in
-                ScheduleBackup.LEGACY_VERSION..ScheduleBackup.CURRENT_VERSION) { "不支持此备份版本" }
             val courses = backup?.courses ?: JsonImporter.parse(jsonString).getOrThrow()
             require(backup != null || courses.isNotEmpty()) { "未找到课程，未修改现有数据" }
-            // 完整备份要校验备份中的全部课程(跨学期),而不仅是当前学期
-            val coursesToValidate = backup?.let {
-                if (it.allCourses.isNotEmpty()) it.allCourses else it.courses
-            } ?: courses
-            require(coursesToValidate.all { it.name.isNotBlank() && it.dayOfWeek in 1..7 && it.startSlot > 0 && it.endSlot >= it.startSlot && it.startWeek > 0 && it.endWeek >= it.startWeek }) { "课程数据无效" }
-            backup?.let { data ->
-                BackupRestorePlanner.validateReferences(data)
-                require(data.semester.totalWeeks in 1..53) { "学期周数无效" }
-                val semestersInBackup = if (data.semesters.isNotEmpty()) data.semesters else listOf(data.semester)
-                require(semestersInBackup.all { it.totalWeeks in 1..53 }) { "学期周数无效" }
-                require(semestersInBackup.all { it.name.isNotBlank() }) { "学期名称无效" }
-                val isNewFormat = data.backupVersion >= 2
-                if (isNewFormat) {
-                    // 新版:各方案各自校验(不同方案可以都有「第1节」,合在一起会误报重复)。
-                    data.schemeSlots.forEach { entry ->
-                        if (entry.slots.isNotEmpty()) {
-                            require(com.chen.schedule.util.ScheduleStatus.isSlotsValid(entry.slots)) {
-                                "作息方案(编号 ${entry.schemeId})节次无效"
-                            }
-                        }
-                    }
-                    // 「原有作息」桶同样按单套校验
-                    val legacy = data.schemeSlots.firstOrNull { it.schemeId == 0L }?.slots
-                        ?: data.timeSlots.filter { it.schemeId == 0L }
-                    if (legacy.isNotEmpty()) {
-                        require(com.chen.schedule.util.ScheduleStatus.isSlotsValid(legacy)) {
-                            "原有作息节次无效"
-                        }
-                    }
-                } else {
-                    // 旧备份:只有单套作息,走原有解析器校验
-                    if (data.timeSlots.isNotEmpty()) com.chen.schedule.util.TimeSlotParser.parse(
-                        data.timeSlots.joinToString("\n") { slot -> "${slot.slotNumber} ${slot.startTime}-${slot.endTime}" })
-                }
-            }
             database.withTransaction {
-                if (backup == null) {
+                if (backup != null) {
+                    // Revalidate against the schemes actually reused, before a snapshot or any writes.
+                    validateFullBackup(backup)
+                } else {
                     val current = semesterRepository.getCurrentSemester() ?: error("请先创建学期")
                     CourseImportRules.validateForSemester(courses, current, timeSlotRepository.getTimeSlotsBySchemeDirect(current.schemeId))
                 }

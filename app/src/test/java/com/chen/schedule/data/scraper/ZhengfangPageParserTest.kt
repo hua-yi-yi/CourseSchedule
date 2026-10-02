@@ -3,6 +3,7 @@ package com.chen.schedule.data.scraper
 import com.chen.schedule.domain.model.WeekType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class ZhengfangPageParserTest {
@@ -147,6 +148,120 @@ class ZhengfangPageParserTest {
         assertEquals(1, courses.size)
         assertEquals(1, courses[0].startSlot)
         assertEquals(2, courses[0].endSlot)
+    }
+
+    @Test
+    fun `同一单元格的多门课程分别保留各自周次`() {
+        val html = """
+            <table id="Table1"><tr><td>1</td><td>
+            课程甲<br>甲老师<br>甲教室<br>1-8周(单)<br>
+            课程乙<br>乙老师<br>乙教室<br>9-16周(双)
+            </td></tr></table>
+        """.trimIndent()
+        val courses = ZhengfangPageParser.parseCourses(html)
+        assertEquals(2, courses.size)
+        val first = courses.single { it.name == "课程甲" }
+        assertEquals("甲老师", first.teacher)
+        assertEquals("甲教室", first.classroom)
+        assertEquals(1, first.startWeek)
+        assertEquals(8, first.endWeek)
+        assertEquals(WeekType.ODD, first.weekType)
+        val second = courses.single { it.name == "课程乙" }
+        assertEquals("乙老师", second.teacher)
+        assertEquals("乙教室", second.classroom)
+        assertEquals(9, second.startWeek)
+        assertEquals(16, second.endWeek)
+        assertEquals(WeekType.EVEN, second.weekType)
+    }
+
+    @Test
+    fun `多门课程缺少教师和教室仍分别关联周次`() {
+        val html = """
+            <table id="Table1"><tr><td>1</td><td>
+            课程甲<br>1-8周(单)<br>课程乙<br>9-16周(双)
+            </td></tr></table>
+        """.trimIndent()
+        val courses = ZhengfangPageParser.parseCourses(html)
+        assertEquals(listOf("课程甲", "课程乙"), courses.map { it.name })
+        assertEquals(listOf(WeekType.ODD, WeekType.EVEN), courses.map { it.weekType })
+        assertEquals(listOf(1, 9), courses.map { it.startWeek })
+        assertEquals(listOf(8, 16), courses.map { it.endWeek })
+        assertEquals(listOf("", ""), courses.map { it.teacher })
+        assertEquals(listOf("", ""), courses.map { it.classroom })
+    }
+
+    @Test
+    fun `单门课程的周次夹在信息行中保持兼容`() {
+        val html = """
+            <table id="Table1"><tr><td>1</td><td>
+            课程甲<br>1-8周(单)<br>甲老师<br>甲教室
+            </td></tr></table>
+        """.trimIndent()
+        val course = ZhengfangPageParser.parseCourses(html).single()
+        assertEquals("课程甲", course.name)
+        assertEquals("甲老师", course.teacher)
+        assertEquals("甲教室", course.classroom)
+        assertEquals(WeekType.ODD, course.weekType)
+    }
+
+    @Test
+    fun `多门课程的周次在块开头或信息之间仍分别关联`() {
+        val cells = listOf(
+            "1-8周(单)<br>课程甲<br>甲老师<br>甲教室<br>9-16周(双)<br>课程乙<br>乙老师<br>乙教室",
+            "课程甲<br>1-8周(单)<br>甲老师<br>甲教室<br>课程乙<br>9-16周(双)<br>乙老师<br>乙教室"
+        )
+        cells.forEach { cell ->
+            val courses = ZhengfangPageParser.parseCourses(
+                "<table id='Table1'><tr><td>1</td><td>$cell</td></tr></table>"
+            )
+            assertEquals(listOf("课程甲", "课程乙"), courses.map { it.name })
+            assertEquals(listOf("甲老师", "乙老师"), courses.map { it.teacher })
+            assertEquals(listOf("甲教室", "乙教室"), courses.map { it.classroom })
+            assertEquals(listOf(1, 9), courses.map { it.startWeek })
+            assertEquals(listOf(8, 16), courses.map { it.endWeek })
+            assertEquals(listOf(WeekType.ODD, WeekType.EVEN), courses.map { it.weekType })
+        }
+    }
+
+    @Test
+    fun `未提供周次的多门课程保持旧格式兼容`() {
+        val html = """
+            <table id="Table1"><tr><td>1</td><td>
+            课程甲<br>甲老师<br>甲教室<br>课程乙<br>乙老师<br>乙教室
+            </td></tr></table>
+        """.trimIndent()
+        val courses = ZhengfangPageParser.parseCourses(html)
+        assertEquals(listOf("课程甲", "课程乙"), courses.map { it.name })
+        assertEquals(listOf(1, 1), courses.map { it.startWeek })
+        assertEquals(listOf(16, 16), courses.map { it.endWeek })
+        assertEquals(listOf(WeekType.ALL, WeekType.ALL), courses.map { it.weekType })
+    }
+
+    @Test
+    fun `多门课程只有一条周次时拒绝歧义`() {
+        val html = """
+            <table id="Table1"><tr><td>1</td><td>
+            课程甲<br>甲老师<br>甲教室<br>课程乙<br>乙老师<br>乙教室<br>1-8周(单)
+            </td></tr></table>
+        """.trimIndent()
+        assertThrows(IllegalArgumentException::class.java) { ZhengfangPageParser.parseCourses(html) }
+    }
+
+    @Test
+    fun `周二课程穿插时周一相邻重复课程仍合并`() {
+        val html = """
+            <table id="Table1">
+            <tr><td>1</td><td>英语听说<br>1-16周</td><td>周二课程<br>1-16周</td></tr>
+            <tr><td>2</td><td>英语听说<br>1-16周</td><td></td></tr>
+            </table>
+        """.trimIndent()
+        val courses = ZhengfangPageParser.parseCourses(html)
+        assertEquals(2, courses.size)
+        val english = courses.single { it.name == "英语听说" }
+        assertEquals(1, english.dayOfWeek)
+        assertEquals(1, english.startSlot)
+        assertEquals(2, english.endSlot)
+        assertEquals(2, courses.single { it.name == "周二课程" }.dayOfWeek)
     }
 
     @Test

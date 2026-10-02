@@ -55,7 +55,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-        viewModel.refreshReminderStatus(); viewModel.refreshRecoveryPoints()
+        viewModel.onSettingsResume()
     }
     val scope = rememberCoroutineScope()
     val downloadState by viewModel.downloadState.collectAsState()
