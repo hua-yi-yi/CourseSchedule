@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,7 +72,7 @@ internal fun CalendarSyncDialog(
                 }
             }
         } else {
-            Toast.makeText(context, "未获得日历权限，无法写入系统日历", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "未获得日历读写权限，无法同步到系统日历。请在系统应用设置中开启「日历」权限。", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -105,7 +106,11 @@ internal fun CalendarSyncDialog(
             }
         },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
                 if (preview == null) {
                     Text("未找到当前学期，请先在「学期与作息」中配置当前学期。", fontSize = 13.sp)
                 } else {
@@ -137,7 +142,15 @@ internal fun CalendarSyncDialog(
                                     "预计生成：${preview.totalEvents} 条日程",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = if (preview.totalEvents > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                )
+                            }
+                            if (preview.totalEvents == 0) {
+                                Text(
+                                    "当前学期暂无可同步的课程日程，请先在课表中添加课程后再进行同步。",
+                                    fontSize = 11.5.sp,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
                             if (preview.syncedCount > 0) {
@@ -239,6 +252,7 @@ internal fun CalendarSyncDialog(
             if (preview != null && !isSyncing) {
                 Button(
                     onClick = onStartSync,
+                    enabled = preview.totalEvents > 0,
                     shape = MaterialTheme.shapes.medium
                 ) {
                     Text(if (preview.syncedCount > 0) "重新覆盖同步" else "立即同步", fontSize = 13.sp)

@@ -59,9 +59,15 @@ object CalendarPlanner {
                 LocalTime.parse(startTimeStr.padStart(5, '0'))
             }.getOrDefault(LocalTime.of(8, 0))
 
-            val endLocalTime = runCatching {
+            val rawEndLocalTime = runCatching {
                 LocalTime.parse(endTimeStr.padStart(5, '0'))
             }.getOrDefault(startLocalTime.plusMinutes(45))
+
+            val endLocalTime = if (rawEndLocalTime.isAfter(startLocalTime)) {
+                rawEndLocalTime
+            } else {
+                startLocalTime.plusMinutes(45)
+            }
 
             val slotRangeLabel = if (course.endSlot > course.startSlot) {
                 "第 ${course.startSlot}-${course.endSlot} 节"
@@ -89,7 +95,7 @@ object CalendarPlanner {
                 planned.add(
                     CalendarEventItem(
                         courseId = course.id,
-                        title = course.name,
+                        title = course.name.ifBlank { "未命名课程" },
                         location = course.classroom,
                         description = desc,
                         startMillis = startZdt.toInstant().toEpochMilli(),

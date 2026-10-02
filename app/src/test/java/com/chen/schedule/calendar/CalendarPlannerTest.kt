@@ -144,4 +144,76 @@ class CalendarPlannerTest {
         val events = CalendarPlanner.planEvents(semester, listOf(mondayLater, nextWeekCourse, mondayEarlier), slots, testZone)
         assertEquals(listOf(2L, 1L, 3L), events.map { it.courseId })
     }
+
+    @Test
+    fun planCourse_blankNameDefaultsToFallback() {
+        val course = Course(
+            id = 501L,
+            name = "   ",
+            dayOfWeek = 1,
+            startSlot = 1,
+            endSlot = 1,
+            startWeek = 1,
+            endWeek = 1,
+            weekType = WeekType.ALL
+        )
+        val events = CalendarPlanner.planEvents(semester, listOf(course), slots, testZone)
+        assertEquals(1, events.size)
+        assertEquals("未命名课程", events.first().title)
+    }
+
+    @Test
+    fun planCourse_invalidWeekRangeProducesNoEvents() {
+        val course = Course(
+            id = 502L,
+            name = "无效周次",
+            dayOfWeek = 1,
+            startSlot = 1,
+            endSlot = 2,
+            startWeek = 10,
+            endWeek = 5,
+            weekType = WeekType.ALL
+        )
+        val events = CalendarPlanner.planEvents(semester, listOf(course), slots, testZone)
+        assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun planCourse_endBeforeStartCorrectsSafely() {
+        val abnormalSlots = listOf(
+            TimeSlot(slotNumber = 1, startTime = "10:00", endTime = "09:00") // 异常节次
+        )
+        val course = Course(
+            id = 503L,
+            name = "异常节次课程",
+            dayOfWeek = 1,
+            startSlot = 1,
+            endSlot = 1,
+            startWeek = 1,
+            endWeek = 1,
+            weekType = WeekType.ALL
+        )
+        val events = CalendarPlanner.planEvents(semester, listOf(course), abnormalSlots, testZone)
+        assertEquals(1, events.size)
+        val event = events.first()
+        assertTrue("结束时间必须晚于开始时间", event.endMillis > event.startMillis)
+        assertEquals(event.startMillis + 45 * 60 * 1000L, event.endMillis)
+    }
+
+    @Test
+    fun planCourse_missingSlotsInSchemeDefaultsSafely() {
+        val course = Course(
+            id = 504L,
+            name = "越界节次课程",
+            dayOfWeek = 1,
+            startSlot = 99,
+            endSlot = 99,
+            startWeek = 1,
+            endWeek = 1,
+            weekType = WeekType.ALL
+        )
+        val events = CalendarPlanner.planEvents(semester, listOf(course), slots, testZone)
+        assertEquals(1, events.size)
+        assertTrue(events.first().endMillis > events.first().startMillis)
+    }
 }
