@@ -20,6 +20,9 @@ import kotlinx.coroutines.flow.StateFlow
 import com.chen.schedule.ui.theme.BackgroundPreset
 import com.chen.schedule.ui.theme.ThemeConfig
 import com.chen.schedule.ui.theme.ThemePrefs
+import com.chen.schedule.ui.theme.WidgetBackgroundMode
+import com.chen.schedule.ui.theme.WidgetTextContrast
+import com.chen.schedule.util.BackgroundFileManager
 import com.chen.schedule.data.repository.CourseRepository
 import com.chen.schedule.data.repository.SemesterRepository
 import com.chen.schedule.data.repository.TimeSlotRepository
@@ -251,6 +254,77 @@ class SettingsViewModel @Inject constructor(
 
     fun updateBackgroundPreset(preset: BackgroundPreset) {
         themePrefs.backgroundPresetId = preset.id
+    }
+
+    fun setCustomBackground(uri: Uri) {
+        viewModelScope.launch {
+            val path = withContext(Dispatchers.IO) {
+                BackgroundFileManager.saveBackgroundFromUri(context, uri, isWidget = false)
+            }
+            if (path != null) {
+                themePrefs.customBackgroundPath = path
+                if (themePrefs.widgetBackgroundMode == WidgetBackgroundMode.APP_IMAGE) {
+                    WidgetUpdater.refreshAll(context)
+                }
+            } else {
+                dataMessage = "图片加载失败，请重试"
+            }
+        }
+    }
+
+    fun clearCustomBackground() {
+        BackgroundFileManager.clearBackground(context, isWidget = false)
+        themePrefs.customBackgroundPath = null
+        if (themePrefs.widgetBackgroundMode == WidgetBackgroundMode.APP_IMAGE) {
+            viewModelScope.launch { WidgetUpdater.refreshAll(context) }
+        }
+    }
+
+    fun updateBackgroundDim(dim: Float) {
+        themePrefs.backgroundDim = dim
+    }
+
+    fun updateCardAlpha(alpha: Float) {
+        themePrefs.cardAlpha = alpha
+    }
+
+    fun updateWidgetBackgroundMode(mode: WidgetBackgroundMode) {
+        themePrefs.widgetBackgroundMode = mode
+        viewModelScope.launch { WidgetUpdater.refreshAll(context) }
+    }
+
+    fun setWidgetCustomBackground(uri: Uri) {
+        viewModelScope.launch {
+            val path = withContext(Dispatchers.IO) {
+                BackgroundFileManager.saveBackgroundFromUri(context, uri, isWidget = true)
+            }
+            if (path != null) {
+                themePrefs.widgetCustomBgPath = path
+                themePrefs.widgetBackgroundMode = WidgetBackgroundMode.CUSTOM_IMAGE
+                WidgetUpdater.refreshAll(context)
+            } else {
+                dataMessage = "小组件壁纸加载失败，请重试"
+            }
+        }
+    }
+
+    fun clearWidgetCustomBackground() {
+        BackgroundFileManager.clearBackground(context, isWidget = true)
+        themePrefs.widgetCustomBgPath = null
+        if (themePrefs.widgetBackgroundMode == WidgetBackgroundMode.CUSTOM_IMAGE) {
+            themePrefs.widgetBackgroundMode = WidgetBackgroundMode.DEFAULT
+        }
+        viewModelScope.launch { WidgetUpdater.refreshAll(context) }
+    }
+
+    fun updateWidgetOpacity(opacity: Float) {
+        themePrefs.widgetOpacity = opacity
+        viewModelScope.launch { WidgetUpdater.refreshAll(context) }
+    }
+
+    fun updateWidgetTextContrast(contrast: WidgetTextContrast) {
+        themePrefs.widgetTextContrast = contrast
+        viewModelScope.launch { WidgetUpdater.refreshAll(context) }
     }
 
     /** 开关上课提醒:立即重排/取消今天的提醒闹钟。 */

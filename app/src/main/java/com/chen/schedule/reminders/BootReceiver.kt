@@ -19,6 +19,9 @@ class BootReceiver : BroadcastReceiver() {
             try {
                 ClassReminderManager.rescheduleNow(appContext)
                 WidgetUpdater.refreshAll(appContext)
+                if (com.chen.schedule.island.IslandPrefs.init(appContext).enabled) {
+                    com.chen.schedule.island.CapsuleIslandManager.start(appContext)
+                }
             } finally {
                 pending.finish()
             }

@@ -14,6 +14,10 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- 应用内静默更新:下载完成后调用系统安装器安装更新包 -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- 桌面悬浮胶囊灵动岛 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <!-- 软件包可见性 (Android 11+ / API 30+): 允许查询与拉起微信客户端 -->
     <queries>
@@ -94,6 +98,16 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- 桌面悬浮胶囊灵动岛后台服务 -->
+        <service
+            android:name=".island.CapsuleIslandService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="floating_capsule_island_for_class_schedule" />
+        </service>
 
         <!-- 应用内更新:提供本地 APK 临时读取 Uri 供系统安装器解析 -->
         <provider

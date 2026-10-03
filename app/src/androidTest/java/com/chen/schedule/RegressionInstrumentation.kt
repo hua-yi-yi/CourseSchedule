@@ -38,7 +38,8 @@ class RegressionInstrumentation : Instrumentation() {
             "importValidationDeduplicationAndRollback" to { importValidation() },
             "reminderBroadcastBoundaries" to { reminderBroadcastBoundaries() },
             "exactAlarmPermissionReceiver" to { com.chen.schedule.reminders.exactAlarmPermissionReceiverRegression(targetContext) },
-            "apkCacheIdentityAndCorruption" to { apkCacheValidation() }
+            "apkCacheIdentityAndCorruption" to { apkCacheValidation() },
+            "capsuleIslandRegression" to { capsuleIslandRegression() }
         )
         var failures = 0
         tests.forEachIndexed { index, (name, test) ->
@@ -332,4 +333,99 @@ class RegressionInstrumentation : Instrumentation() {
             check(downloader.checkExistingCompletedApk("v$version") == null)
         } finally { scratch.deleteRecursively() }
     }
+
+    private fun capsuleIslandRegression() {
+        val prefs = com.chen.schedule.island.IslandPrefs.init(targetContext)
+        val origEnabled = prefs.enabled
+        val origLead = prefs.leadMinutes
+        try {
+            prefs.enabled = true
+            check(prefs.enabled)
+            prefs.leadMinutes = 25
+            check(prefs.leadMinutes == 25)
+            prefs.positionY = 120
+            check(prefs.positionY == 120)
+            prefs.mockMode = true
+            prefs.mockState = 0
+            check(prefs.mockMode)
+            check(prefs.mockState == 0)
+
+            val dummyCourse = Course(
+                id = 999L,
+                name = "高等数学",
+                teacher = "陈老师",
+                classroom = "教一 101",
+                dayOfWeek = 1,
+                startSlot = 1,
+                endSlot = 2,
+                color = 0xFF3B82F6
+            )
+
+            // View instantiation, state rendering and click events on Main UI thread
+            runOnMainSync {
+                val view = com.chen.schedule.island.CapsuleIslandView(targetContext)
+                check(view.visibility == android.view.View.VISIBLE)
+                val ongoingState = com.chen.schedule.island.IslandState.Ongoing(
+                    course = dummyCourse,
+                    courseName = dummyCourse.name,
+                    classroom = dummyCourse.classroom,
+                    teacher = dummyCourse.teacher,
+                    slotRange = "第 1-2 节",
+                    startTime = "08:00",
+                    endTime = "09:40",
+                    startMillis = System.currentTimeMillis() - 40 * 60 * 1000L,
+                    endMillis = System.currentTimeMillis() + 60 * 60 * 1000L,
+                    remainingMinutes = 60,
+                    totalMinutes = 100,
+                    progress = 0.40f,
+                    color = dummyCourse.color,
+                    compactText = "高数 · 剩60分",
+                    subText = "@A101 · 09:40下课"
+                )
+                view.updateState(ongoingState)
+                // Test expand click
+                view.performClick()
+                // Test Upcoming state
+                val upcomingState = com.chen.schedule.island.IslandState.Upcoming(
+                    course = dummyCourse,
+                    courseName = dummyCourse.name,
+                    classroom = dummyCourse.classroom,
+                    teacher = dummyCourse.teacher,
+                    slotRange = "第 3-4 节",
+                    startTime = "10:00",
+                    endTime = "11:40",
+                    startMillis = System.currentTimeMillis() + 15 * 60 * 1000L,
+                    minutesUntilStart = 15,
+                    color = dummyCourse.color,
+                    compactText = "15分后 · 高数",
+                    subText = "@A101 · 10:00上课"
+                )
+                view.updateState(upcomingState)
+                // Test Idle state
+                view.updateState(
+                    com.chen.schedule.island.IslandState.Idle(
+                        todayTotalCourses = 4,
+                        finishedCourses = 2,
+                        nextCourse = dummyCourse,
+                        nextCourseStartTime = "14:00",
+                        compactText = "下节 14:00",
+                        subText = "今日还剩 2 节课"
+                    )
+                )
+                // Test None state
+                view.updateState(com.chen.schedule.island.IslandState.None)
+            }
+
+            // Test CapsuleIslandManager API calls
+            com.chen.schedule.island.CapsuleIslandManager.refresh(targetContext)
+            com.chen.schedule.island.CapsuleIslandManager.setMockTest(targetContext, true, 0)
+            com.chen.schedule.island.CapsuleIslandManager.stop(targetContext)
+            check(!prefs.enabled)
+        } finally {
+            prefs.enabled = origEnabled
+            prefs.leadMinutes = origLead
+            prefs.mockMode = false
+        }
+    }
 }
+

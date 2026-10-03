@@ -54,7 +54,8 @@ fun WeekView(
     currentWeek: Int,
     onCourseClick: (primaryCourse: Course, cluster: List<Course>) -> Unit,
     onBlankCellClick: (dayOfWeek: Int, slotNumber: Int, positionInCell: Offset) -> Unit = { _, _, _ -> },
-    pendingCell: PendingBlankCell? = null
+    pendingCell: PendingBlankCell? = null,
+    cardAlpha: Float = 1.0f
 ) {
     val days = DayOfWeek.entries.filter { showWeekend || it.index <= 5 }
     val allCourses = clusters.flatMap { it.allCourses }
@@ -77,7 +78,11 @@ fun WeekView(
             .padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 4.dp),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (cardAlpha < 1.0f) {
+                MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha)
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
         )
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -85,7 +90,13 @@ fun WeekView(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .background(
+                        if (cardAlpha < 1.0f) {
+                            MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.85f * cardAlpha)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        }
+                    )
                     .height((36 * density.fontScale.coerceAtLeast(1f)).dp)
             ) {
                 Box(

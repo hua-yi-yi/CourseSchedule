@@ -220,6 +220,11 @@ fun SettingsScreen(
 
             ReminderSettings(viewModel) { notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
 
+            Spacer(Modifier.height(16.dp))
+
+            // ===== 胶囊灵动岛 =====
+            IslandSettings()
+
             // ===== 桌面小组件 =====
             SettingsGroup(title = "桌面小组件") {
                 SettingsItem(

@@ -1,9 +1,9 @@
 {
-  "versionName": "1.3.4",
-  "versionTag": "v1.3.4",
-  "title": "v1.3.4 · 系统日历同步与交互体验全面优化",
-  "publishedAt": "2026-10-03",
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.4/CourseSchedule-v1.3.4.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.4",
-  "changelog": "- 新增系统日历一键直接同步功能，支持独立日历账户与权限引导。\n- 优化课表主页交互：学期下拉微胶囊指示、日视图公历日期对齐、空课表新手引导与课程详情弹窗布局。\n- 优化空白格快速加课直接触控响应、弹性缩放动效与自适应提示标签。\n- 课程编辑数字选择器支持整行任意位置直接点选弹出、选项格式化高亮与课程名实时校验。\n- 导入核对列表支持一键全选/反选与整行触控，手工修改弹窗升级为星期芯片与规范数字输入；粘贴导入支持格式智能识别。\n- 初始设置向导支持结构化作息微调与已配置学期概览卡片。"
+  "versionName": "1.3.5",
+  "versionTag": "v1.3.5",
+  "title": "v1.3.5 · 胶囊灵动岛与个性化自定义背景",
+  "publishedAt": "2026-10-04",
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.5/CourseSchedule-v1.3.5.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.5",
+  "changelog": "- 新增胶囊灵动岛：支持桌面全局悬浮胶囊与应用内流体胶囊，精准计算上课倒计时、进度条与提前候课提示。\n- 胶囊灵动岛支持紧凑胶囊与展开大卡片平滑切换动画、触控交互与一键回跳课表，具备完善防崩溃与熄屏 0 功耗监听。\n- 新增课表自定义背景图片：支持本地图片导入、透明度与高斯模糊实时调节，配合半透明磨砂卡片保障壁纸下课表文字清晰度。\n- 新增桌面小组件（Widget）自定义背景与透明度调节，课表变更自动刷新组件。\n- 设置页新增灵动岛专区，支持悬浮窗权限检查与跳转授权、提前提醒时间自定义与一键模拟测试。"
 }

@@ -58,7 +58,8 @@ fun DayView(
     isToday: Boolean = true,
     onCourseClick: (primaryCourse: Course, cluster: List<Course>) -> Unit,
     onBlankCellClick: (slotNumber: Int, positionInCell: Offset) -> Unit = { _, _ -> },
-    pendingCell: PendingBlankCell? = null
+    pendingCell: PendingBlankCell? = null,
+    cardAlpha: Float = 1.0f
 ) {
     val allCourses = clusters.flatMap { it.allCourses }
     val visibleSlots = com.chen.schedule.util.TimetableSlots.rows(timeSlots, allCourses)
@@ -82,7 +83,11 @@ fun DayView(
             .padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 4.dp),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (cardAlpha < 1.0f) {
+                MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha)
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
         )
     ) {
         Column(modifier = Modifier.fillMaxSize()) {

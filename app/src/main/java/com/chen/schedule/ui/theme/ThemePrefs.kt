@@ -30,14 +30,58 @@ enum class BackgroundPreset(
     }
 }
 
+/**
+ * 桌面小组件背景风格模式。
+ */
+enum class WidgetBackgroundMode(val id: Int, val label: String) {
+    DEFAULT(0, "跟随系统"),
+    TRANSPARENT(1, "全透明"),
+    TRANSLUCENT_LIGHT(2, "半透浅色"),
+    TRANSLUCENT_DARK(3, "半透深色"),
+    SOLID_WHITE(4, "纯白卡片"),
+    SOLID_BLACK(5, "极夜纯黑"),
+    APP_IMAGE(6, "使用应用壁纸"),
+    CUSTOM_IMAGE(7, "独立小组件壁纸");
+
+    companion object {
+        fun fromId(id: Int): WidgetBackgroundMode = entries.firstOrNull { it.id == id } ?: DEFAULT
+    }
+}
+
+/**
+ * 桌面小组件文字高对比度选项。
+ */
+enum class WidgetTextContrast(val id: Int, val label: String) {
+    AUTO(0, "自动适应"),
+    LIGHT(1, "浅色文字 (适合暗色壁纸)"),
+    DARK(2, "深色文字 (适合浅色壁纸)");
+
+    companion object {
+        fun fromId(id: Int): WidgetTextContrast = entries.firstOrNull { it.id == id } ?: AUTO
+    }
+}
+
 data class ThemeConfig(
     val themeMode: Int = ThemePrefs.THEME_MODE_LIGHT,
-    val backgroundPreset: BackgroundPreset = BackgroundPreset.DEFAULT
+    val backgroundPreset: BackgroundPreset = BackgroundPreset.DEFAULT,
+    /** 应用自定义壁纸文件绝对路径 */
+    val customBackgroundPath: String? = null,
+    /** 壁纸遮罩暗度 (0.0f 完全无遮罩 ~ 0.8f 较深遮罩，默认 0.25f) */
+    val backgroundDim: Float = 0.25f,
+    /** 课表卡片不透明度 (0.2f 高透 ~ 1.0f 纯色不透，默认 0.85f) */
+    val cardAlpha: Float = 0.85f,
+    /** 小组件背景模式 */
+    val widgetBackgroundMode: WidgetBackgroundMode = WidgetBackgroundMode.DEFAULT,
+    /** 小组件专属壁纸绝对路径 (用于 CUSTOM_IMAGE 模式) */
+    val widgetCustomBgPath: String? = null,
+    /** 小组件底板不透明度 (0.0f - 1.0f) */
+    val widgetOpacity: Float = 1.0f,
+    /** 小组件文字对比度模式 */
+    val widgetTextContrast: WidgetTextContrast = WidgetTextContrast.AUTO
 )
 
 /**
- * 外观主题与背景底色偏好设置。
- * 默认设为浅色模式(THEME_MODE_LIGHT)，彻底告别开屏纯黑背景。
+ * 外观主题、自定义背景与小组件背景偏好设置。
  */
 class ThemePrefs(context: Context) {
     private val prefs: SharedPreferences =
@@ -57,9 +101,65 @@ class ThemePrefs(context: Context) {
             _state.value = currentConfig()
         }
 
+    var customBackgroundPath: String?
+        get() = prefs.getString(KEY_CUSTOM_BG_PATH, null)?.takeIf { it.isNotBlank() }
+        set(value) {
+            prefs.edit().putString(KEY_CUSTOM_BG_PATH, value).apply()
+            _state.value = currentConfig()
+        }
+
+    var backgroundDim: Float
+        get() = prefs.getFloat(KEY_BG_DIM, 0.25f)
+        set(value) {
+            prefs.edit().putFloat(KEY_BG_DIM, value.coerceIn(0f, 0.8f)).apply()
+            _state.value = currentConfig()
+        }
+
+    var cardAlpha: Float
+        get() = prefs.getFloat(KEY_CARD_ALPHA, 0.85f)
+        set(value) {
+            prefs.edit().putFloat(KEY_CARD_ALPHA, value.coerceIn(0.2f, 1.0f)).apply()
+            _state.value = currentConfig()
+        }
+
+    var widgetBackgroundMode: WidgetBackgroundMode
+        get() = WidgetBackgroundMode.fromId(prefs.getInt(KEY_WIDGET_BG_MODE, WidgetBackgroundMode.DEFAULT.id))
+        set(value) {
+            prefs.edit().putInt(KEY_WIDGET_BG_MODE, value.id).apply()
+            _state.value = currentConfig()
+        }
+
+    var widgetCustomBgPath: String?
+        get() = prefs.getString(KEY_WIDGET_CUSTOM_BG_PATH, null)?.takeIf { it.isNotBlank() }
+        set(value) {
+            prefs.edit().putString(KEY_WIDGET_CUSTOM_BG_PATH, value).apply()
+            _state.value = currentConfig()
+        }
+
+    var widgetOpacity: Float
+        get() = prefs.getFloat(KEY_WIDGET_OPACITY, 1.0f)
+        set(value) {
+            prefs.edit().putFloat(KEY_WIDGET_OPACITY, value.coerceIn(0f, 1.0f)).apply()
+            _state.value = currentConfig()
+        }
+
+    var widgetTextContrast: WidgetTextContrast
+        get() = WidgetTextContrast.fromId(prefs.getInt(KEY_WIDGET_TEXT_CONTRAST, WidgetTextContrast.AUTO.id))
+        set(value) {
+            prefs.edit().putInt(KEY_WIDGET_TEXT_CONTRAST, value.id).apply()
+            _state.value = currentConfig()
+        }
+
     fun currentConfig(): ThemeConfig = ThemeConfig(
         themeMode = themeMode,
-        backgroundPreset = BackgroundPreset.fromId(backgroundPresetId)
+        backgroundPreset = BackgroundPreset.fromId(backgroundPresetId),
+        customBackgroundPath = customBackgroundPath,
+        backgroundDim = backgroundDim,
+        cardAlpha = cardAlpha,
+        widgetBackgroundMode = widgetBackgroundMode,
+        widgetCustomBgPath = widgetCustomBgPath,
+        widgetOpacity = widgetOpacity,
+        widgetTextContrast = widgetTextContrast
     )
 
     init {
@@ -73,6 +173,14 @@ class ThemePrefs(context: Context) {
 
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_BG_PRESET = "background_preset"
+        private const val KEY_CUSTOM_BG_PATH = "custom_bg_path"
+        private const val KEY_BG_DIM = "bg_dim"
+        private const val KEY_CARD_ALPHA = "card_alpha"
+
+        private const val KEY_WIDGET_BG_MODE = "widget_bg_mode"
+        private const val KEY_WIDGET_CUSTOM_BG_PATH = "widget_custom_bg_path"
+        private const val KEY_WIDGET_OPACITY = "widget_opacity"
+        private const val KEY_WIDGET_TEXT_CONTRAST = "widget_text_contrast"
 
         private val _state = MutableStateFlow(ThemeConfig())
         val state: StateFlow<ThemeConfig> = _state.asStateFlow()

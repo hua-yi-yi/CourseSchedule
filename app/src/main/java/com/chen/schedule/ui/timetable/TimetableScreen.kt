@@ -76,6 +76,7 @@ import com.chen.schedule.domain.model.DayOfWeek
 import com.chen.schedule.util.WeekCalculator
 import com.chen.schedule.ui.schedule.StatusAmber
 import com.chen.schedule.ui.schedule.StatusBadge
+import com.chen.schedule.ui.theme.ThemePrefs
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,6 +94,8 @@ fun TimetableScreen(
     viewModel: TimetableViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val themeConfig by ThemePrefs.state.collectAsState()
+    val hasCustomBg = !themeConfig.customBackgroundPath.isNullOrBlank()
     var selectedCluster by remember { mutableStateOf<List<Course>?>(null) }
     var activeCourseIndex by remember { mutableStateOf(0) }
     var pendingCancel by remember { mutableStateOf<Course?>(null) }
@@ -137,7 +140,7 @@ fun TimetableScreen(
         dismissButton = { TextButton(onClick = { pendingCancel = null }) { Text("保留") } }) }
     Scaffold(
         snackbarHost = { androidx.compose.material3.SnackbarHost(snackbar) },
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = if (hasCustomBg) Color.Transparent else MaterialTheme.colorScheme.background,
         floatingActionButton = {
             if (state.currentSemester != null) FloatingActionButton(
                 onClick = {
@@ -192,6 +195,21 @@ fun TimetableScreen(
                         onNavigateToImport = onNavigateToImport,
                         onNavigateToSettings = onNavigateToSettings
                     )
+
+                    // ===== 应用内胶囊灵动岛 =====
+                    val islandConfig by com.chen.schedule.island.IslandPrefs.state.collectAsState()
+                    if (islandConfig.inAppEnabled) {
+                        com.chen.schedule.island.InAppCapsuleIsland(
+                            courses = state.courses,
+                            timeSlots = state.timeSlots,
+                            currentWeek = state.currentWeek,
+                            leadMinutes = islandConfig.leadMinutes,
+                            onCourseClick = { course ->
+                                selectedCluster = listOf(course)
+                                activeCourseIndex = 0
+                            }
+                        )
+                    }
 
                     // 本学期暂无课程时显示直观的新手引导卡片
                     if (state.courses.isEmpty()) {
@@ -293,6 +311,7 @@ fun TimetableScreen(
                                     clusters = viewModel.getCourseClusters(week),
                                     timeSlots = state.timeSlots,
                                     pendingCell = pendingBlankCell?.takeIf { it.week == week && it.dayOfWeek == state.selectedDay },
+                                    cardAlpha = if (hasCustomBg) themeConfig.cardAlpha else 1.0f,
                                     onCourseClick = { primary, cluster ->
                                         pendingBlankCell = null
                                         selectedCluster = cluster
@@ -311,6 +330,7 @@ fun TimetableScreen(
                                 semesterStartDate = semester.startDate,
                                 currentWeek = week,
                                 pendingCell = pendingBlankCell,
+                                cardAlpha = if (hasCustomBg) themeConfig.cardAlpha else 1.0f,
                                 onCourseClick = { primary, cluster ->
                                     pendingBlankCell = null
                                     selectedCluster = cluster
