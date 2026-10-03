@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -170,7 +171,11 @@ fun CourseEditScreen(
                 onValueChange = viewModel::updateName,
                 label = { Text("课程名称 *") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                isError = state.error != null && state.name.isBlank(),
+                supportingText = if (state.error != null && state.name.isBlank()) {
+                    { Text("请输入课程名称", color = MaterialTheme.colorScheme.error) }
+                } else null
             )
 
             Spacer(Modifier.height(12.dp))
@@ -239,6 +244,7 @@ fun CourseEditScreen(
                     onValueChange = viewModel::updateStartSlot,
                     range = 1..(state.slotNumbers.maxOrNull() ?: 1),
                     choices = state.slotNumbers,
+                    formatter = { "第 $it 节" },
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(12.dp))
@@ -248,6 +254,7 @@ fun CourseEditScreen(
                     onValueChange = viewModel::updateEndSlot,
                     range = 1..(state.slotNumbers.maxOrNull() ?: 1),
                     choices = state.slotNumbers,
+                    formatter = { "第 $it 节" },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -262,6 +269,7 @@ fun CourseEditScreen(
                     value = state.startWeek,
                     onValueChange = viewModel::updateStartWeek,
                     range = 1..state.totalWeeks,
+                    formatter = { "第 $it 周" },
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(12.dp))
@@ -270,6 +278,7 @@ fun CourseEditScreen(
                     value = state.endWeek,
                     onValueChange = viewModel::updateEndWeek,
                     range = 1..state.totalWeeks,
+                    formatter = { "第 $it 周" },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -423,41 +432,66 @@ fun NumberPicker(
     onValueChange: (Int) -> Unit,
     range: IntRange,
     choices: List<Int> = range.toList(),
+    formatter: (Int) -> String = { "$it" },
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    OutlinedTextField(
-        value = value.toString(),
-        onValueChange = {
-            it.toIntOrNull()?.let { v ->
-                if (v in range) onValueChange(v)
-            }
-        },
-        label = { Text(label) },
-        modifier = modifier,
-        singleLine = true,
-        readOnly = true,
-        trailingIcon = {
-            Box(modifier = Modifier.clickable { expanded = true }) {
+    Box(modifier = modifier) {
+        OutlinedTextField(
+            value = formatter(value),
+            onValueChange = {},
+            label = { Text(label) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            readOnly = true,
+            trailingIcon = {
                 Icon(
                     Icons.Default.ArrowDropDown,
                     contentDescription = "选择",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp).padding(end = 4.dp)
+                    modifier = Modifier.size(20.dp)
                 )
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    choices.forEach { n ->
-                        DropdownMenuItem(
-                            text = { Text("$n") },
-                            onClick = {
-                                onValueChange(n)
-                                expanded = false
-                            }
+            }
+        )
+        // 覆盖整个输入框的可点击透明层，点击任意位置（文字、标签、空白、箭头）均可触发选择菜单
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clip(MaterialTheme.shapes.extraSmall)
+                .clickable { expanded = true }
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.heightIn(max = 280.dp)
+        ) {
+            choices.forEach { n ->
+                val isSelected = n == value
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            formatter(n),
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
+                    },
+                    trailingIcon = if (isSelected) {
+                        {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    } else null,
+                    onClick = {
+                        onValueChange(n)
+                        expanded = false
                     }
-                }
+                )
             }
         }
-    )
+    }
 }

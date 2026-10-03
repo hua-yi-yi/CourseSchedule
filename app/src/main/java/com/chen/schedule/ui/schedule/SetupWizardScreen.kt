@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
 import com.chen.schedule.util.WeekCalculator
 import androidx.compose.foundation.verticalScroll
@@ -403,22 +404,96 @@ fun SetupWizardScreen(
                             onSelectScheme = viewModel::selectScheme
                         )
                         var adjusting by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-                        TextButton(onClick = { adjusting = !adjusting }) { Text(if (adjusting) "收起作息调整" else "在这里调整作息时间") }
-                        if (adjusting) state.schemeSlots.forEach { slot ->
-                            Text("第 ${slot.slotNumber} 节")
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(slot.startTime, { viewModel.updateSlot(slot.slotNumber, start = it) }, label = { Text("开始 HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
-                                OutlinedTextField(slot.endTime, { viewModel.updateSlot(slot.slotNumber, end = it) }, label = { Text("结束 HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
+                        TextButton(
+                            onClick = { adjusting = !adjusting },
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            Text(if (adjusting) "收起作息调整 ▲" else "微调各节起止时间 ▼")
+                        }
+                        if (adjusting) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    state.schemeSlots.sortedBy { it.slotNumber }.forEach { slot ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                "第 ${slot.slotNumber} 节",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.width(64.dp)
+                                            )
+                                            OutlinedTextField(
+                                                value = slot.startTime,
+                                                onValueChange = { viewModel.updateSlot(slot.slotNumber, start = it) },
+                                                label = { Text("开始") },
+                                                singleLine = true,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            OutlinedTextField(
+                                                value = slot.endTime,
+                                                onValueChange = { viewModel.updateSlot(slot.slotNumber, end = it) },
+                                                label = { Text("结束") },
+                                                singleLine = true,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                    else -> Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                        Text("${state.name} · ${viewModel.formatDate(state.dateMillis)}起 · ${state.totalWeeks}周")
-                        Text(state.dateMillis?.let { WeekCalculator.activeWeek(it, state.totalWeeks) }?.let { "今天为第 $it 周" } ?: "今天不在教学期内")
+                    else -> Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    "已配置学期",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "${state.name} · ${viewModel.formatDate(state.dateMillis)} 开学 · 共 ${state.totalWeeks} 周",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    state.dateMillis?.let { WeekCalculator.activeWeek(it, state.totalWeeks) }?.let { "今天为第 $it 周" } ?: "今天不在教学期内",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                         ImportStep(
-                        importMode = importMode,
-                        onPickMode = { importMode = it }
-                    )
+                            importMode = importMode,
+                            onPickMode = { importMode = it }
+                        )
                     }
                 }
             }

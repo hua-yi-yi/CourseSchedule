@@ -25,9 +25,12 @@ import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
@@ -190,6 +193,60 @@ fun TimetableScreen(
                         onNavigateToSettings = onNavigateToSettings
                     )
 
+                    // 本学期暂无课程时显示直观的新手引导卡片
+                    if (state.courses.isEmpty()) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "本学期暂无课程",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        "点击空白格子即可添加，或直接导入课表",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                TextButton(
+                                    onClick = onNavigateToImport
+                                ) {
+                                    Text("导入课表")
+                                }
+                            }
+                        }
+                    }
+
                     // ===== 极度跟手的真实左右滑动切周 (HorizontalPager 实时跟随手指、惯性滑动与边缘回弹) =====
                     val pagerState = rememberPagerState(
                         initialPage = (state.currentWeek - 1).coerceIn(0, (semester.totalWeeks - 1).coerceAtLeast(0))
@@ -227,7 +284,9 @@ fun TimetableScreen(
                                 DaySelector(
                                     selectedDay = state.selectedDay,
                                     onDaySelected = viewModel::selectDay,
-                                    showWeekend = state.showWeekend
+                                    showWeekend = state.showWeekend,
+                                    semesterStartDate = semester.startDate,
+                                    currentWeek = week
                                 )
                                 DayView(
                                     isToday = week == WeekCalculator.activeWeek(semester.startDate, semester.totalWeeks) && state.selectedDay == LocalDate.now().dayOfWeek.value,
@@ -399,23 +458,34 @@ private fun CompactTopBar(
             .padding(start = 4.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 1. 菜单 + 学期名(极简)
+        // 1. 菜单 + 学期名(带切换提示图标)
         TopMenu(
             onNavigateToImport = onNavigateToImport,
             onNavigateToSettings = onNavigateToSettings
         )
-        Text(
-            semesterName,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Row(
             modifier = Modifier
                 .weight(1f, fill = false)
+                .clip(RoundedCornerShape(6.dp))
                 .clickable(onClick = onSelectSemester)
-                .padding(end = 4.dp)
-        )
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                semesterName,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Icon(
+                Icons.Default.ArrowDropDown,
+                contentDescription = "切换学期",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+        }
 
         Spacer(Modifier.weight(1f))
 
@@ -505,10 +575,15 @@ private fun CompactTopBar(
 private fun DaySelector(
     selectedDay: Int,
     onDaySelected: (Int) -> Unit,
-    showWeekend: Boolean = false
+    showWeekend: Boolean = false,
+    semesterStartDate: Long? = null,
+    currentWeek: Int = 1
 ) {
     val days = DayOfWeek.entries.filter { showWeekend || it.index <= 5 }
-    val todayIndex = LocalDate.now().dayOfWeek.value
+    val today = LocalDate.now()
+    val semesterMonday = semesterStartDate?.let {
+        com.chen.schedule.util.WeekCalculator.semesterMonday(it)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -517,7 +592,8 @@ private fun DaySelector(
     ) {
         days.forEach { day ->
             val selected = selectedDay == day.index
-            val isToday = day.index == todayIndex
+            val date = semesterMonday?.plusDays(((currentWeek - 1) * 7 + (day.index - 1)).toLong())
+            val isToday = date == today || (date == null && day.index == today.dayOfWeek.value)
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -533,20 +609,33 @@ private fun DaySelector(
                     .padding(vertical = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    day.label,
-                    fontSize = 11.5.sp,
-                    fontWeight = when {
-                        selected -> FontWeight.Bold
-                        isToday -> FontWeight.SemiBold
-                        else -> FontWeight.Normal
-                    },
-                    color = when {
-                        selected -> MaterialTheme.colorScheme.onPrimary
-                        isToday -> MaterialTheme.colorScheme.primary
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        day.label,
+                        fontSize = 11.5.sp,
+                        fontWeight = when {
+                            selected -> FontWeight.Bold
+                            isToday -> FontWeight.SemiBold
+                            else -> FontWeight.Normal
+                        },
+                        color = when {
+                            selected -> MaterialTheme.colorScheme.onPrimary
+                            isToday -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                    if (date != null) {
+                        Text(
+                            "${date.monthValue}/${date.dayOfMonth}",
+                            fontSize = 9.sp,
+                            color = when {
+                                selected -> MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
+                                isToday -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            }
+                        )
                     }
-                )
+                }
             }
         }
     }
@@ -622,13 +711,13 @@ private fun CourseDetailDialog(
     AlertDialog(
         onDismissRequest = { onDismiss(currentCourse) },
         shape = RoundedCornerShape(22.dp),
-        title = if (cluster.size > 1) {
-            {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (cluster.size > 1) {
                     IconButton(
                         onClick = {
                             if (pagerState.currentPage > 0) {
@@ -638,7 +727,7 @@ private fun CourseDetailDialog(
                             }
                         },
                         enabled = pagerState.currentPage > 0,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(36.dp)
                     ) {
                         Icon(Icons.Default.ChevronLeft, contentDescription = "上一门")
                     }
@@ -666,13 +755,30 @@ private fun CourseDetailDialog(
                             }
                         },
                         enabled = pagerState.currentPage < cluster.size - 1,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(36.dp)
                     ) {
                         Icon(Icons.Default.ChevronRight, contentDescription = "下一门")
                     }
+                } else {
+                    Text(
+                        "课程详情",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                IconButton(
+                    onClick = { onDismiss(currentCourse) },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "关闭",
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
-        } else null,
+        },
         text = {
             HorizontalPager(
                 state = pagerState,
@@ -740,15 +846,23 @@ private fun CourseDetailDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onEdit(currentCourse) }) { Text("调课 / 换教室 / 编辑") }
-            TextButton(onClick = { onCancelOnce(currentCourse) }) { Text("本周停课") }
+            Button(onClick = { onEdit(currentCourse) }) {
+                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("编辑 / 调课")
+            }
         },
         dismissButton = {
-            Row {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = { onDelete(currentCourse) }) {
                     Text("删除", color = MaterialTheme.colorScheme.error)
                 }
-                TextButton(onClick = { onDismiss(currentCourse) }) { Text("关闭") }
+                TextButton(onClick = { onCancelOnce(currentCourse) }) {
+                    Text("本周停课")
+                }
+                TextButton(onClick = { onDismiss(currentCourse) }) {
+                    Text("关闭")
+                }
             }
         }
     )

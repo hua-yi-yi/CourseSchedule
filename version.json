@@ -1,9 +1,9 @@
 {
-  "versionName": "1.3.3",
-  "versionTag": "v1.3.3",
-  "title": "v1.3.3 · 导入、恢复与提醒修复",
+  "versionName": "1.3.4",
+  "versionTag": "v1.3.4",
+  "title": "v1.3.4 · 系统日历同步与交互体验全面优化",
   "publishedAt": "2026-10-03",
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.3/CourseSchedule-v1.3.3.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.3",
-  "changelog": "- 正方导入的每门课程分别保留周次与单双周，修复连续课程合并。\n- 完整备份在预览和恢复前按各学期作息校验课程范围，保留旧备份和空课程学期兼容。\n- 防止异常大的节次范围导致课表内存耗尽。\n- 更新服务器返回无效版本信息时自动尝试备用来源，避免误报最新版本。\n- 获得精确闹钟授权后立即重新安排提醒。"
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.4/CourseSchedule-v1.3.4.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.4",
+  "changelog": "- 新增系统日历一键直接同步功能，支持独立日历账户与权限引导。\n- 优化课表主页交互：学期下拉微胶囊指示、日视图公历日期对齐、空课表新手引导与课程详情弹窗布局。\n- 优化空白格快速加课直接触控响应、弹性缩放动效与自适应提示标签。\n- 课程编辑数字选择器支持整行任意位置直接点选弹出、选项格式化高亮与课程名实时校验。\n- 导入核对列表支持一键全选/反选与整行触控，手工修改弹窗升级为星期芯片与规范数字输入；粘贴导入支持格式智能识别。\n- 初始设置向导支持结构化作息微调与已配置学期概览卡片。"
 }
