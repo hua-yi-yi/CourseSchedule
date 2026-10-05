@@ -24,10 +24,21 @@ import java.util.UUID
 
 /** 无额外测试框架依赖的真机回归入口；只创建隔离数据库，不读取用户课表。 */
 class RegressionInstrumentation : Instrumentation() {
-    override fun onCreate(arguments: Bundle?) { super.onCreate(arguments); start() }
+    private var testArguments = Bundle()
+    override fun onCreate(arguments: Bundle?) {
+        testArguments = arguments ?: Bundle()
+        super.onCreate(arguments)
+        start()
+    }
 
     override fun onStart() {
-        val tests = listOf<Pair<String, () -> Unit>>(
+        val tests = if (testArguments.getString("testFilter") == "islandPermissionProbe")
+            listOf("islandPermissionProbe" to {
+                com.chen.schedule.island.islandPermissionProbe(targetContext,
+                    testArguments.getString("expectedSound", "true").toBoolean(),
+                    testArguments.getString("expectedSystem", "true").toBoolean())
+            })
+        else listOf<Pair<String, () -> Unit>>(
             "migration1to4" to { migration(1) },
             "migration2to4" to { migration(2) },
             "migration3to4" to { migration(3) },
@@ -39,6 +50,7 @@ class RegressionInstrumentation : Instrumentation() {
             "reminderBroadcastBoundaries" to { reminderBroadcastBoundaries() },
             "exactAlarmPermissionReceiver" to { com.chen.schedule.reminders.exactAlarmPermissionReceiverRegression(targetContext) },
             "apkCacheIdentityAndCorruption" to { apkCacheValidation() },
+            "islandRuntimeAndMigration" to { com.chen.schedule.island.islandRuntimeRegression(this) },
             "capsuleIslandRegression" to { capsuleIslandRegression() }
         )
         var failures = 0
@@ -338,6 +350,8 @@ class RegressionInstrumentation : Instrumentation() {
         val prefs = com.chen.schedule.island.IslandPrefs.init(targetContext)
         val origEnabled = prefs.enabled
         val origLead = prefs.leadMinutes
+        val origPosition = prefs.positionY
+        val origMode = prefs.mode
         try {
             prefs.enabled = true
             check(prefs.enabled)
@@ -420,11 +434,13 @@ class RegressionInstrumentation : Instrumentation() {
             com.chen.schedule.island.CapsuleIslandManager.refresh(targetContext)
             com.chen.schedule.island.CapsuleIslandManager.setMockTest(targetContext, true, 0)
             com.chen.schedule.island.CapsuleIslandManager.stop(targetContext)
-            check(!prefs.enabled)
+            check(prefs.enabled) // stopping the service must not change user intent
         } finally {
             prefs.enabled = origEnabled
             prefs.leadMinutes = origLead
-            prefs.mockMode = false
+            prefs.positionY = origPosition
+            prefs.mode = origMode
+            com.chen.schedule.island.CapsuleIslandManager.setMockTest(targetContext, false)
         }
     }
 }

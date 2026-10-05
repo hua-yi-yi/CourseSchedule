@@ -34,7 +34,8 @@ class CapsuleIslandView(context: Context) : FrameLayout(context) {
         private set
 
     var onToggleExpand: ((Boolean) -> Unit)? = null
-    var onDragPositionChanged: ((newX: Int, newY: Int) -> Unit)? = null
+    /** 每次回调仅传递自上次回调以来的位移，避免重复累计手势起点位移。 */
+    var onDragPositionChanged: ((deltaX: Int, deltaY: Int) -> Unit)? = null
     var onOpenApp: (() -> Unit)? = null
     var onCloseRequested: (() -> Unit)? = null
 
@@ -66,8 +67,12 @@ class CapsuleIslandView(context: Context) : FrameLayout(context) {
     // 拖拽手势判定
     private var initialTouchX = 0f
     private var initialTouchY = 0f
+    private var emittedDragX = 0
+    private var emittedDragY = 0
     private var isDragging = false
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private var availableWidth = context.resources.displayMetrics.widthPixels
+    private var availableHeight = context.resources.displayMetrics.heightPixels
 
     init {
         layoutTransition = LayoutTransition().apply {
@@ -161,6 +166,7 @@ class CapsuleIslandView(context: Context) : FrameLayout(context) {
                 addView(tvExpandedTitle)
 
                 btnMinimize = ImageView(context).apply {
+                    contentDescription = "收起课程胶囊"
                     setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_island_close))
                     setColorFilter(Color.parseColor("#94A3B8"))
                     layoutParams = LinearLayout.LayoutParams(dp(24f), dp(24f))
@@ -325,6 +331,30 @@ class CapsuleIslandView(context: Context) : FrameLayout(context) {
         return layout to text
     }
 
+    /** WindowManager 的窗口内容也必须适配安全区，不能只夹取左上角。 */
+    fun setAvailableBounds(width: Int, height: Int) {
+        val safeWidth = width.coerceAtLeast(1)
+        val safeHeight = height.coerceAtLeast(1)
+        if (availableWidth == safeWidth && availableHeight == safeHeight) return
+        availableWidth = safeWidth
+        availableHeight = safeHeight
+        expandedContainer.layoutParams = expandedContainer.layoutParams.apply {
+            this.width = dp(310f).coerceAtMost(safeWidth)
+        }
+        tvCompactTitle.maxWidth = (safeWidth - dp(110f)).coerceAtLeast(1).coerceAtMost(dp(190f))
+        requestLayout()
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        fun boundedSpec(spec: Int, limit: Int): Int {
+            val mode = MeasureSpec.getMode(spec)
+            val size = if (mode == MeasureSpec.UNSPECIFIED) limit
+            else MeasureSpec.getSize(spec).coerceAtMost(limit)
+            return MeasureSpec.makeMeasureSpec(size, if (mode == MeasureSpec.EXACTLY) mode else MeasureSpec.AT_MOST)
+        }
+        super.onMeasure(boundedSpec(widthMeasureSpec, availableWidth), boundedSpec(heightMeasureSpec, availableHeight))
+    }
+
     fun updateState(state: IslandState) {
         currentState = state
         when (state) {
@@ -443,6 +473,8 @@ class CapsuleIslandView(context: Context) : FrameLayout(context) {
             MotionEvent.ACTION_DOWN -> {
                 initialTouchX = ev.rawX
                 initialTouchY = ev.rawY
+                emittedDragX = 0
+                emittedDragY = 0
                 isDragging = false
             }
             MotionEvent.ACTION_MOVE -> {
@@ -462,22 +494,28 @@ class CapsuleIslandView(context: Context) : FrameLayout(context) {
             MotionEvent.ACTION_DOWN -> {
                 initialTouchX = event.rawX
                 initialTouchY = event.rawY
+                emittedDragX = 0
+                emittedDragY = 0
                 isDragging = false
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 val dx = event.rawX - initialTouchX
                 val dy = event.rawY - initialTouchY
-                if (abs(dx) > touchSlop || abs(dy) > touchSlop) {
+                if (isDragging || abs(dx) > touchSlop || abs(dy) > touchSlop) {
                     isDragging = true
-                    onDragPositionChanged?.invoke(dx.roundToInt(), dy.roundToInt())
+                    val totalX = dx.roundToInt()
+                    val totalY = dy.roundToInt()
+                    onDragPositionChanged?.invoke(totalX - emittedDragX, totalY - emittedDragY)
+                    emittedDragX = totalX
+                    emittedDragY = totalY
                 }
                 return true
             }
             MotionEvent.ACTION_UP -> {
                 if (!isDragging) {
                     // 点击切换展开 / 折叠
-                    setExpanded(!isExpanded, animate = true)
+                    performClick()
                 }
                 isDragging = false
                 return true
@@ -488,6 +526,12 @@ class CapsuleIslandView(context: Context) : FrameLayout(context) {
             }
         }
         return super.onTouchEvent(event)
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        setExpanded(!isExpanded, animate = true)
+        return true
     }
 
     private fun createCircleDrawable(color: Int): GradientDrawable {

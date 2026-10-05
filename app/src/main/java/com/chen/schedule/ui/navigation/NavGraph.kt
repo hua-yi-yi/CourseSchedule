@@ -2,6 +2,7 @@ package com.chen.schedule.ui.navigation
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -60,8 +61,16 @@ sealed class Screen(val route: String) {
 }
 
 @Composable
-fun AppNavHost() {
+fun AppNavHost(openTimetableRequest: Int = 0) {
     val navController = rememberNavController()
+    LaunchedEffect(openTimetableRequest) {
+        if (openTimetableRequest > 0) {
+            navController.navigate(Screen.Timetable.route) {
+                popUpTo(Screen.Timetable.route) { inclusive = false }
+                launchSingleTop = true
+            }
+        }
+    }
 
     NavHost(
         navController = navController,

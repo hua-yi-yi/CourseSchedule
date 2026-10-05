@@ -98,7 +98,6 @@ class SettingsViewModel @Inject constructor(
     }
     var reminderEnabled by androidx.compose.runtime.mutableStateOf(false); private set
     var reminderLead by androidx.compose.runtime.mutableStateOf(ReminderPrefs.DEFAULT_LEAD_MINUTES); private set
-    var reminderOngoing by androidx.compose.runtime.mutableStateOf(true); private set
 
     var autoCheckUpdate by androidx.compose.runtime.mutableStateOf(true); private set
     var useMirror by androidx.compose.runtime.mutableStateOf(true); private set
@@ -116,7 +115,6 @@ class SettingsViewModel @Inject constructor(
     init {
         reminderEnabled = reminderPrefs.enabled
         reminderLead = reminderPrefs.leadMinutes
-        reminderOngoing = reminderPrefs.ongoingClassEnabled
 
         autoCheckUpdate = updatePrefs.autoCheckUpdate
         useMirror = updatePrefs.useMirror
@@ -339,14 +337,6 @@ class SettingsViewModel @Inject constructor(
     fun updateReminderLead(minutes: Int) {
         reminderPrefs.leadMinutes = minutes
         reminderLead = minutes
-        ClassReminderManager.rescheduleAsync(context)
-        refreshReminderStatus()
-    }
-
-    /** 开关上课中常驻看板:立即更新偏好并重排看板与闹钟。 */
-    fun updateReminderOngoing(enabled: Boolean) {
-        reminderPrefs.ongoingClassEnabled = enabled
-        reminderOngoing = enabled
         ClassReminderManager.rescheduleAsync(context)
         refreshReminderStatus()
     }

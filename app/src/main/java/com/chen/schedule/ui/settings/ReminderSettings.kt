@@ -53,7 +53,7 @@ internal fun ReminderSettings(viewModel: SettingsViewModel, requestNotificationP
                     if (viewModel.reminderEnabled) {
                         "提前 ${viewModel.reminderLead} 分钟通知今天剩余的课程"
                     } else {
-                        "关闭状态，不会发送任何通知"
+                        "关闭状态，不发送课前提醒"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.5.sp,
@@ -86,35 +86,12 @@ internal fun ReminderSettings(viewModel: SettingsViewModel, requestNotificationP
             }
         }
         GroupDivider()
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("上课中常驻看板", style = MaterialTheme.typography.bodyMedium, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                Text(
-                    if (!viewModel.reminderEnabled) {
-                        "需先开启上方提醒总开关"
-                    } else if (viewModel.reminderOngoing) {
-                        "正在上课时常驻显示教室、节次与下课时间，下课后自动清除"
-                    } else {
-                        "已关闭，上课时不显示常驻卡片"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 11.5.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = viewModel.reminderOngoing,
-                enabled = viewModel.reminderEnabled,
-                onCheckedChange = { enabled ->
-                    viewModel.updateReminderOngoing(enabled)
-                }
-            )
-        }
+        Text(
+            "课程状态通知与悬浮胶囊在下方「胶囊灵动岛」中统一设置，可独立于课前提醒开启。",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 
     Spacer(Modifier.height(16.dp))

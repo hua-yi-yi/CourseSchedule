@@ -1,5 +1,6 @@
 package com.chen.schedule
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,7 +13,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -25,8 +28,30 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private var timetableOpenRequest by mutableIntStateOf(0)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        acceptTimetableRequest(intent)
+    }
+
+    private fun acceptTimetableRequest(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_TIMETABLE, false) == true) {
+            timetableOpenRequest++
+            intent.removeExtra(EXTRA_OPEN_TIMETABLE)
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        com.chen.schedule.island.CapsuleIslandManager.sync(this)
+        com.chen.schedule.reminders.ClassReminderManager.rescheduleAsync(this)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        acceptTimetableRequest(intent)
         enableEdgeToEdge()
         setContent {
             val themeConfig by ThemePrefs.state.collectAsState()
@@ -55,10 +80,14 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         color = if (bgBitmap != null) Color.Transparent else MaterialTheme.colorScheme.background
                     ) {
-                        AppNavHost()
+                        AppNavHost(openTimetableRequest = timetableOpenRequest)
                     }
                 }
             }
         }
+    }
+
+    companion object {
+        const val EXTRA_OPEN_TIMETABLE = "com.chen.schedule.OPEN_TIMETABLE"
     }
 }

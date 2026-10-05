@@ -36,6 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,13 +45,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chen.schedule.domain.model.Course
-import com.chen.schedule.domain.model.TimeSlot
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 
 /**
  * 应用内嵌入式胶囊灵动岛组件。
@@ -58,40 +66,42 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun InAppCapsuleIsland(
-    courses: List<Course>,
-    timeSlots: List<TimeSlot>,
-    currentWeek: Int,
-    leadMinutes: Int = 30,
     modifier: Modifier = Modifier,
     onCourseClick: ((Course) -> Unit)? = null
 ) {
-    var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val prefs = remember(context) { IslandPrefs.init(context) }
+    val config by IslandPrefs.state.collectAsState()
+    var islandState by remember { mutableStateOf<IslandState>(IslandState.None) }
     var isExpanded by remember { mutableStateOf(false) }
     var dismissedForSession by remember { mutableStateOf(false) }
 
-    // 每 15 秒更新一次当前时刻以驱动倒计时与进度条刷新
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(15_000L)
-            nowMillis = System.currentTimeMillis()
+    // 与系统通知、悬浮胶囊共用真实日期状态，前台恢复时立即刷新。
+    LaunchedEffect(lifecycleOwner, prefs, config.leadMinutes) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (isActive) {
+                islandState = try {
+                    withContext(Dispatchers.IO) { IslandStateRepository.load(context) }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    IslandState.None
+                }
+                delay(15_000L)
+            }
         }
     }
 
-    val todayDow = remember(nowMillis) {
-        java.time.LocalDate.now().dayOfWeek.value
+    val activityKey = when (val state = islandState) {
+        is IslandState.Ongoing -> "${state.course.id}:${state.startMillis}"
+        is IslandState.Upcoming -> "${state.course.id}:${state.startMillis}"
+        else -> null
     }
-
-    val islandState = remember(courses, timeSlots, currentWeek, todayDow, nowMillis, leadMinutes) {
-        IslandStateCalculator.calculate(
-            nowMillis = nowMillis,
-            slots = timeSlots,
-            courses = courses,
-            currentWeek = currentWeek,
-            todayDayOfWeek = todayDow,
-            leadMinutes = leadMinutes
-        )
+    LaunchedEffect(activityKey) {
+        dismissedForSession = false
+        isExpanded = false
     }
-
     val isVisible = !dismissedForSession && (islandState is IslandState.Ongoing || islandState is IslandState.Upcoming)
 
     AnimatedVisibility(
@@ -106,23 +116,23 @@ fun InAppCapsuleIsland(
                 .padding(horizontal = 12.dp, vertical = 4.dp),
             contentAlignment = Alignment.Center
         ) {
-            when (islandState) {
+            when (val state = islandState) {
                 is IslandState.Ongoing -> {
                     OngoingIslandCard(
-                        state = islandState,
+                        state = state,
                         isExpanded = isExpanded,
                         onToggleExpand = { isExpanded = !isExpanded },
                         onDismiss = { dismissedForSession = true },
-                        onClickCourse = { onCourseClick?.invoke(islandState.course) }
+                        onClickCourse = { onCourseClick?.invoke(state.course) }
                     )
                 }
                 is IslandState.Upcoming -> {
                     UpcomingIslandCard(
-                        state = islandState,
+                        state = state,
                         isExpanded = isExpanded,
                         onToggleExpand = { isExpanded = !isExpanded },
                         onDismiss = { dismissedForSession = true },
-                        onClickCourse = { onCourseClick?.invoke(islandState.course) }
+                        onClickCourse = { onCourseClick?.invoke(state.course) }
                     )
                 }
                 else -> {}

@@ -22,6 +22,7 @@
     <!-- 软件包可见性 (Android 11+ / API 30+): 允许查询与拉起微信客户端 -->
     <queries>
         <package android:name="com.tencent.mm" />
+        <provider android:authorities="miui.statusbar.notification.public" />
     </queries>
 
     <application
@@ -96,6 +97,9 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
 

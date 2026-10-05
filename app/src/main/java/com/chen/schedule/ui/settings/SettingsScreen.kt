@@ -108,7 +108,7 @@ fun SettingsScreen(
         uri?.let(viewModel::previewRestore)
     }
 
-    // 通知权限(Android 13+):开启上课提醒时申请
+    // 此授权回调仅供课前提醒；灵动岛使用自己的授权回调，避免联动开启声音提醒。
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->

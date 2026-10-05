@@ -21,7 +21,9 @@ object ClassReminderPlanner {
         /** 例如 "第 3-4 节"。 */
         val slotRange: String,
         /** 上课开始时间,例如 "10:00"。 */
-        val startTime: String
+        val startTime: String,
+        val courseId: Long = 0,
+        val startAtMillis: Long = 0
     )
 
     /** 进行中课程信息模型。 */
@@ -85,7 +87,9 @@ object ClassReminderPlanner {
                     } else {
                         "第 ${course.startSlot} 节"
                     },
-                    startTime = slot.startTime
+                    startTime = slot.startTime,
+                    courseId = course.id,
+                    startAtMillis = today.atTime(start).atZone(zone).toInstant().toEpochMilli()
                 )
             }
             .sortedBy { it.triggerAtMillis }

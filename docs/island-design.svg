@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="550" viewBox="0 0 1040 550">
+  <rect width="1040" height="550" fill="#f4f6fa"/>
+  <g font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif">
+    <text x="48" y="54" font-size="27" font-weight="bold" fill="#162033">课程实时展示 · 静态图文方案</text>
+    <text x="48" y="84" font-size="15" fill="#64748b">设计示意，非厂商系统截图；课程场景与设备权限获准后才启用原生扩展</text>
+    <text x="48" y="133" font-size="18" font-weight="bold" fill="#334155">候课阶段 · 07:30—08:00</text>
+    <text x="552" y="133" font-size="18" font-weight="bold" fill="#334155">上课阶段 · 08:00—09:40</text>
+    <rect x="48" y="156" width="430" height="68" rx="34" fill="#15191f"/>
+    <circle cx="84" cy="190" r="17" fill="#3b82f6"/>
+    <text x="76" y="197" font-size="19" fill="white">课</text>
+    <text x="116" y="197" font-size="23" fill="white">候课</text>
+    <text x="304" y="197" font-size="23" fill="white">08:00</text>
+    <text x="378" y="197" font-size="15" fill="#b5c0cf">上课</text>
+    <rect x="552" y="156" width="430" height="68" rx="34" fill="#15191f"/>
+    <circle cx="588" cy="190" r="17" fill="#3b82f6"/>
+    <text x="580" y="197" font-size="19" fill="white">课</text>
+    <text x="620" y="197" font-size="23" fill="white">上课</text>
+    <text x="808" y="197" font-size="23" fill="white">09:40</text>
+    <text x="882" y="197" font-size="15" fill="#b5c0cf">下课</text>
+    <text x="48" y="258" font-size="15" fill="#64748b">OS3 大岛摘要：图文组件1 + 文本组件；小岛只显示应用图标</text>
+    <rect x="48" y="282" width="430" height="171" rx="22" fill="white" stroke="#dce3ef"/>
+    <text x="74" y="318" font-size="15" fill="#64748b">即将上课</text>
+    <text x="74" y="357" font-size="25" font-weight="bold" fill="#162033">高等数学</text>
+    <text x="74" y="390" font-size="18" fill="#334155">公教楼 B204</text>
+    <text x="74" y="423" font-size="18" fill="#334155">08:00—09:40</text>
+    <circle cx="421" cy="335" r="26" fill="#3b82f6"/>
+    <text x="410" y="344" font-size="24" fill="white">课</text>
+    <rect x="552" y="282" width="430" height="171" rx="22" fill="white" stroke="#dce3ef"/>
+    <text x="578" y="318" font-size="15" fill="#64748b">正在上课</text>
+    <text x="578" y="357" font-size="25" font-weight="bold" fill="#162033">高等数学</text>
+    <text x="578" y="390" font-size="18" fill="#334155">公教楼 B204</text>
+    <text x="578" y="423" font-size="18" fill="#334155">08:00—09:40</text>
+    <circle cx="925" cy="335" r="26" fill="#3b82f6"/>
+    <text x="914" y="344" font-size="24" fill="white">课</text>
+    <text x="48" y="490" font-size="15" fill="#64748b">OS2 焦点通知 / OS3 展开态：完整课程名、地点、起止时间和状态；点击进入课程表</text>
+    <text x="48" y="518" font-size="15" fill="#64748b">下课重算下一课程，无候课或上课时结束。准备版不启用秒级计时器或动态进度环。</text>
+  </g>
+</svg>

@@ -20,7 +20,8 @@ class ReminderPrefs(context: Context) {
         get() = prefs.getInt(KEY_LEAD, DEFAULT_LEAD_MINUTES)
         set(value) = prefs.edit().putInt(KEY_LEAD, value.coerceIn(1, 120)).apply()
 
-    /** 上课中是否在通知栏常驻卡片(默认开启)。 */
+    /** Legacy migration input only. Live presentation is now owned by IslandPrefs. */
+    @Deprecated("Use IslandPrefs.enabled and mode; this value is only read during upgrade")
     var ongoingClassEnabled: Boolean
         get() = prefs.getBoolean(KEY_ONGOING, true)
         set(value) = prefs.edit().putBoolean(KEY_ONGOING, value).apply()

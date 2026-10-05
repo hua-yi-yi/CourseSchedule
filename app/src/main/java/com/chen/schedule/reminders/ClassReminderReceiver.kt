@@ -6,96 +6,75 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import android.util.Log
 import com.chen.schedule.MainActivity
 import com.chen.schedule.R
+import com.chen.schedule.island.CapsuleIslandManager
+import com.chen.schedule.island.IslandStateRepository
 import com.chen.schedule.widget.WidgetUpdater
+import com.chen.schedule.util.ScheduleStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.time.Instant
 
-/**
- * 应用内部提醒广播；开机广播由 BootReceiver 单独处理。
- * 1. [ClassReminderManager.ACTION_CLASS_REMINDER]:发出提醒通知;
- * 2. [ClassReminderManager.ACTION_RESCHEDULE]:跨天闹钟,重排当天剩余提醒;
- */
+/** Alarm extras are wake-up hints, never authoritative course-state snapshots. */
 class ClassReminderReceiver : BroadcastReceiver() {
-
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action !in setOf(ClassReminderManager.ACTION_RESCHEDULE,
+                ClassReminderManager.ACTION_CLASS_START, ClassReminderManager.ACTION_CLASS_END,
+                ClassReminderManager.ACTION_ISLAND_BOUNDARY, ClassReminderManager.ACTION_CLASS_REMINDER)) return
         val appContext = context.applicationContext
-        when (intent.action) {
-            ClassReminderManager.ACTION_RESCHEDULE -> {
-                val pending = goAsync()
-                CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-                    try {
-                        ClassReminderManager.rescheduleNow(appContext)
-                        // 跨天(零点)与开机时顺带强制刷新小组件:
-                        // 部分桌面会拖延 30 分钟周期刷新,导致「今天」组件显示昨天的课
-                        WidgetUpdater.refreshAll(appContext)
-                    } finally {
-                        pending.finish()
-                    }
-                }
-            }
-            ClassReminderManager.ACTION_CLASS_START -> {
-                val courseName = intent.getStringExtra(ClassReminderManager.EXTRA_TITLE).orEmpty()
-                val classroom = intent.getStringExtra(ClassReminderManager.EXTRA_CLASSROOM).orEmpty()
-                val teacher = intent.getStringExtra(ClassReminderManager.EXTRA_TEACHER).orEmpty()
-                val slotRange = intent.getStringExtra(ClassReminderManager.EXTRA_SLOT_RANGE).orEmpty()
-                val startTime = intent.getStringExtra(ClassReminderManager.EXTRA_START_TIME).orEmpty()
-                val endTime = intent.getStringExtra(ClassReminderManager.EXTRA_END_TIME).orEmpty()
-                val prefs = ReminderPrefs(appContext)
-                if (prefs.enabled && prefs.ongoingClassEnabled && courseName.isNotBlank()) {
-                    ClassReminderManager.notifyOngoing(
-                        appContext,
-                        ClassReminderPlanner.OngoingCourseInfo(
-                            courseName = courseName,
-                            classroom = classroom,
-                            teacher = teacher,
-                            slotRange = slotRange,
-                            startTime = startTime,
-                            endTime = endTime,
-                            startAtMillis = 0L,
-                            endAtMillis = 0L
-                        )
-                    )
-                }
-            }
-            ClassReminderManager.ACTION_CLASS_END -> {
-                ClassReminderManager.clearOngoing(appContext)
-                // 下课后异步触发一次重排以检查后续状态与小组件刷新
-                ClassReminderManager.rescheduleAsync(appContext)
-            }
-            ClassReminderManager.ACTION_CLASS_REMINDER -> notifyClass(appContext, intent)
+        val pending = goAsync()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                if (intent.action == ClassReminderManager.ACTION_CLASS_REMINDER) notifyClass(appContext, intent)
+                ClassReminderManager.rescheduleNow(appContext)
+                withContext(Dispatchers.Main) { CapsuleIslandManager.refresh(appContext) }
+                if (intent.action == ClassReminderManager.ACTION_RESCHEDULE) WidgetUpdater.refreshAll(appContext)
+            } catch (error: Exception) {
+                Log.w("ClassReminder", "Course alarm reconciliation failed", error)
+            } finally { pending.finish() }
         }
     }
 
-    private fun notifyClass(context: Context, intent: Intent) {
-        ClassReminderManager.ensureChannel(context)
-        val prefs = ReminderPrefs(context)
-        if (!prefs.enabled) return
-        val manager = context.getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= 33 && !manager.areNotificationsEnabled()) return
-
-        val requestCode = intent.getIntExtra(ClassReminderManager.EXTRA_REQUEST_CODE, 0)
-        val title = intent.getStringExtra(ClassReminderManager.EXTRA_TITLE) ?: "快上课了"
-        val text = intent.getStringExtra(ClassReminderManager.EXTRA_TEXT).orEmpty()
-
-        val contentIntent = PendingIntent.getActivity(
-            context, 0,
-            Intent(context, MainActivity::class.java)
+    private suspend fun notifyClass(context: Context, intent: Intent) {
+        ClassReminderManager.ensureChannels(context)
+        if (!ReminderPrefs(context).enabled || !ReminderStatus.notificationsAllowed(context)) return
+        val snapshot = IslandStateRepository.snapshot(context)
+        val now = snapshot.nowMillis
+        val week = snapshot.activeWeek ?: return
+        val courseId = intent.getLongExtra(ClassReminderManager.EXTRA_COURSE_ID, -1)
+        val start = intent.getLongExtra(ClassReminderManager.EXTRA_START_MILLIS, 0)
+        val course = snapshot.courses.firstOrNull {
+            it.id == courseId && it.appliesToWeek(week) && it.dayOfWeek == snapshot.dayOfWeek
+        } ?: return
+        // Skip expired reminders and notifications whose course time changed after scheduling.
+        val firstSlot = snapshot.slots.firstOrNull { it.slotNumber == course.startSlot } ?: return
+        val localStart = ScheduleStatus.parseTime(firstSlot.startTime) ?: return
+        val actualStart = Instant.ofEpochMilli(now).atZone(snapshot.zone).toLocalDate()
+            .atTime(localStart).atZone(snapshot.zone).toInstant().toEpochMilli()
+        if (actualStart != start || now >= actualStart ||
+            now < actualStart - ReminderPrefs(context).leadMinutes * 60_000L) return
+        val pi = PendingIntent.getActivity(context, 0,
+            Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_OPEN_TIMETABLE, true)
                 .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val slotRange = if (course.startSlot == course.endSlot) "第 ${course.startSlot} 节"
+            else "第 ${course.startSlot}–${course.endSlot} 节"
+        val text = listOf(slotRange, "${firstSlot.startTime}上课", course.classroom)
+            .filter { it.isNotBlank() }.joinToString(" · ")
+        val commitTime = System.currentTimeMillis()
+        if (commitTime >= actualStart || !ReminderPrefs(context).enabled ||
+            !ReminderStatus.notificationsAllowed(context)) return
         val notification = Notification.Builder(context, ClassReminderManager.CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setStyle(Notification.BigTextStyle().bigText(text))
-            .setContentIntent(contentIntent)
-            .setAutoCancel(true)
-            .build()
-        manager.notify(requestCode, notification)
+            .setSmallIcon(R.drawable.ic_notification).setContentTitle("上课提醒 · ${course.name}")
+            .setContentText(text).setStyle(Notification.BigTextStyle().bigText(text)).setContentIntent(pi)
+            .setAutoCancel(true).setTimeoutAfter(actualStart - commitTime).build()
+        try { context.getSystemService(NotificationManager::class.java)
+            .notify(intent.getIntExtra(ClassReminderManager.EXTRA_REQUEST_CODE, 0), notification) }
+        catch (error: SecurityException) { Log.w("ClassReminder", "Notification permission changed", error) }
     }
 }

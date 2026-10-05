@@ -200,10 +200,6 @@ fun TimetableScreen(
                     val islandConfig by com.chen.schedule.island.IslandPrefs.state.collectAsState()
                     if (islandConfig.inAppEnabled) {
                         com.chen.schedule.island.InAppCapsuleIsland(
-                            courses = state.courses,
-                            timeSlots = state.timeSlots,
-                            currentWeek = state.currentWeek,
-                            leadMinutes = islandConfig.leadMinutes,
                             onCourseClick = { course ->
                                 selectedCluster = listOf(course)
                                 activeCourseIndex = 0
