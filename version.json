@@ -1,9 +1,9 @@
 {
-  "versionName": "1.3.6",
-  "versionTag": "v1.3.6",
-  "title": "v1.3.6 · 课程实时卡片与厂商原生接入准备",
-  "publishedAt": "2026-10-05",
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.6/CourseSchedule-v1.3.6.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.6",
-  "changelog": "- 新增系统优先与兼容悬浮两种模式；小米公开本地协议与分场景资格检查已准备，未获资格时使用普通课程通知，其他厂商明确标记待接入。\n- 声音提醒与实时课程卡片独立控制，按实际教学周统一处理课程交接和延迟到达的旧广播。\n- 一次性迁移原有设置；预览限时一分钟，退出后恢复真实状态。\n- 修复浏览周影响实时课程、授权返回、悬浮拖拽和窗口边界。\n- 精确闹钟未获授权时提示更新可能延迟。原生展示仍须取得厂商资格并通过真机验证。"
+  "versionName": "1.3.7",
+  "versionTag": "v1.3.7",
+  "title": "v1.3.7 · 河科大课表导入修复",
+  "publishedAt": "2026-10-07",
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.7/CourseSchedule-v1.3.7.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.7",
+  "changelog": "- 修复河科大教务课表导入:网格周次段以空格分隔(如「1-6 8-11周」)时整个网格解析被丢弃并回退到明细表,导致出现「,」等乱码课程名或直接报错;现按空格/逗号统一拆分周次段。\n- 适配新版「理论课程安排」明细表(学分/学时/起止周等多列布局):续行「[1-6],[8-10]」不再被误认成课程单元格,裸周次列表(如「2,4,6,8,10,12」)按单双周归类,多段周次全部保留。\n- 网格与明细表并集去重升级为周次覆盖判定,课程名忽略空白差异、教室容忍校区后缀省略,同一安排不再重复导入。"
 }
