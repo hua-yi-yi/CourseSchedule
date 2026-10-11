@@ -118,6 +118,8 @@ class HaustImportViewModel @Inject constructor(
     /** 导入成功后的提示;非空时弹出「导入成功」对话框,确定后返回主页。 */
     var successMessage by mutableStateOf<String?>(null); private set
     var busy by mutableStateOf(false); private set
+    /** WebVPN/CAS 双登录的内存中转凭据;仅本会话有效,不持久化。 */
+    val loginRelay = HaustLoginRelay()
 
     fun clearPreview() { if (!busy) preview = emptyList() }
     fun report(text: String) { message = text }
@@ -160,7 +162,7 @@ class HaustImportViewModel @Inject constructor(
     }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
+@SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewModel = hiltViewModel()) {
@@ -176,8 +178,10 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
         onDispose {
             ready = false
             browser?.stopLoading()
+            browser?.removeJavascriptInterface("HaustLoginRelay")
             browser?.destroy()
             browser = null
+            viewModel.loginRelay.clear()
             // This screen is the app's only WebView; do not retain school authentication cookies.
             android.webkit.CookieManager.getInstance().removeAllCookies(null)
             if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
@@ -195,7 +199,7 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
         })
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            Text("登录后会自动进入 VPN 教务。再点“我的课表”直达，选择全部教学周后读取。",
+            Text("登录后会自动进入 VPN 教务。再点“我的课表”直达，选择全部教学周后读取。第一次登录输入的账号密码仅在本次导入的内存中临时保留，自动填充第二个登录页，关闭页面即清除。",
                 modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall)
             val controlsEnabled = ready && !reading && !viewModel.busy
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -230,6 +234,11 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
                     settings.loadWithOverviewMode = true
                     settings.useWideViewPort = true
                     android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                    // 双登录中转桥:仅接收凭据,暴露范围被 *.haust.edu.cn 的 URL 白名单限制
+                    addJavascriptInterface(
+                        HaustLoginRelayBridge(viewModel.loginRelay) { viewModel.report(it) },
+                        "HaustLoginRelay"
+                    )
                     webViewClient = object : WebViewClient() {
                         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                             val u = request.url
@@ -241,6 +250,19 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
                             val uri = Uri.parse(url)
                             address = uri.host.orEmpty()
                             adaptHaustPage(view, url)
+                            // VPN 会把 cas/jwgl 改写成 cas-haust-edu-cn-s 等变体域名,两次 CAS 的 Cookie 互不相通,
+                            // 因此对所有学校域名注入:捕获第一次登录输入,出现下一个登录页时自动填充;凭据随页面销毁清除
+                            if (address.endsWith(".haust.edu.cn")) {
+                                val js = buildString {
+                                    append(HAUST_LOGIN_RELAY_JS)
+                                    viewModel.loginRelay.peek()?.let { c ->
+                                        append(";window.__haustRelay.fill(")
+                                            .append(JSONObject.quote(c.username)).append(",")
+                                            .append(JSONObject.quote(c.password)).append(")")
+                                    }
+                                }
+                                view.evaluateJavascript(js, null)
+                            }
                             if (uri.host == "vpn.haust.edu.cn" && uri.path.orEmpty().startsWith("/portal")) {
                                 view.postDelayed({
                                     if (view.url?.startsWith("https://vpn.haust.edu.cn/portal") == true) {
