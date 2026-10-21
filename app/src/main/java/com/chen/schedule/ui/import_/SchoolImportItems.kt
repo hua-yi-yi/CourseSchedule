@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.import_
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -67,7 +69,7 @@ internal fun LazyListScope.schoolImportItems(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp),
-                shape = MaterialTheme.shapes.medium,
+                shape = ScheduleStyle.CardShape,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 )
@@ -93,7 +95,7 @@ internal fun LazyListScope.schoolImportItems(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp),
-                shape = MaterialTheme.shapes.large,
+                shape = ScheduleStyle.CardShape,
                 colors = CardDefaults.cardColors(
                     containerColor = if (preset.systemType == SchoolSystemType.WEB_VPN_EAMS)
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)

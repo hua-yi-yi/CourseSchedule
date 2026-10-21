@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.schedule
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,7 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.chen.schedule.ui.theme.ScheduleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -55,7 +57,7 @@ fun ScheduleConfigScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
+            ScheduleTopAppBar(
                 title = { Text("学期与作息", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -70,7 +72,7 @@ fun ScheduleConfigScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = ScheduleStyle.PagePadding)
         ) {
             Spacer(Modifier.height(8.dp))
 
@@ -155,7 +157,7 @@ fun SemesterMenuScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
+            ScheduleTopAppBar(
                 title = { Text("当前学期", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -170,7 +172,7 @@ fun SemesterMenuScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = ScheduleStyle.PagePadding)
         ) {
             Spacer(Modifier.height(8.dp))
             MenuEntryRow(
@@ -213,7 +215,7 @@ fun SchemeMenuScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
+            ScheduleTopAppBar(
                 title = { Text("当前作息", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -228,7 +230,7 @@ fun SchemeMenuScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = ScheduleStyle.PagePadding)
         ) {
             Spacer(Modifier.height(8.dp))
             MenuEntryRow(

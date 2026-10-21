@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.import_
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
@@ -34,7 +36,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.chen.schedule.ui.theme.ScheduleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -90,7 +92,7 @@ fun ImportScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
+            ScheduleTopAppBar(
                 title = { Text("导入课表", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -102,7 +104,7 @@ fun ImportScreen(
         snackbarHost = {
             if (state.message.isNotBlank()) {
                 Snackbar(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(ScheduleStyle.PagePadding),
                     containerColor = if (state.isError)
                         MaterialTheme.colorScheme.errorContainer
                     else
@@ -117,7 +119,7 @@ fun ImportScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(ScheduleStyle.PagePadding)
         ) {
 
             if (state.isImporting) item { Text("正在读取 / 导入，请稍候…", color = MaterialTheme.colorScheme.primary) }

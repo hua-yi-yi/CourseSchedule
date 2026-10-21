@@ -277,7 +277,7 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
     val baseModifier = GlanceModifier
         .fillMaxSize()
         .appWidgetBackground()
-        .cornerRadius(16.dp)
+        .cornerRadius(WidgetStyle.CardRadius)
         .clickable(actionStartActivity<MainActivity>())
 
     val backgroundModifier = when {
@@ -292,7 +292,7 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
                 provider = ImageProvider(visualStyle.backgroundBitmap),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = GlanceModifier.fillMaxSize().cornerRadius(16.dp)
+                modifier = GlanceModifier.fillMaxSize().cornerRadius(WidgetStyle.CardRadius)
             )
         }
 
@@ -405,7 +405,7 @@ private fun WeekWidgetContent(data: WeekWidgetData) {
                                         chunk.forEach { block ->
                                             val height = (block.startRow until block.startRow + block.rowSpan)
                                                 .sumOf { heights[it].toDouble() }.toFloat()
-                                            WeekCell(block.cell, height, isDarkTheme, emptyBg)
+                                            WeekCell(block.cell, height, emptyBg, titleColor)
                                         }
                                     }
                                 }
@@ -468,14 +468,11 @@ private fun SlotTimeCell(
 private fun WeekCell(
     cell: WeekGridBuilder.Cell?,
     height: Float,
-    isDarkTheme: Boolean,
-    emptyBackground: ColorProvider
+    emptyBackground: ColorProvider,
+    titleColor: ColorProvider
 ) {
     val courseBackground = cell?.let {
-        WeekGridBuilder.pastelColorFor(it.color, isDark = isDarkTheme)
-    }
-    val courseTextColor = courseBackground?.let {
-        Color(WeekGridBuilder.textColorFor(it))
+        Color(it.color).copy(alpha = WidgetStyle.CourseTintAlpha)
     }
     Box(
         modifier = GlanceModifier
@@ -486,14 +483,14 @@ private fun WeekCell(
     ) {
         if (cell != null) {
             val mainText = if (cell.extraCount > 0) "${cell.name}+${cell.extraCount}" else cell.name
-            val textColor = requireNotNull(courseTextColor)
+            val textColor = titleColor
 
             Row(
                 modifier = GlanceModifier
                     .fillMaxSize()
                     .padding(horizontal = 1.dp, vertical = 1.dp)
-                    .cornerRadius(6.dp)
-                    .background(ColorProvider(Color(courseBackground)))
+                    .cornerRadius(8.dp)
+                    .background(ColorProvider(requireNotNull(courseBackground)))
                     .padding(horizontal = 2.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -522,7 +519,7 @@ private fun WeekCell(
                         style = TextStyle(
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = ColorProvider(textColor)
+                            color = textColor
                         ),
                         maxLines = 2
                     )
@@ -533,7 +530,7 @@ private fun WeekCell(
                             style = TextStyle(
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = ColorProvider(textColor.copy(alpha = 0.88f))
+                                color = textColor
                             ),
                             maxLines = Int.MAX_VALUE
                         )

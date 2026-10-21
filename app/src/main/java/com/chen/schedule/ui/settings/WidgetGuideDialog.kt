@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.settings
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import android.content.Intent
 import android.provider.Settings
 import android.net.Uri
@@ -56,7 +58,7 @@ internal fun WidgetGuideDialog(onDismiss: () -> Unit) {
                     )
 
                     Surface(
-                        shape = MaterialTheme.shapes.medium,
+                        shape = ScheduleStyle.CardShape,
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -79,7 +81,7 @@ internal fun WidgetGuideDialog(onDismiss: () -> Unit) {
                     }
 
                     Surface(
-                        shape = MaterialTheme.shapes.medium,
+                        shape = ScheduleStyle.CardShape,
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                         modifier = Modifier.fillMaxWidth()
                     ) {

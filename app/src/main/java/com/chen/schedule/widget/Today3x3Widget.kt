@@ -3,9 +3,7 @@ package com.chen.schedule.widget
 import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.glance.ExperimentalGlanceApi
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -33,11 +31,9 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
-import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
 import com.chen.schedule.MainActivity
 
 /**
@@ -70,20 +66,20 @@ private fun Today3x3WidgetContent(data: WidgetData) {
 
     val titleColor = visualStyle.titleColor ?: GlanceTheme.colors.onSurface
     val subtitleColor = visualStyle.subtitleColor ?: GlanceTheme.colors.onSurfaceVariant
-    val badgeBg = visualStyle.badgeBg ?: (if (data.courses.isNotEmpty()) GlanceTheme.colors.primaryContainer else GlanceTheme.colors.surfaceVariant)
+    val badgeBg = visualStyle.badgeBg ?: (if (data.courses.isNotEmpty()) GlanceTheme.colors.primaryContainer else GlanceTheme.colors.surface)
     val badgeTextColor = visualStyle.badgeTextColor ?: (if (data.courses.isNotEmpty()) GlanceTheme.colors.onPrimaryContainer else GlanceTheme.colors.onSurfaceVariant)
-    val emptyCardBg = visualStyle.itemCardBg ?: GlanceTheme.colors.surfaceVariant
+    val emptyCardBg = visualStyle.itemCardBg ?: GlanceTheme.colors.surface
 
     val baseModifier = GlanceModifier
         .fillMaxSize()
         .appWidgetBackground()
-        .cornerRadius(16.dp)
+        .cornerRadius(WidgetStyle.CardRadius)
         .clickable(actionStartActivity<MainActivity>())
 
     val backgroundModifier = when {
         visualStyle.containerColor != null -> baseModifier.background(visualStyle.containerColor)
         visualStyle.backgroundBitmap != null -> baseModifier
-        else -> baseModifier.background(GlanceTheme.colors.surface)
+        else -> baseModifier.background(GlanceTheme.colors.background)
     }
 
     Box(modifier = backgroundModifier) {
@@ -92,14 +88,14 @@ private fun Today3x3WidgetContent(data: WidgetData) {
                 provider = ImageProvider(visualStyle.backgroundBitmap),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = GlanceModifier.fillMaxSize().cornerRadius(16.dp)
+                modifier = GlanceModifier.fillMaxSize().cornerRadius(WidgetStyle.CardRadius)
             )
         }
 
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .padding(12.dp)
+                .padding(WidgetStyle.ContentPadding)
         ) {
             // 顶部信息区：日期 · 星期与学期周次，右侧圆角胶囊徽标
             Row(
@@ -112,7 +108,7 @@ private fun Today3x3WidgetContent(data: WidgetData) {
                     Text(
                         text = "${data.dateLabel} · ${data.dayOfWeekLabel}",
                         style = TextStyle(
-                            fontSize = 14.sp,
+                            fontSize = WidgetStyle.TitleSize,
                             fontWeight = FontWeight.Bold,
                             color = titleColor
                         )
@@ -120,7 +116,7 @@ private fun Today3x3WidgetContent(data: WidgetData) {
                     Text(
                         text = if (data.currentWeek > 0) "${data.semesterName} · 第${data.currentWeek}周" else data.semesterName,
                         style = TextStyle(
-                            fontSize = 11.sp,
+                            fontSize = WidgetStyle.DetailSize,
                             color = subtitleColor
                         ),
                         maxLines = 1
@@ -138,7 +134,7 @@ private fun Today3x3WidgetContent(data: WidgetData) {
                     Text(
                         text = if (data.courses.isNotEmpty()) "共 ${data.courses.size} 门课" else "无课",
                         style = TextStyle(
-                            fontSize = 11.sp,
+                            fontSize = WidgetStyle.DetailSize,
                             fontWeight = FontWeight.Medium,
                             color = badgeTextColor
                         )
@@ -153,7 +149,7 @@ private fun Today3x3WidgetContent(data: WidgetData) {
                     modifier = GlanceModifier
                         .fillMaxSize()
                         .padding(top = 16.dp)
-                        .cornerRadius(14.dp)
+                        .cornerRadius(WidgetStyle.CardRadius)
                         .background(emptyCardBg)
                         .clickable(actionStartActivity<MainActivity>())
                         .padding(horizontal = 16.dp, vertical = 24.dp),
@@ -166,7 +162,7 @@ private fun Today3x3WidgetContent(data: WidgetData) {
                         Text(
                             text = "今日无课",
                             style = TextStyle(
-                                fontSize = 14.sp,
+                                fontSize = WidgetStyle.TitleSize,
                                 fontWeight = FontWeight.Bold,
                                 color = titleColor
                             )
@@ -175,7 +171,7 @@ private fun Today3x3WidgetContent(data: WidgetData) {
                         Text(
                             text = "享受属于自己的自由时间吧",
                             style = TextStyle(
-                                fontSize = 11.5.sp,
+                                fontSize = WidgetStyle.DetailSize,
                                 color = subtitleColor
                             )
                         )
@@ -184,90 +180,10 @@ private fun Today3x3WidgetContent(data: WidgetData) {
             } else {
                 LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                     items(data.courses) { course ->
-                        Today3x3CourseCard(course, isDarkTheme)
+                        WidgetCourseCard(course, visualStyle, maxLines = 2)
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun Today3x3CourseCard(course: WidgetCourse, isDarkTheme: Boolean) {
-    val courseBackground = WeekGridBuilder.pastelColorFor(course.color, isDark = isDarkTheme)
-    val textColor = WeekGridBuilder.textColorFor(courseBackground)
-
-    Row(
-        modifier = GlanceModifier
-            .fillMaxWidth()
-            .padding(vertical = 3.5.dp)
-            .cornerRadius(12.dp)
-            .background(ColorProvider(Color(courseBackground)))
-            .padding(horizontal = 10.dp, vertical = 8.dp)
-            .clickable(actionStartActivity<MainActivity>()),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // 左侧课程微条（圆角 2dp，与主页 DayView / WeekView 保持一致）
-        Box(
-            modifier = GlanceModifier
-                .width(3.5.dp)
-                .height(44.dp)
-                .cornerRadius(2.dp)
-                .background(ColorProvider(Color(course.color)))
-        ) {}
-
-        Spacer(modifier = GlanceModifier.width(9.dp))
-
-        Column(modifier = GlanceModifier.defaultWeight()) {
-            // 课程名称：完整显示，主文本粗体
-            Text(
-                text = course.name,
-                style = TextStyle(
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = ColorProvider(Color(textColor))
-                ),
-                maxLines = 2
-            )
-
-            Spacer(modifier = GlanceModifier.height(2.5.dp))
-
-            // 节次与时间：与主页风格对齐（如 第1-2节 · 08:00-09:40）
-            val timeText = if (course.startTime.isNotBlank() && course.endTime.isNotBlank()) {
-                "${course.slotDisplay} · ${course.startTime}-${course.endTime}"
-            } else {
-                course.slotDisplay
-            }
-            Text(
-                text = timeText,
-                style = TextStyle(
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = ColorProvider(Color(textColor).copy(alpha = 0.78f))
-                ),
-                maxLines = 1
-            )
-
-            // 上课地点与教师：主页风格以 @地点 开头
-            val placeText = if (course.classroom.isNotBlank()) {
-                if (course.teacher.isNotBlank()) "@${course.classroom.trim()} · ${course.teacher.trim()}"
-                else "@${course.classroom.trim()}"
-            } else if (course.teacher.isNotBlank()) {
-                course.teacher.trim()
-            } else {
-                "未设地点"
-            }
-
-            Spacer(modifier = GlanceModifier.height(1.5.dp))
-
-            Text(
-                text = placeText,
-                style = TextStyle(
-                    fontSize = 11.sp,
-                    color = ColorProvider(Color(textColor).copy(alpha = 0.88f))
-                ),
-                maxLines = 2
-            )
         }
     }
 }

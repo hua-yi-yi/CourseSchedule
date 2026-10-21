@@ -1,9 +1,9 @@
 {
-  "versionName": "1.3.8",
-  "versionTag": "v1.3.8",
-  "title": "v1.3.8 · 河科大导入免二次输入",
-  "publishedAt": "2026-10-11",
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.8/CourseSchedule-v1.3.8.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.8",
-  "changelog": "- 河科大导入免二次输入:WebVPN 会把统一身份认证改写为独立域名,同一会话需登录两次;现第一次登录输入的账号密码仅在本次导入会话的内存中临时保留,第二个登录页出现时自动填充(只填空字段、不自动提交,关闭导入页立即清除);应用仍不保存密码、不持久化任何凭据。"
+  "versionName": "1.3.9",
+  "versionTag": "v1.3.9",
+  "title": "v1.3.9 · 统一应用与桌面小组件风格",
+  "publishedAt": "2026-10-21",
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.9/CourseSchedule-v1.3.9.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.9",
+  "changelog": "- 应用内页面与课表主页统一视觉风格：使用紧凑标题栏、统一卡片圆角、页面边距与字体层级，覆盖设置、导入、课程编辑、学期与作息管理及初始化引导。\n- 今日课程、今日看板与周课表三种桌面小组件统一蓝灰背景、蓝色徽标和淡彩课程卡片，保留透明底板、独立壁纸和文字明暗设置。\n- 提取共享样式与今日课程卡片，减少不同页面和组件之间的样式差异；不改变课程数据和导入逻辑。"
 }

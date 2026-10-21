@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.settings
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import android.os.Build
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +28,7 @@ internal fun ReminderSettings(viewModel: SettingsViewModel, requestNotificationP
     // ===== 上课提醒 =====
     SettingsGroup(title = "上课提醒") {
         Text(viewModel.reminderStatus, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.primary)
-        Text(viewModel.nextReminder, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall)
+        Text(viewModel.nextReminder, Modifier.padding(horizontal = ScheduleStyle.PagePadding), style = MaterialTheme.typography.bodySmall)
         val context = androidx.compose.ui.platform.LocalContext.current
         Row(Modifier.fillMaxWidth()) {
             androidx.compose.material3.TextButton(onClick = {

@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.settings
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,7 +26,7 @@ internal fun SettingsGroup(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = ScheduleStyle.CardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -46,7 +48,7 @@ internal fun SettingsGroup(
 @Composable
 internal fun GroupDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 16.dp),
+        modifier = Modifier.padding(horizontal = ScheduleStyle.PagePadding),
         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
     )
 }
@@ -66,7 +68,6 @@ internal fun SettingsItem(
             Text(
                 title,
                 style = MaterialTheme.typography.bodyMedium,
-                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = if (isDanger) MaterialTheme.colorScheme.error
                 else MaterialTheme.colorScheme.onSurface
@@ -76,7 +77,6 @@ internal fun SettingsItem(
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                fontSize = 11.5.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         },

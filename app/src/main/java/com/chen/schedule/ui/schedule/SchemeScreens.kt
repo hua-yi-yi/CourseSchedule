@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.schedule
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -45,7 +47,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TopAppBar
+import com.chen.schedule.ui.theme.ScheduleTopAppBar
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -162,7 +164,7 @@ fun SchemeListScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
+            ScheduleTopAppBar(
                 title = { Text("选择作息方案", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -177,7 +179,7 @@ fun SchemeListScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = ScheduleStyle.PagePadding)
         ) {
             Spacer(Modifier.height(8.dp))
             SectionLabel("内置模板")
@@ -237,7 +239,7 @@ fun SchemeListScreen(
             previewScheme?.let { scheme ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large,
+                    shape = ScheduleStyle.CardShape,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     )
@@ -315,7 +317,7 @@ private fun SchemePickRow(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clickable { onSelect() },
-        shape = MaterialTheme.shapes.medium,
+        shape = ScheduleStyle.CardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
@@ -510,7 +512,7 @@ fun SchemeEditScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
+            ScheduleTopAppBar(
                 title = {
                     Text(
                         when {
@@ -572,7 +574,7 @@ fun SchemeEditScreen(
                 Spacer(Modifier.height(8.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
+                    shape = ScheduleStyle.CardShape,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
                     )
@@ -796,7 +798,7 @@ private fun SlotEditRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 3.dp),
-        shape = MaterialTheme.shapes.medium,
+        shape = ScheduleStyle.CardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(10.dp)) {

@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.schedule
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -19,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
 import com.chen.schedule.util.WeekCalculator
 import androidx.compose.foundation.verticalScroll
@@ -45,7 +46,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import com.chen.schedule.ui.theme.ScheduleTopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -319,7 +320,7 @@ fun SetupWizardScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
+            ScheduleTopAppBar(
                 title = {
                     Text(
                         "初始设置 ${step + 1}/${stepTitles.size} · ${stepTitles[step]}",
@@ -338,7 +339,7 @@ fun SetupWizardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = ScheduleStyle.PagePadding)
         ) {
             Spacer(Modifier.height(8.dp))
             // 步骤圆点 + 进度
@@ -418,7 +419,7 @@ fun SetupWizardScreen(
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                                 ),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = ScheduleStyle.CardShape
                             ) {
                                 Column(
                                     modifier = Modifier.padding(12.dp),
@@ -467,7 +468,7 @@ fun SetupWizardScreen(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
                             ),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = ScheduleStyle.CardShape
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Text(
@@ -569,7 +570,7 @@ private fun OptionCard(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clickable(onClick = onClick),
-        shape = MaterialTheme.shapes.medium,
+        shape = ScheduleStyle.CardShape,
         colors = CardDefaults.cardColors(
             containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
             else MaterialTheme.colorScheme.surface
@@ -693,7 +694,7 @@ private fun DateStep(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onOpenDatePicker),
-            shape = MaterialTheme.shapes.medium,
+            shape = ScheduleStyle.CardShape,
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
             )
@@ -800,7 +801,7 @@ private fun ImportStep(
         Spacer(Modifier.height(10.dp))
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium,
+            shape = ScheduleStyle.CardShape,
             colors = CardDefaults.cardColors(
                 containerColor = if (importMode == 0) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
                 else MaterialTheme.colorScheme.surface
@@ -840,7 +841,7 @@ private fun WizardSchemeRow(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clickable(onClick = onClick),
-        shape = MaterialTheme.shapes.medium,
+        shape = ScheduleStyle.CardShape,
         colors = CardDefaults.cardColors(
             containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
             else MaterialTheme.colorScheme.surface

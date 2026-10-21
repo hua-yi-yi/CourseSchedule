@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import com.chen.schedule.ui.theme.ScheduleTopAppBar
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -194,7 +195,7 @@ fun HaustImportScreen(onNavigateBack: () -> Unit, viewModel: HaustImportViewMode
             viewModel.preview.isEmpty() && viewModel.successMessage == null
     ) { browser?.goBack() }
     Scaffold(topBar = {
-        TopAppBar(title = { Text("河南科技大学课表") }, navigationIcon = {
+        ScheduleTopAppBar(title = { Text("河南科技大学课表") }, navigationIcon = {
             TextButton(onClick = onNavigateBack) { Text("关闭") }
         })
     }) { padding ->

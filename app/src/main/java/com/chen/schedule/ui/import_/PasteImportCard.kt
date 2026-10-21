@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.import_
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
@@ -58,7 +60,7 @@ internal fun PasteImportCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
-        shape = MaterialTheme.shapes.medium,
+        shape = ScheduleStyle.CardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         )

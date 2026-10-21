@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.settings
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import android.Manifest
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -253,7 +255,7 @@ internal fun CalendarSyncDialog(
                 Button(
                     onClick = onStartSync,
                     enabled = preview.totalEvents > 0,
-                    shape = MaterialTheme.shapes.medium
+                    shape = ScheduleStyle.CardShape
                 ) {
                     Text(if (preview.syncedCount > 0) "重新覆盖同步" else "立即同步", fontSize = 13.sp)
                 }
@@ -264,7 +266,7 @@ internal fun CalendarSyncDialog(
                 if (preview != null && preview.syncedCount > 0 && !isSyncing) {
                     OutlinedButton(
                         onClick = { showConfirmClearDialog = true },
-                        shape = MaterialTheme.shapes.medium
+                        shape = ScheduleStyle.CardShape
                     ) {
                         Text("清除日历", color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
                     }

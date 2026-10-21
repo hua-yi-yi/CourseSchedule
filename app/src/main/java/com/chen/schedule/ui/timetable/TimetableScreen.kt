@@ -216,7 +216,7 @@ fun TimetableScreen(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
                             ),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = com.chen.schedule.ui.theme.ScheduleStyle.CardShape
                         ) {
                             Row(
                                 modifier = Modifier

@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.Color
 import androidx.glance.unit.ColorProvider
+import com.chen.schedule.ui.theme.DarkColorScheme
+import com.chen.schedule.ui.theme.LightColorScheme
 import com.chen.schedule.ui.theme.ThemeConfig
 import com.chen.schedule.ui.theme.ThemePrefs
 import com.chen.schedule.ui.theme.WidgetBackgroundMode
@@ -63,7 +65,7 @@ object WidgetThemeHelper {
                 containerColor = Color.White.copy(alpha = opacity * 0.78f)
             }
             WidgetBackgroundMode.TRANSLUCENT_DARK -> {
-                containerColor = Color(0xFF1E1E1E).copy(alpha = opacity * 0.78f)
+                containerColor = DarkColorScheme.surface.copy(alpha = opacity * 0.78f)
             }
             WidgetBackgroundMode.SOLID_WHITE -> {
                 containerColor = Color.White.copy(alpha = opacity)
@@ -99,13 +101,14 @@ object WidgetThemeHelper {
         }
 
         val isDefault = mode == WidgetBackgroundMode.DEFAULT && contrast == WidgetTextContrast.AUTO
+        val palette = if (shouldUseLightText) DarkColorScheme else LightColorScheme
 
         val titleColor = if (isDefault) null else {
-            if (shouldUseLightText) ColorProvider(Color(0xFFF8FAFC)) else ColorProvider(Color(0xFF0F172A))
+            ColorProvider(palette.onSurface)
         }
 
         val subtitleColor = if (isDefault) null else {
-            if (shouldUseLightText) ColorProvider(Color(0xFFCBD5E1)) else ColorProvider(Color(0xFF475569))
+            ColorProvider(palette.onSurfaceVariant)
         }
 
         val itemCardBg = when {
@@ -119,14 +122,12 @@ object WidgetThemeHelper {
 
         val badgeBg = when {
             isDefault -> null
-            shouldUseLightText -> ColorProvider(Color(0x4038BDF8))
-            else -> ColorProvider(Color(0x300284C7))
+            else -> ColorProvider(palette.primaryContainer)
         }
 
         val badgeTextColor = when {
             isDefault -> null
-            shouldUseLightText -> ColorProvider(Color(0xFFBAE6FD))
-            else -> ColorProvider(Color(0xFF0369A1))
+            else -> ColorProvider(palette.onPrimaryContainer)
         }
 
         val headerBg = when {

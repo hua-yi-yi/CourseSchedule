@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.schedule
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -97,7 +99,7 @@ fun ScheduleMenuCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = MaterialTheme.shapes.large,
+        shape = ScheduleStyle.CardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
@@ -155,7 +157,7 @@ fun MenuEntryRow(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clickable { onClick() },
-        shape = MaterialTheme.shapes.medium,
+        shape = ScheduleStyle.CardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(

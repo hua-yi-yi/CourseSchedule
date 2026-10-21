@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.import_
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -150,7 +152,7 @@ internal fun LazyListScope.fileImportItems(
                 .fillMaxWidth()
                 .padding(vertical = 4.dp)
                 .clickable(onClick = onScraperLogin),
-            shape = MaterialTheme.shapes.medium,
+            shape = ScheduleStyle.CardShape,
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             )
@@ -190,7 +192,7 @@ internal fun LazyListScope.fileImportItems(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
+            shape = ScheduleStyle.CardShape,
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow
             )
@@ -257,7 +259,7 @@ internal fun LazyListScope.fileImportItems(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
+            shape = ScheduleStyle.CardShape,
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow
             )

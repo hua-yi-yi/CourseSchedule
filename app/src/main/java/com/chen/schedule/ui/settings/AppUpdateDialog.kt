@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.settings
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -95,7 +97,7 @@ internal fun AppUpdateDialog(viewModel: SettingsViewModel, downloadState: Downlo
                     )
 
                     Surface(
-                        shape = MaterialTheme.shapes.medium,
+                        shape = ScheduleStyle.CardShape,
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                         modifier = Modifier
                             .fillMaxWidth()

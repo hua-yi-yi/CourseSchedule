@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.import_
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -46,7 +48,7 @@ internal fun OtherMethodCard(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clickable { expanded = !expanded },
-        shape = MaterialTheme.shapes.medium,
+        shape = ScheduleStyle.CardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )

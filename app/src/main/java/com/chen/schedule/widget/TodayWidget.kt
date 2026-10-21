@@ -74,20 +74,20 @@ private fun TodayWidgetContent(data: WidgetData) {
 
     val titleColor = visualStyle.titleColor ?: GlanceTheme.colors.onSurface
     val subtitleColor = visualStyle.subtitleColor ?: GlanceTheme.colors.onSurfaceVariant
-    val badgeBg = visualStyle.badgeBg ?: (if (data.courses.isNotEmpty()) GlanceTheme.colors.primaryContainer else GlanceTheme.colors.surfaceVariant)
+    val badgeBg = visualStyle.badgeBg ?: (if (data.courses.isNotEmpty()) GlanceTheme.colors.primaryContainer else GlanceTheme.colors.surface)
     val badgeTextColor = visualStyle.badgeTextColor ?: (if (data.courses.isNotEmpty()) GlanceTheme.colors.onPrimaryContainer else GlanceTheme.colors.onSurfaceVariant)
-    val emptyCardBg = visualStyle.itemCardBg ?: GlanceTheme.colors.surfaceVariant
+    val emptyCardBg = visualStyle.itemCardBg ?: GlanceTheme.colors.surface
 
     val baseModifier = GlanceModifier
         .fillMaxSize()
         .appWidgetBackground()
-        .cornerRadius(16.dp)
+        .cornerRadius(WidgetStyle.CardRadius)
         .clickable(actionStartActivity<MainActivity>())
 
     val backgroundModifier = when {
         visualStyle.containerColor != null -> baseModifier.background(visualStyle.containerColor)
         visualStyle.backgroundBitmap != null -> baseModifier
-        else -> baseModifier.background(GlanceTheme.colors.surface)
+        else -> baseModifier.background(GlanceTheme.colors.background)
     }
 
     Box(modifier = backgroundModifier) {
@@ -96,14 +96,14 @@ private fun TodayWidgetContent(data: WidgetData) {
                 provider = ImageProvider(visualStyle.backgroundBitmap),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = GlanceModifier.fillMaxSize().cornerRadius(16.dp)
+                modifier = GlanceModifier.fillMaxSize().cornerRadius(WidgetStyle.CardRadius)
             )
         }
 
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .padding(12.dp)
+                .padding(WidgetStyle.ContentPadding)
         ) {
             // 顶部信息区：日期·星期，学期·周次，右侧课程数胶囊徽标
             Row(
@@ -116,7 +116,7 @@ private fun TodayWidgetContent(data: WidgetData) {
                     Text(
                         text = "${data.dateLabel} · ${data.dayOfWeekLabel}",
                         style = TextStyle(
-                            fontSize = 14.sp,
+                            fontSize = WidgetStyle.TitleSize,
                             fontWeight = FontWeight.Bold,
                             color = titleColor
                         )
@@ -124,7 +124,7 @@ private fun TodayWidgetContent(data: WidgetData) {
                     Text(
                         text = if (data.currentWeek > 0) "${data.semesterName} · 第${data.currentWeek}周" else data.semesterName,
                         style = TextStyle(
-                            fontSize = 11.sp,
+                            fontSize = WidgetStyle.DetailSize,
                             color = subtitleColor
                         ),
                         maxLines = 1
@@ -142,7 +142,7 @@ private fun TodayWidgetContent(data: WidgetData) {
                     Text(
                         text = if (data.courses.isNotEmpty()) "共 ${data.courses.size} 门课" else "无课",
                         style = TextStyle(
-                            fontSize = 11.sp,
+                            fontSize = WidgetStyle.DetailSize,
                             fontWeight = FontWeight.Medium,
                             color = badgeTextColor
                         )
@@ -157,7 +157,7 @@ private fun TodayWidgetContent(data: WidgetData) {
                     modifier = GlanceModifier
                         .fillMaxSize()
                         .padding(top = 8.dp)
-                        .cornerRadius(12.dp)
+                        .cornerRadius(WidgetStyle.CardRadius)
                         .background(emptyCardBg)
                         .clickable(actionStartActivity<MainActivity>())
                         .padding(horizontal = 16.dp, vertical = 16.dp),
@@ -170,7 +170,7 @@ private fun TodayWidgetContent(data: WidgetData) {
                         Text(
                             text = "今日无课",
                             style = TextStyle(
-                                fontSize = 14.sp,
+                                fontSize = WidgetStyle.TitleSize,
                                 fontWeight = FontWeight.Bold,
                                 color = titleColor
                             )
@@ -179,7 +179,7 @@ private fun TodayWidgetContent(data: WidgetData) {
                         Text(
                             text = "享受属于自己的自由时间吧",
                             style = TextStyle(
-                                fontSize = 11.5.sp,
+                                fontSize = WidgetStyle.DetailSize,
                                 color = subtitleColor
                             )
                         )
@@ -188,7 +188,7 @@ private fun TodayWidgetContent(data: WidgetData) {
             } else {
                 LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                     items(data.courses) { course ->
-                        TodayCourseCard(course, isDarkTheme)
+                        WidgetCourseCard(course, visualStyle)
                     }
                 }
             }
@@ -197,16 +197,17 @@ private fun TodayWidgetContent(data: WidgetData) {
 }
 
 @Composable
-private fun TodayCourseCard(course: WidgetCourse, isDarkTheme: Boolean) {
-    val courseBackground = WeekGridBuilder.pastelColorFor(course.color, isDark = isDarkTheme)
-    val textColor = WeekGridBuilder.textColorFor(courseBackground)
+internal fun WidgetCourseCard(course: WidgetCourse, visualStyle: WidgetVisualStyle, maxLines: Int = 1) {
+    val courseBackground = Color(course.color).copy(alpha = WidgetStyle.CourseTintAlpha)
+    val textColor = visualStyle.titleColor ?: GlanceTheme.colors.onSurface
+    val detailColor = visualStyle.subtitleColor ?: GlanceTheme.colors.onSurfaceVariant
 
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()
             .padding(vertical = 3.5.dp)
-            .cornerRadius(12.dp)
-            .background(ColorProvider(Color(courseBackground)))
+            .cornerRadius(WidgetStyle.CardRadius)
+            .background(ColorProvider(courseBackground))
             .padding(horizontal = 10.dp, vertical = 8.dp)
             .clickable(actionStartActivity<MainActivity>()),
         verticalAlignment = Alignment.CenterVertically
@@ -227,11 +228,11 @@ private fun TodayCourseCard(course: WidgetCourse, isDarkTheme: Boolean) {
             Text(
                 text = course.name,
                 style = TextStyle(
-                    fontSize = 13.5.sp,
+                    fontSize = WidgetStyle.TitleSize,
                     fontWeight = FontWeight.Bold,
-                    color = ColorProvider(Color(textColor))
+                    color = textColor
                 ),
-                maxLines = 1
+                maxLines = maxLines
             )
 
             Spacer(modifier = GlanceModifier.height(2.5.dp))
@@ -245,11 +246,11 @@ private fun TodayCourseCard(course: WidgetCourse, isDarkTheme: Boolean) {
             Text(
                 text = timeText,
                 style = TextStyle(
-                    fontSize = 11.sp,
+                    fontSize = WidgetStyle.DetailSize,
                     fontWeight = FontWeight.Medium,
-                    color = ColorProvider(Color(textColor).copy(alpha = 0.78f))
+                    color = detailColor
                 ),
-                maxLines = 1
+                maxLines = maxLines
             )
 
             // 上课地点与教师：主页风格以 @地点 开头
@@ -267,10 +268,10 @@ private fun TodayCourseCard(course: WidgetCourse, isDarkTheme: Boolean) {
             Text(
                 text = placeText,
                 style = TextStyle(
-                    fontSize = 11.sp,
-                    color = ColorProvider(Color(textColor).copy(alpha = 0.88f))
+                    fontSize = WidgetStyle.DetailSize,
+                    color = detailColor
                 ),
-                maxLines = 1
+                maxLines = maxLines
             )
         }
     }

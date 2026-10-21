@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.import_
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -181,7 +183,7 @@ fun ImportReviewDialog(
                     )
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.medium,
+                        shape = ScheduleStyle.CardShape,
                         colors = CardDefaults.cardColors(
                             containerColor = if (isExcluded) MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.35f)
                             else MaterialTheme.colorScheme.surfaceContainerLow

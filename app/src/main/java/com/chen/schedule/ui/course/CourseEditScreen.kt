@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.course
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -35,7 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.chen.schedule.ui.theme.ScheduleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -93,7 +94,7 @@ fun CourseEditScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
+            ScheduleTopAppBar(
                 title = {
                     Text(if (state.isEditing) "编辑课程" else "添加课程", fontWeight = FontWeight.Bold)
                 },
@@ -323,7 +324,7 @@ fun CourseEditScreen(
                         containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
                         contentColor = MaterialTheme.colorScheme.onErrorContainer
                     ),
-                    shape = MaterialTheme.shapes.medium,
+                    shape = ScheduleStyle.CardShape,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -360,7 +361,7 @@ fun CourseEditScreen(
             Text("课程颜色", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Card(
-                shape = RoundedCornerShape(14.dp),
+                shape = ScheduleStyle.CardShape,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),

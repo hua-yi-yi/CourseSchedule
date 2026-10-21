@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.schedule
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,7 +44,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import com.chen.schedule.ui.theme.ScheduleTopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -82,7 +84,7 @@ fun SemesterListScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
+            ScheduleTopAppBar(
                 title = { Text("选择学期", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -101,7 +103,7 @@ fun SemesterListScreen(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = ScheduleStyle.PagePadding)
             ) {
                 Spacer(Modifier.height(8.dp))
                 if (allSemesters.isEmpty()) {
@@ -157,7 +159,7 @@ private fun SemesterPickRow(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clickable { onSelect() },
-        shape = MaterialTheme.shapes.medium,
+        shape = ScheduleStyle.CardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
@@ -268,7 +270,7 @@ fun SemesterEditScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
+            ScheduleTopAppBar(
                 title = {
                     Text(if (form.isEditing) "编辑学期" else "新建学期", fontWeight = FontWeight.Bold)
                 },
@@ -359,7 +361,7 @@ fun SemesterEditScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { showDatePicker = true },
-                shape = MaterialTheme.shapes.medium,
+                shape = ScheduleStyle.CardShape,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                 )

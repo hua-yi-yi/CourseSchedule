@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.settings
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -78,7 +80,7 @@ internal fun MirrorSelectionDialog(viewModel: SettingsViewModel, onDismiss: () -
                         val latency = viewModel.mirrorLatencies[mirror]
 
                         Surface(
-                            shape = MaterialTheme.shapes.medium,
+                            shape = ScheduleStyle.CardShape,
                             color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
                             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                             modifier = Modifier

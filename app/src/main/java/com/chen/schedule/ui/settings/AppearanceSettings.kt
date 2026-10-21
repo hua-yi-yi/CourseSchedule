@@ -1,5 +1,7 @@
 package com.chen.schedule.ui.settings
 
+import com.chen.schedule.ui.theme.ScheduleStyle
+
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -177,7 +179,7 @@ internal fun AppearanceSettings(viewModel: SettingsViewModel) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = ScheduleStyle.CardShape
                     ) {
                         Row(
                             modifier = Modifier
@@ -336,7 +338,7 @@ internal fun AppearanceSettings(viewModel: SettingsViewModel) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = ScheduleStyle.CardShape
                     ) {
                         Row(
                             modifier = Modifier

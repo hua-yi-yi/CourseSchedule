@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 与主页 LightColorScheme 保持一致: surface, surfaceContainer, surfaceContainerLow -->
-    <color name="week_widget_canvas">#FDFDFF</color>
+    <!-- 与主页 LightColorScheme 保持一致: background, surfaceContainer, surfaceContainerLow -->
+    <color name="week_widget_canvas">#F3F5F9</color>
     <color name="week_widget_header">#F1F4F8</color>
     <color name="week_widget_time">#F7F9FC</color>
     <color name="week_widget_empty">#F7F9FC</color>
