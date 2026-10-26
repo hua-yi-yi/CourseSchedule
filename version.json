@@ -1,9 +1,9 @@
 {
-  "versionName": "1.3.9",
-  "versionTag": "v1.3.9",
-  "title": "v1.3.9 · 统一应用与桌面小组件风格",
-  "publishedAt": "2026-10-21",
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.9/CourseSchedule-v1.3.9.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.9",
-  "changelog": "- 应用内页面与课表主页统一视觉风格：使用紧凑标题栏、统一卡片圆角、页面边距与字体层级，覆盖设置、导入、课程编辑、学期与作息管理及初始化引导。\n- 今日课程、今日看板与周课表三种桌面小组件统一蓝灰背景、蓝色徽标和淡彩课程卡片，保留透明底板、独立壁纸和文字明暗设置。\n- 提取共享样式与今日课程卡片，减少不同页面和组件之间的样式差异；不改变课程数据和导入逻辑。"
+  "versionName": "1.3.10",
+  "versionTag": "v1.3.10",
+  "title": "v1.3.10 · 增加课表提取诊断与 GitHub 一键反馈",
+  "publishedAt": "2026-10-26",
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.10/CourseSchedule-v1.3.10.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.10",
+  "changelog": "- 导入核对页面增加课表提取诊断与 GitHub Issue 一键反馈：提取遇到缺课或格式解析异常时，可导出完整脱敏诊断数据并直达 GitHub 提交 Issue。\n- 支持一键复制完整诊断 Markdown 与 JSON 报告，方便离线交流与快速排查。\n- 仓库增加课表提取异常 Issue 模板，提升问题定位效率。"
 }

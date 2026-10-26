@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chen.schedule.domain.model.*
 import com.chen.schedule.util.*
+import android.content.Intent
+import android.net.Uri
+import kotlinx.coroutines.launch
 
 /**
  * 导入核对对话框：统一核对、修正、选择替换与删除旧安排的交互流程。
@@ -58,6 +61,7 @@ fun ImportReviewDialog(
     var removals by androidx.compose.runtime.saveable.rememberSaveable(incoming, stateSaver = removalsSaver) { mutableStateOf(emptySet<Long>()) }
     var editing by remember { mutableStateOf<Int?>(null) }
     var choosing by remember { mutableStateOf<Int?>(null) }
+    var showDiagnostic by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
     val selected = drafts.indices.filter { it !in excluded }
@@ -322,6 +326,15 @@ fun ImportReviewDialog(
                         Text(it, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(10.dp), style = MaterialTheme.typography.bodySmall)
                     }
                 }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    TextButton(onClick = { showDiagnostic = true }) {
+                        Text("提取不全或有误？上报/导出诊断", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
             }
         },
         confirmButton = {
@@ -388,6 +401,15 @@ fun ImportReviewDialog(
                 }
             },
             confirmButton = { TextButton(onClick = { choosing = null }) { Text("取消") } }
+        )
+    }
+
+    if (showDiagnostic) {
+        DiagnosticReportDialog(
+            context = context,
+            courses = drafts.filterIndexed { index, _ -> index in selected },
+            error = error.orEmpty(),
+            onDismiss = { showDiagnostic = false }
         )
     }
 }
@@ -585,3 +607,89 @@ fun CourseDraftDialog(
         }
     )
 }
+
+@Composable
+private fun DiagnosticReportDialog(
+    context: ImportReviewContext,
+    courses: List<Course>,
+    error: String,
+    onDismiss: () -> Unit
+) {
+    val androidContext = androidx.compose.ui.platform.LocalContext.current
+    var note by remember { mutableStateOf("") }
+
+    fun getPayload() = DiagnosticReporter.buildPayload(
+        source = context.source,
+        semesterName = context.semester.name,
+        totalWeeks = context.semester.totalWeeks,
+        courses = courses,
+        error = error,
+        note = note
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("课表提取诊断与反馈", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "诊断信息包含解析提取到的课程概况及环境参数（不含任何账号密码隐私），可直接同步到 GitHub Issues 供开发者快速排查漏课原因。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("补充说明（选填，如：漏了周三第5节高数）") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val payload = getPayload()
+                    val issueUrl = DiagnosticReporter.buildGithubIssueUrl(payload)
+                    val reportText = DiagnosticReporter.buildMarkdownReport(payload)
+                    val clipboard = androidContext.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("课表诊断数据", reportText))
+                    runCatching {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(issueUrl)).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        androidContext.startActivity(intent)
+                        android.widget.Toast.makeText(androidContext, "已打开 GitHub，诊断文本已同时复制！", android.widget.Toast.LENGTH_SHORT).show()
+                        onDismiss()
+                    }.onFailure {
+                        android.widget.Toast.makeText(androidContext, "无法打开浏览器，诊断文本已复制到剪贴板！", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            ) {
+                Text("在 GitHub 提交反馈")
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = onDismiss) {
+                    Text("取消")
+                }
+                TextButton(
+                    onClick = {
+                        val payload = getPayload()
+                        val reportText = DiagnosticReporter.buildMarkdownReport(payload)
+                        val clipboard = androidContext.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("课表诊断数据", reportText))
+                        android.widget.Toast.makeText(androidContext, "已复制完整诊断报告，可直接发送给开发者！", android.widget.Toast.LENGTH_LONG).show()
+                        onDismiss()
+                    }
+                ) {
+                    Text("复制诊断文本")
+                }
+            }
+        }
+    )
+}
+
