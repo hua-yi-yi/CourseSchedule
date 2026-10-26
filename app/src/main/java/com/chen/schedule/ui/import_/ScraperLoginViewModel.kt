@@ -173,6 +173,14 @@ class ScraperLoginViewModel @Inject constructor(
                 val source = "zhengfang:" + android.net.Uri.parse(_state.value.url).host.orEmpty()
                 val review = importService.review(fetched.courses, source)
                 require(review.semester.id == destination.id) { "当前学期已切换，请重新读取" }
+                com.chen.schedule.util.ImportSnapshotManager.record(
+                    context = context,
+                    source = "正方教务 (" + android.net.Uri.parse(_state.value.url).host.orEmpty() + ")",
+                    semesterName = destination.name,
+                    totalWeeks = destination.totalWeeks,
+                    courses = fetched.courses,
+                    rawContent = fetched.rawContent.orEmpty()
+                )
                 _state.update { it.copy(isLoading = false, preview = fetched.courses, review = review, message = "请核对后确认导入") }
             } catch (e: CancellationException) {
                 throw e

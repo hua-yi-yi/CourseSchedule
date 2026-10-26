@@ -139,6 +139,15 @@ class HaustImportViewModel @Inject constructor(
                 sourceSemester = result.first
                 preview = CoursePalette.assignColors(result.second)
                 review = importService.review(preview, "haust")
+                val dest = destination
+                com.chen.schedule.util.ImportSnapshotManager.record(
+                    context = context,
+                    source = "河南科技大学教务 (WebVPN)",
+                    semesterName = dest?.name ?: result.first,
+                    totalWeeks = dest?.totalWeeks ?: 20,
+                    courses = preview,
+                    rawContent = raw
+                )
                 message = ""
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { message = e.message ?: "读取失败" }

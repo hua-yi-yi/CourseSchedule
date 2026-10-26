@@ -99,21 +99,39 @@ class ImportViewModel @Inject constructor(
         }
     }
 
-    private suspend fun parseJsonText(jsonString: String) = preparePreview(JsonImporter.parse(jsonString))
+    private suspend fun parseJsonText(jsonString: String) = preparePreview(JsonImporter.parse(jsonString), "JSON文本导入", jsonString)
 
-    private suspend fun parseCsvText(csvString: String) = preparePreview(CsvImporter.parse(csvString))
+    private suspend fun parseCsvText(csvString: String) = preparePreview(CsvImporter.parse(csvString), "CSV文本导入", csvString)
 
-    private suspend fun preparePreview(result: Result<List<Course>>) {
+    private suspend fun preparePreview(result: Result<List<Course>>, source: String = "文件/文本导入", raw: String = "") {
         try {
             val courses = result.getOrThrow()
             val semester = semesterRepository.getCurrentSemester() ?: error("请先创建学期")
             val review = importService.review(courses, "file")
+            com.chen.schedule.util.ImportSnapshotManager.record(
+                context = context,
+                source = source,
+                semesterName = semester.name,
+                totalWeeks = semester.totalWeeks,
+                courses = courses,
+                rawContent = raw
+            )
             _state.update { it.copy(review = review, previewCourses = courses, previewSemesterId = semester.id,
                 previewSemesterName = semester.name, isError = false,
                 message = "解析成功，共 ${courses.size} 条课程安排", isImporting = false) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            val semester = semesterRepository.getCurrentSemester()
+            com.chen.schedule.util.ImportSnapshotManager.record(
+                context = context,
+                source = source,
+                semesterName = semester?.name.orEmpty(),
+                totalWeeks = semester?.totalWeeks ?: 16,
+                courses = emptyList(),
+                rawContent = raw,
+                error = e.message
+            )
             _state.update { it.copy(previewCourses = emptyList(), previewSemesterId = null,
                 message = "读取失败：${e.message}；未导入任何课程", isError = true, isImporting = false) }
         }

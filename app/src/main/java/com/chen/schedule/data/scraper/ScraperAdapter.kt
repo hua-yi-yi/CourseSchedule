@@ -11,7 +11,8 @@ data class ScraperConfig(
 
 data class ScraperResult(
     val courses: List<Course>,
-    val semesterName: String? = null
+    val semesterName: String? = null,
+    val rawContent: String? = null
 )
 
 /** 登录结果:携带具体失败原因,便于 UI 直接展示 */

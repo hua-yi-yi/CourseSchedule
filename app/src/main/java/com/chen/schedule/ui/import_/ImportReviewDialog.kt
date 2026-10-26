@@ -617,6 +617,7 @@ private fun DiagnosticReportDialog(
 ) {
     val androidContext = androidx.compose.ui.platform.LocalContext.current
     var note by remember { mutableStateOf("") }
+    var showHistory by remember { mutableStateOf(false) }
 
     fun getPayload() = DiagnosticReporter.buildPayload(
         source = context.source,
@@ -646,6 +647,17 @@ private fun DiagnosticReportDialog(
                     label = { Text("补充说明（选填，如：漏了周三第5节高数）") },
                     modifier = Modifier.fillMaxWidth()
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = { showHistory = true },
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("查看本地历史导入快照", fontSize = 12.sp)
+                    }
+                }
             }
         },
         confirmButton = {
@@ -691,5 +703,9 @@ private fun DiagnosticReportDialog(
             }
         }
     )
+
+    if (showHistory) {
+        ImportSnapshotHistoryDialog(onDismiss = { showHistory = false })
+    }
 }
 

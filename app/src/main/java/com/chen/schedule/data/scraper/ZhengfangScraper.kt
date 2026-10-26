@@ -128,7 +128,7 @@ class ZhengfangScraper @Inject constructor() : ScraperAdapter {
             if (courses.isEmpty()) {
                 throw ScraperException("未能解析到课程数据:请确认教务系统地址,或改用 JSON/CSV 导入")
             }
-            ScraperResult(courses)
+            ScraperResult(courses, rawContent = html)
         } catch (e: ScraperException) {
             throw e
         } catch (_: Exception) {

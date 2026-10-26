@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -66,6 +67,7 @@ fun ImportScreen(
     val context = LocalContext.current
     var showJsonGuide by remember { mutableStateOf(false) }
     var showCsvGuide by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
     // 导入方式二选一:0 = 高校教务系统导入, 1 = 文件与文本导入
     var importMode by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initialMode) }
     var schoolSearchQuery by remember { mutableStateOf("") }
@@ -97,6 +99,11 @@ fun ImportScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showHistory = true }) {
+                        Icon(Icons.Default.History, "导入快照历史", modifier = Modifier.size(20.dp))
                     }
                 }
             )
@@ -155,5 +162,9 @@ fun ImportScreen(
     }
     state.review?.takeIf { state.previewCourses.isNotEmpty() }?.let { review ->
         ImportReviewDialog(state.previewCourses, review, state.isImporting, viewModel::dismissPreview, viewModel::confirmImport)
+    }
+
+    if (showHistory) {
+        ImportSnapshotHistoryDialog(onDismiss = { showHistory = false })
     }
 }
