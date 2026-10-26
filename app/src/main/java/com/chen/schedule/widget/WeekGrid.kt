@@ -51,11 +51,15 @@ object WeekGridBuilder {
         courses: List<Course>,
         week: Int,
         maxSlots: Int = MAX_SLOTS,
-        timeSlots: List<TimeSlot> = emptyList()
+        timeSlots: List<TimeSlot> = emptyList(),
+        preferredCourseIds: Set<Long> = emptySet()
     ): List<List<Cell?>> {
         val grid = Array(maxSlots) { arrayOfNulls<Cell>(7) }
-        for ((sourceIndex, course) in courses.withIndex()) {
-            if (!course.appliesToWeek(week)) continue
+        val filtered = courses.filter { it.appliesToWeek(week) }
+        val clusters = com.chen.schedule.util.CourseConflictDetector.resolveClusters(filtered, preferredCourseIds)
+
+        for ((clusterIndex, cluster) in clusters.withIndex()) {
+            val course = cluster.primaryCourse
             val day = course.dayOfWeek - 1
             if (day !in 0..6) continue
             if (course.startSlot > maxSlots || course.endSlot < 1 || course.endSlot < course.startSlot) continue
@@ -64,6 +68,7 @@ object WeekGridBuilder {
             val span = end - start + 1
             val startTime = timeSlots.find { it.slotNumber == course.startSlot }?.startTime ?: ""
             val endTime = timeSlots.find { it.slotNumber == course.endSlot }?.endTime ?: ""
+            val extraCount = cluster.allCourses.size - 1
 
             for (slot in start..end) {
                 val idx = slot - 1
@@ -77,13 +82,10 @@ object WeekGridBuilder {
                     endTime = endTime,
                     slotIndexInCourse = slotIndexInCourse,
                     courseSpan = span,
-                    extraCount = 0,
-                    sourceIndex = sourceIndex
+                    extraCount = extraCount,
+                    sourceIndex = clusterIndex
                 )
-                grid[idx][day] = when (val cur = grid[idx][day]) {
-                    null -> newCell
-                    else -> cur.copy(extraCount = cur.extraCount + 1)
-                }
+                grid[idx][day] = newCell
             }
         }
         return grid.map { row -> row.toList() }

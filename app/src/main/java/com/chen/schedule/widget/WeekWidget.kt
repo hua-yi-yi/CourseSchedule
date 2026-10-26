@@ -147,7 +147,8 @@ class WeekWidget : GlanceAppWidget() {
                 courses.maxOfOrNull { it.endSlot } ?: 0
             ).coerceAtMost(WeekGridBuilder.MAX_SLOTS)
 
-            val grid = WeekGridBuilder.build(courses, week, slotCount, configuredSlots)
+            val preferredIds = com.chen.schedule.util.CourseConflictDetector.loadPreferredCourseIds(context)
+            val grid = WeekGridBuilder.build(courses, week, slotCount, configuredSlots, preferredIds)
             val today = LocalDate.now()
             val todayDayOfWeek = today.dayOfWeek.value
 

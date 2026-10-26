@@ -224,9 +224,10 @@ internal fun WidgetCourseCard(course: WidgetCourse, visualStyle: WidgetVisualSty
         Spacer(modifier = GlanceModifier.width(9.dp))
 
         Column(modifier = GlanceModifier.defaultWeight()) {
-            // 课程名称：完整显示，主文本粗体
+            // 课程名称：完整显示，主文本粗体（若有冲突重叠，标明重叠门数）
+            val courseTitle = if (course.extraCount > 0) "${course.name} · ${course.extraCount + 1}门" else course.name
             Text(
-                text = course.name,
+                text = courseTitle,
                 style = TextStyle(
                     fontSize = WidgetStyle.TitleSize,
                     fontWeight = FontWeight.Bold,

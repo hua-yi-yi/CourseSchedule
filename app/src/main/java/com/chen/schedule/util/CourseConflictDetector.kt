@@ -1,5 +1,6 @@
 package com.chen.schedule.util
 
+import android.content.Context
 import com.chen.schedule.domain.model.Course
 
 /**
@@ -11,6 +12,20 @@ import com.chen.schedule.domain.model.Course
  * 3. 存在至少一个共同生效的教学周 (考虑 startWeek..endWeek 及单双周规则)
  */
 object CourseConflictDetector {
+
+    const val PREFS_NAME = "timetable_prefs"
+    const val KEY_PREFERRED_COURSE_IDS = "preferred_course_ids"
+
+    fun loadPreferredCourseIds(context: Context): Set<Long> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val raw = prefs.getStringSet(KEY_PREFERRED_COURSE_IDS, emptySet()).orEmpty()
+        return raw.mapNotNull { it.toLongOrNull() }.toSet()
+    }
+
+    fun savePreferredCourseIds(context: Context, ids: Set<Long>) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putStringSet(KEY_PREFERRED_COURSE_IDS, ids.map { it.toString() }.toSet()).apply()
+    }
 
     data class CourseConflict(
         val existingCourse: Course,

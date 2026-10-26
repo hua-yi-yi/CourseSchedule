@@ -15,7 +15,8 @@ data class WidgetCourse(
     val endSlot: Int,
     val startTime: String = "",
     val endTime: String = "",
-    val color: Long = 0xFF4CAF50
+    val color: Long = 0xFF4CAF50,
+    val extraCount: Int = 0
 ) {
     /** 完整起止时间展示，例如 "08:00 - 09:40" 或在未设置具体时间时展示 "第1-2节" */
     val timeDisplay: String
@@ -73,31 +74,28 @@ object TodayWidgetDataLoader {
             val slots = entryPoint.timeSlotDao().getTimeSlotsBySchemeDirect(sem.schemeId)
             val slotMap = slots.associateBy { it.slotNumber }
 
-            val courses = entities
-                .filter { course ->
-                    val weekMatch = when (course.weekType) {
-                        "odd" -> week % 2 == 1
-                        "even" -> week % 2 == 0
-                        else -> true
-                    }
-                    weekMatch && course.startWeek <= week && course.endWeek >= week
-                }
-                .sortedBy { it.startSlot }
-                .map { e ->
-                    val startSlot = slotMap[e.startSlot]
-                    val endSlot = slotMap[e.endSlot] ?: startSlot
-                    WidgetCourse(
-                        id = e.id,
-                        name = e.name,
-                        classroom = e.classroom,
-                        teacher = e.teacher,
-                        startSlot = e.startSlot,
-                        endSlot = e.endSlot,
-                        startTime = startSlot?.startTime.orEmpty(),
-                        endTime = endSlot?.endTime.orEmpty(),
-                        color = e.color
-                    )
-                }
+            val domainCourses = entities.map { it.toDomain() }
+            val filtered = domainCourses.filter { it.appliesToWeek(week) }
+            val preferredIds = com.chen.schedule.util.CourseConflictDetector.loadPreferredCourseIds(context)
+            val clusters = com.chen.schedule.util.CourseConflictDetector.resolveClusters(filtered, preferredIds)
+
+            val courses = clusters.map { cluster ->
+                val c = cluster.primaryCourse
+                val startSlot = slotMap[c.startSlot]
+                val endSlot = slotMap[c.endSlot] ?: startSlot
+                WidgetCourse(
+                    id = c.id,
+                    name = c.name,
+                    classroom = c.classroom,
+                    teacher = c.teacher,
+                    startSlot = c.startSlot,
+                    endSlot = c.endSlot,
+                    startTime = startSlot?.startTime.orEmpty(),
+                    endTime = endSlot?.endTime.orEmpty(),
+                    color = c.color,
+                    extraCount = cluster.allCourses.size - 1
+                )
+            }.sortedBy { it.startSlot }
 
             WidgetData(
                 semesterName = sem.name,
@@ -112,3 +110,25 @@ object TodayWidgetDataLoader {
         }
     }
 }
+
+private fun com.chen.schedule.data.local.entity.CourseEntity.toDomain() = com.chen.schedule.domain.model.Course(
+    id = id,
+    name = name,
+    teacher = teacher,
+    classroom = classroom,
+    dayOfWeek = dayOfWeek,
+    startSlot = startSlot,
+    endSlot = endSlot,
+    startWeek = startWeek,
+    endWeek = endWeek,
+    weekType = when (weekType) {
+        "odd" -> com.chen.schedule.domain.model.WeekType.ODD
+        "even" -> com.chen.schedule.domain.model.WeekType.EVEN
+        else -> com.chen.schedule.domain.model.WeekType.ALL
+    },
+    color = color,
+    semesterId = semesterId,
+    note = note,
+    importSource = importSource
+)
+

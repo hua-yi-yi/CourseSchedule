@@ -101,12 +101,11 @@ class TimetableViewModel @Inject constructor(
     }
 
     private fun loadPreferredCourseIds(): Set<Long> {
-        val raw = prefs.getStringSet("preferred_course_ids", emptySet()).orEmpty()
-        return raw.mapNotNull { it.toLongOrNull() }.toSet()
+        return com.chen.schedule.util.CourseConflictDetector.loadPreferredCourseIds(context)
     }
 
     private fun savePreferredCourseIds(ids: Set<Long>) {
-        prefs.edit().putStringSet("preferred_course_ids", ids.map { it.toString() }.toSet()).apply()
+        com.chen.schedule.util.CourseConflictDetector.savePreferredCourseIds(context, ids)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -212,6 +211,7 @@ class TimetableViewModel @Inject constructor(
         val updated = (current - clusterIds) + course.id
         savePreferredCourseIds(updated)
         _state.update { it.copy(preferredCourseIds = updated) }
+        viewModelScope.launch { WidgetUpdater.refreshAll(context) }
     }
 
     /**

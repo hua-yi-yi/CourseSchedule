@@ -133,6 +133,20 @@ class WeekGridBuilderTest {
     }
 
     @Test
+    fun `重叠课程根据优选偏好选定展示的课程`() {
+        val courseA = course(name = "A", day = 1, start = 1, end = 2).copy(id = 101)
+        val courseB = course(name = "B", day = 1, start = 1, end = 2).copy(id = 102)
+
+        val cellDefault = WeekGridBuilder.build(listOf(courseA, courseB), week = 1)[0][0]
+        assertEquals("A", cellDefault?.name)
+        assertEquals(1, cellDefault?.extraCount)
+
+        val cellWithPref = WeekGridBuilder.build(listOf(courseA, courseB), week = 1, preferredCourseIds = setOf(102L))[0][0]
+        assertEquals("B", cellWithPref?.name)
+        assertEquals(1, cellWithPref?.extraCount)
+    }
+
+    @Test
     fun `超过最大节次数的课程被钳制`() {
         val c = course(name = "晚课", day = 5, start = 11, end = 13)
         val grid = WeekGridBuilder.build(listOf(c), week = 1) // maxSlots 默认 12
