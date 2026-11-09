@@ -77,7 +77,10 @@ data class ThemeConfig(
     /** 小组件底板不透明度 (0.0f - 1.0f) */
     val widgetOpacity: Float = 1.0f,
     /** 小组件文字对比度模式 */
-    val widgetTextContrast: WidgetTextContrast = WidgetTextContrast.AUTO
+    val widgetTextContrast: WidgetTextContrast = WidgetTextContrast.AUTO,
+    // 替换壁纸后文件路径不变，版本号用于重新加载位图。
+    val customBackgroundRevision: Long = 0L,
+    val widgetCustomBgRevision: Long = 0L
 )
 
 /**
@@ -104,7 +107,10 @@ class ThemePrefs(context: Context) {
     var customBackgroundPath: String?
         get() = prefs.getString(KEY_CUSTOM_BG_PATH, null)?.takeIf { it.isNotBlank() }
         set(value) {
-            prefs.edit().putString(KEY_CUSTOM_BG_PATH, value).apply()
+            prefs.edit()
+                .putString(KEY_CUSTOM_BG_PATH, value)
+                .putLong(KEY_CUSTOM_BG_REVISION, prefs.getLong(KEY_CUSTOM_BG_REVISION, 0L) + 1)
+                .apply()
             _state.value = currentConfig()
         }
 
@@ -132,7 +138,10 @@ class ThemePrefs(context: Context) {
     var widgetCustomBgPath: String?
         get() = prefs.getString(KEY_WIDGET_CUSTOM_BG_PATH, null)?.takeIf { it.isNotBlank() }
         set(value) {
-            prefs.edit().putString(KEY_WIDGET_CUSTOM_BG_PATH, value).apply()
+            prefs.edit()
+                .putString(KEY_WIDGET_CUSTOM_BG_PATH, value)
+                .putLong(KEY_WIDGET_CUSTOM_BG_REVISION, prefs.getLong(KEY_WIDGET_CUSTOM_BG_REVISION, 0L) + 1)
+                .apply()
             _state.value = currentConfig()
         }
 
@@ -159,7 +168,9 @@ class ThemePrefs(context: Context) {
         widgetBackgroundMode = widgetBackgroundMode,
         widgetCustomBgPath = widgetCustomBgPath,
         widgetOpacity = widgetOpacity,
-        widgetTextContrast = widgetTextContrast
+        widgetTextContrast = widgetTextContrast,
+        customBackgroundRevision = prefs.getLong(KEY_CUSTOM_BG_REVISION, 0L),
+        widgetCustomBgRevision = prefs.getLong(KEY_WIDGET_CUSTOM_BG_REVISION, 0L)
     )
 
     init {
@@ -174,11 +185,13 @@ class ThemePrefs(context: Context) {
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_BG_PRESET = "background_preset"
         private const val KEY_CUSTOM_BG_PATH = "custom_bg_path"
+        private const val KEY_CUSTOM_BG_REVISION = "custom_bg_revision"
         private const val KEY_BG_DIM = "bg_dim"
         private const val KEY_CARD_ALPHA = "card_alpha"
 
         private const val KEY_WIDGET_BG_MODE = "widget_bg_mode"
         private const val KEY_WIDGET_CUSTOM_BG_PATH = "widget_custom_bg_path"
+        private const val KEY_WIDGET_CUSTOM_BG_REVISION = "widget_custom_bg_revision"
         private const val KEY_WIDGET_OPACITY = "widget_opacity"
         private const val KEY_WIDGET_TEXT_CONTRAST = "widget_text_contrast"
 

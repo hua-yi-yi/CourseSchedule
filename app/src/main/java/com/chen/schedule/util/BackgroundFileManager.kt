@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
+import android.system.Os
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.max
@@ -41,25 +42,13 @@ object BackgroundFileManager {
             val maxH = if (isWidget) MAX_WIDGET_HEIGHT else MAX_APP_HEIGHT
             val targetFilename = if (isWidget) WIDGET_BG_FILENAME else APP_BG_FILENAME
 
-            // 1. 获取图片尺寸
+            // 仅解码尺寸时返回值为空，尺寸写入 options。
             val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            context.contentResolver.openInputStream(uri)?.use { stream ->
-                BitmapFactory.decodeStream(stream, null, options)
-            } ?: return null
+            val boundsStream = context.contentResolver.openInputStream(uri) ?: return null
+            boundsStream.use { BitmapFactory.decodeStream(it, null, options) }
 
             if (options.outWidth <= 0 || options.outHeight <= 0) return null
 
-            // 2. 计算采样率
-            options.inSampleSize = calculateInSampleSize(options, maxW, maxH)
-            options.inJustDecodeBounds = false
-            options.inPreferredConfig = Bitmap.Config.ARGB_8888
-
-            // 3. 解码 Bitmap
-            val rawBitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
-                BitmapFactory.decodeStream(stream, null, options)
-            } ?: return null
-
-            // 4. 校准 EXIF 方向
             val orientation = runCatching {
                 context.contentResolver.openInputStream(uri)?.use { stream ->
                     ExifInterface(stream).getAttributeInt(
@@ -69,27 +58,38 @@ object BackgroundFileManager {
                 } ?: ExifInterface.ORIENTATION_NORMAL
             }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
 
-            val orientedBitmap = applyExifOrientation(rawBitmap, orientation)
-
-            // 5. 若仍超出尺寸则精确缩放
-            val finalBitmap = scaleIfNeeded(orientedBitmap, maxW, maxH)
-
-            // 6. 写入内部存储
-            val bgDir = File(context.filesDir, DIR_NAME).apply { if (!exists()) mkdirs() }
-            val destFile = File(bgDir, targetFilename)
-            FileOutputStream(destFile).use { out ->
-                finalBitmap.compress(Bitmap.CompressFormat.JPEG, if (isWidget) 82 else 88, out)
-                out.flush()
+            val swapDimensions = orientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+                orientation == ExifInterface.ORIENTATION_ROTATE_270
+            options.inSampleSize = if (swapDimensions) {
+                calculateInSampleSize(options, maxH, maxW)
+            } else {
+                calculateInSampleSize(options, maxW, maxH)
             }
+            options.inJustDecodeBounds = false
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888
 
-            if (finalBitmap != orientedBitmap && !orientedBitmap.isRecycled) {
-                orientedBitmap.recycle()
-            }
-            if (orientedBitmap != rawBitmap && !rawBitmap.isRecycled) {
-                rawBitmap.recycle()
-            }
+            val rawBitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            } ?: return null
+            val bitmap = scaleIfNeeded(applyExifOrientation(rawBitmap, orientation), maxW, maxH)
 
-            destFile.absolutePath
+            try {
+                val bgDir = File(context.filesDir, DIR_NAME).apply { mkdirs() }
+                val destFile = File(bgDir, targetFilename)
+                val tempFile = File.createTempFile(targetFilename, ".tmp", bgDir)
+                try {
+                    val saved = FileOutputStream(tempFile).use { out ->
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, if (isWidget) 82 else 88, out)
+                    }
+                    if (!saved) return null
+                    Os.rename(tempFile.absolutePath, destFile.absolutePath)
+                    destFile.absolutePath
+                } finally {
+                    tempFile.delete()
+                }
+            } finally {
+                bitmap.recycle()
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             null
@@ -164,7 +164,7 @@ object BackgroundFileManager {
         if (height > reqHeight || width > reqWidth) {
             val halfHeight: Int = height / 2
             val halfWidth: Int = width / 2
-            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+            while (halfHeight / inSampleSize >= reqHeight || halfWidth / inSampleSize >= reqWidth) {
                 inSampleSize *= 2
             }
         }

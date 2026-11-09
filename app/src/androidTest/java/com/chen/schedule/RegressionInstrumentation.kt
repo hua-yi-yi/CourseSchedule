@@ -2,7 +2,10 @@ package com.chen.schedule
 
 import android.app.Activity
 import android.app.Instrumentation
+import android.content.ContextWrapper
 import android.database.sqlite.SQLiteDatabase
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import androidx.room.Room
@@ -12,6 +15,7 @@ import com.chen.schedule.domain.model.Course
 import com.chen.schedule.domain.model.Semester
 import com.chen.schedule.domain.model.TimeSlot
 import com.chen.schedule.ui.settings.ScheduleBackupService
+import com.chen.schedule.util.BackgroundFileManager
 import com.chen.schedule.util.ScheduleBackup
 import com.chen.schedule.util.update.AppUpdateDownloader
 import kotlinx.coroutines.flow.first
@@ -20,7 +24,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import java.io.File
+import java.nio.file.Files
 import java.util.UUID
+import kotlin.math.abs
 
 /** 无额外测试框架依赖的真机回归入口；只创建隔离数据库，不读取用户课表。 */
 class RegressionInstrumentation : Instrumentation() {
@@ -43,6 +49,7 @@ class RegressionInstrumentation : Instrumentation() {
             "migration2to4" to { migration(2) },
             "migration3to4" to { migration(3) },
             "reviewedUpdatesScopesAndRecovery" to { reviewedUpdates() },
+            "wallpaperImportAndReplacement" to { wallpaperImportAndReplacement() },
             "backupRoundTripAndRollback" to { backupRoundTrip() },
             "legacyBackupWithAndWithoutCourses" to { legacyBackup() },
             "invalidFullBackupRejectedBeforeWrites" to { invalidFullBackup() },
@@ -71,6 +78,59 @@ class RegressionInstrumentation : Instrumentation() {
         }
         finish(if (failures == 0) Activity.RESULT_OK else Activity.RESULT_CANCELED,
             Bundle().apply { putString("stream", "${tests.size - failures}/${tests.size} regression tests passed; failures=$failures\n") })
+    }
+
+    private fun wallpaperImportAndReplacement() {
+        val directory = Files.createTempDirectory(targetContext.cacheDir.toPath(), "wallpaper-").toFile()
+        val context = object : ContextWrapper(targetContext) {
+            override fun getFilesDir(): File = directory
+        }
+
+        fun writeImage(name: String, color: Int): Uri {
+            val file = File(directory, name)
+            val bitmap = Bitmap.createBitmap(4096, 256, Bitmap.Config.ARGB_8888)
+            try {
+                bitmap.eraseColor(color)
+                file.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            } finally {
+                bitmap.recycle()
+            }
+            return Uri.fromFile(file)
+        }
+
+        fun checkImage(path: String, isWidget: Boolean, expectedColor: Int) {
+            val maxWidth = if (isWidget) 720 else 1440
+            val bitmap = checkNotNull(
+                if (isWidget) BackgroundFileManager.loadWidgetBitmap(path, 720, 720)
+                else BackgroundFileManager.loadBitmap(path)
+            )
+            try {
+                check(bitmap.width <= maxWidth && bitmap.width > bitmap.height)
+                val pixel = bitmap.getPixel(bitmap.width / 2, bitmap.height / 2)
+                check(abs(Color.red(pixel) - Color.red(expectedColor)) < 10)
+                check(abs(Color.blue(pixel) - Color.blue(expectedColor)) < 10)
+            } finally {
+                bitmap.recycle()
+            }
+        }
+
+        try {
+            val first = writeImage("red.png", Color.RED)
+            val second = writeImage("blue.png", Color.BLUE)
+            val invalid = Uri.fromFile(File(directory, "invalid.png").apply { writeText("invalid image") })
+            for (isWidget in listOf(false, true)) {
+                val path = checkNotNull(BackgroundFileManager.saveBackgroundFromUri(context, first, isWidget))
+                checkImage(path, isWidget, Color.RED)
+                check(BackgroundFileManager.saveBackgroundFromUri(context, second, isWidget) == path)
+                checkImage(path, isWidget, Color.BLUE)
+                check(BackgroundFileManager.saveBackgroundFromUri(context, invalid, isWidget) == null)
+                checkImage(path, isWidget, Color.BLUE)
+                check(BackgroundFileManager.clearBackground(context, isWidget))
+                check(!BackgroundFileManager.backgroundExists(path))
+            }
+        } finally {
+            directory.deleteRecursively()
+        }
     }
 
     private fun migration(version: Int) = runBlocking<Unit> {

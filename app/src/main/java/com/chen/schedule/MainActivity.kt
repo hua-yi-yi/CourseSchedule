@@ -56,7 +56,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeConfig by ThemePrefs.state.collectAsState()
             ScheduleTheme(themeConfig = themeConfig) {
-                val bgBitmap = remember(themeConfig.customBackgroundPath) {
+                val bgBitmap = remember(themeConfig.customBackgroundPath, themeConfig.customBackgroundRevision) {
                     BackgroundFileManager.loadBitmap(themeConfig.customBackgroundPath)?.asImageBitmap()
                 }
 

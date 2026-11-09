@@ -2,6 +2,9 @@ package com.chen.schedule.ui.settings
 
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import android.content.Context
 import android.net.Uri
@@ -39,6 +42,7 @@ import com.chen.schedule.reminders.ReminderPrefs
 import com.chen.schedule.reminders.ReminderStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 
+private val wallpaperMutex = Mutex()
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -254,29 +258,9 @@ class SettingsViewModel @Inject constructor(
         themePrefs.backgroundPresetId = preset.id
     }
 
-    fun setCustomBackground(uri: Uri) {
-        viewModelScope.launch {
-            val path = withContext(Dispatchers.IO) {
-                BackgroundFileManager.saveBackgroundFromUri(context, uri, isWidget = false)
-            }
-            if (path != null) {
-                themePrefs.customBackgroundPath = path
-                if (themePrefs.widgetBackgroundMode == WidgetBackgroundMode.APP_IMAGE) {
-                    WidgetUpdater.refreshAll(context)
-                }
-            } else {
-                dataMessage = "图片加载失败，请重试"
-            }
-        }
-    }
+    fun setCustomBackground(uri: Uri) = updateWallpaper(uri, isWidget = false)
 
-    fun clearCustomBackground() {
-        BackgroundFileManager.clearBackground(context, isWidget = false)
-        themePrefs.customBackgroundPath = null
-        if (themePrefs.widgetBackgroundMode == WidgetBackgroundMode.APP_IMAGE) {
-            viewModelScope.launch { WidgetUpdater.refreshAll(context) }
-        }
-    }
+    fun clearCustomBackground() = updateWallpaper(null, isWidget = false)
 
     fun updateBackgroundDim(dim: Float) {
         themePrefs.backgroundDim = dim
@@ -291,28 +275,52 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { WidgetUpdater.refreshAll(context) }
     }
 
-    fun setWidgetCustomBackground(uri: Uri) {
-        viewModelScope.launch {
-            val path = withContext(Dispatchers.IO) {
-                BackgroundFileManager.saveBackgroundFromUri(context, uri, isWidget = true)
-            }
-            if (path != null) {
-                themePrefs.widgetCustomBgPath = path
-                themePrefs.widgetBackgroundMode = WidgetBackgroundMode.CUSTOM_IMAGE
-                WidgetUpdater.refreshAll(context)
-            } else {
-                dataMessage = "小组件壁纸加载失败，请重试"
-            }
-        }
-    }
+    fun setWidgetCustomBackground(uri: Uri) = updateWallpaper(uri, isWidget = true)
 
-    fun clearWidgetCustomBackground() {
-        BackgroundFileManager.clearBackground(context, isWidget = true)
-        themePrefs.widgetCustomBgPath = null
-        if (themePrefs.widgetBackgroundMode == WidgetBackgroundMode.CUSTOM_IMAGE) {
-            themePrefs.widgetBackgroundMode = WidgetBackgroundMode.DEFAULT
+    fun clearWidgetCustomBackground() = updateWallpaper(null, isWidget = true)
+
+    private fun updateWallpaper(uri: Uri?, isWidget: Boolean) {
+        viewModelScope.launch {
+            wallpaperMutex.withLock {
+                // 离开设置页时也要完成已经开始的文件与偏好设置更新。
+                withContext(NonCancellable) {
+                    val path = if (uri == null) {
+                        val cleared = withContext(Dispatchers.IO) {
+                            BackgroundFileManager.clearBackground(context, isWidget)
+                        }
+                        if (!cleared) {
+                            Toast.makeText(context, "移除壁纸失败，请重试", Toast.LENGTH_SHORT).show()
+                            return@withContext
+                        }
+                        null
+                    } else {
+                        val savedPath = withContext(Dispatchers.IO) {
+                            BackgroundFileManager.saveBackgroundFromUri(context, uri, isWidget)
+                        }
+                        if (savedPath == null) {
+                            val message = if (isWidget) "小组件壁纸加载失败，请重试" else "图片加载失败，请重试"
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                            return@withContext
+                        }
+                        savedPath
+                    }
+
+                    if (isWidget) {
+                        themePrefs.widgetCustomBgPath = path
+                        if (path != null) {
+                            themePrefs.widgetBackgroundMode = WidgetBackgroundMode.CUSTOM_IMAGE
+                        } else if (themePrefs.widgetBackgroundMode == WidgetBackgroundMode.CUSTOM_IMAGE) {
+                            themePrefs.widgetBackgroundMode = WidgetBackgroundMode.DEFAULT
+                        }
+                    } else {
+                        themePrefs.customBackgroundPath = path
+                    }
+                    if (isWidget || themePrefs.widgetBackgroundMode == WidgetBackgroundMode.APP_IMAGE) {
+                        WidgetUpdater.refreshAll(context)
+                    }
+                }
+            }
         }
-        viewModelScope.launch { WidgetUpdater.refreshAll(context) }
     }
 
     fun updateWidgetOpacity(opacity: Float) {

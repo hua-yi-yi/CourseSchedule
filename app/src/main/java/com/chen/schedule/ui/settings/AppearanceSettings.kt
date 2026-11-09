@@ -171,7 +171,7 @@ internal fun AppearanceSettings(viewModel: SettingsViewModel) {
             // 自定义壁纸配置
             AnimatedVisibility(visible = hasCustomBg) {
                 Column(modifier = Modifier.padding(top = 12.dp)) {
-                    val appBitmap = remember(themeConfig.customBackgroundPath) {
+                    val appBitmap = remember(themeConfig.customBackgroundPath, themeConfig.customBackgroundRevision) {
                         BackgroundFileManager.loadBitmap(themeConfig.customBackgroundPath, 400, 240)?.asImageBitmap()
                     }
 
@@ -331,7 +331,7 @@ internal fun AppearanceSettings(viewModel: SettingsViewModel) {
             // 若选择「独立小组件壁纸」
             AnimatedVisibility(visible = themeConfig.widgetBackgroundMode == WidgetBackgroundMode.CUSTOM_IMAGE) {
                 Column(modifier = Modifier.padding(top = 10.dp)) {
-                    val widgetBitmap = remember(themeConfig.widgetCustomBgPath) {
+                    val widgetBitmap = remember(themeConfig.widgetCustomBgPath, themeConfig.widgetCustomBgRevision) {
                         BackgroundFileManager.loadWidgetBitmap(themeConfig.widgetCustomBgPath, 300, 300)?.asImageBitmap()
                     }
 

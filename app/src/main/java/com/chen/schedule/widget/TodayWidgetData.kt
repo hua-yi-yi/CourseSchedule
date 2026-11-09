@@ -56,7 +56,7 @@ object TodayWidgetDataLoader {
             )
             val sem = entryPoint.semesterDao().getCurrentSemester()
             val now = LocalDate.now()
-            val dateLabel = "${now.monthValue}月${now.dayOfMonth}日"
+            val dateLabel = "${now.monthValue}/${now.dayOfMonth}"
 
             if (sem == null) {
                 return@runCatching WidgetData("未设置学期", 0, "", dateLabel, emptyList())
@@ -106,7 +106,7 @@ object TodayWidgetDataLoader {
             )
         }.getOrElse {
             val now = LocalDate.now()
-            WidgetData("今日课程", 0, "", "${now.monthValue}月${now.dayOfMonth}日", emptyList())
+            WidgetData("今日课程", 0, "", "${now.monthValue}/${now.dayOfMonth}", emptyList())
         }
     }
 }

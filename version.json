@@ -1,9 +1,9 @@
 {
-  "versionName": "1.3.12",
-  "versionTag": "v1.3.12",
-  "title": "v1.3.12 · 统一小组件与主页重叠课程展示及即时联动",
-  "publishedAt": "2026-10-26",
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.12/CourseSchedule-v1.3.12.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.12",
-  "changelog": "- 桌面小组件与主页重叠课程展示统一：所有桌面小组件（周课表、今日课程、今日看板）统一调用主页的冲突聚类与优选逻辑，多门课程重叠时展示的课程与主页完全保持一致。\n- 重叠课程角标统一：重叠时小组件卡片同步标注重叠门数（如“· 2门”），视觉与主页对齐。\n- 主页优选即时联动：主页切换重叠课程的一瞬间，桌面所有小组件实时同步刷新。"
+  "versionName": "1.3.13",
+  "versionTag": "v1.3.13",
+  "title": "v1.3.13 · 修复自定义壁纸并统一小组件样式",
+  "publishedAt": "2026-11-09",
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.13/CourseSchedule-v1.3.13.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.13",
+  "changelog": "- 修复应用壁纸和小组件独立壁纸选图失败的问题。更换后立即刷新预览，保存失败时保留原壁纸。\n- 统一 4×1 今日课程、3×3 今日看板和 4×4 周课表的底板、日期高亮、课程卡片、色条及重叠标记。\n- 4×1 小组件在高度较小时采用横向布局，为可滚动的课程列表留出空间。"
 }
