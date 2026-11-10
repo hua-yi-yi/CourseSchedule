@@ -3,6 +3,7 @@ package com.chen.schedule.ui.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -12,7 +13,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -89,6 +93,79 @@ internal val DarkColorScheme = darkColorScheme(
     scrim = md_theme_dark_scrim
 )
 
+// At this luminance, black and white have the same contrast against the background.
+private const val DARK_BACKGROUND_THRESHOLD = 0.179f
+
+internal fun resolveScheduleColorScheme(
+    preset: BackgroundPreset,
+    darkTheme: Boolean,
+    baseScheme: (Boolean) -> ColorScheme = { if (it) DarkColorScheme else LightColorScheme }
+): ColorScheme {
+    val presetBackground = if (darkTheme) preset.darkColor else preset.lightColor
+    val background = presetBackground?.let { Color(it) } ?: return baseScheme(darkTheme)
+    val useDarkPalette = background.luminance() < DARK_BACKGROUND_THRESHOLD
+    val scheme = baseScheme(useDarkPalette)
+    val presetSurface = if (darkTheme) preset.darkSurface else preset.lightSurface
+    val surface = presetSurface?.let { Color(it) } ?: background
+    val shade = if (useDarkPalette) Color.White else Color.Black
+    val oppositeShade = if (useDarkPalette) Color.Black else Color.White
+    val surfaceVariant = surface.tintedWith(shade, 0.10f)
+    val byLuminance = compareBy<Color> { it.luminance() }
+    val limitingSurface = if (useDarkPalette) {
+        maxOf(background, surfaceVariant, byLuminance)
+    } else {
+        minOf(background, surfaceVariant, byLuminance)
+    }
+    val primary = scheme.primary.withTextContrast(limitingSurface, scheme.onSurface)
+
+    return scheme.copy(
+        background = background,
+        surface = surface,
+        surfaceVariant = surfaceVariant,
+        surfaceDim = if (useDarkPalette) surface else surfaceVariant,
+        surfaceBright = if (useDarkPalette) surfaceVariant else surface,
+        surfaceContainerLowest = surface.tintedWith(oppositeShade, 0.10f),
+        surfaceContainerLow = surface.tintedWith(shade, 0.02f),
+        surfaceContainer = surface.tintedWith(shade, 0.04f),
+        surfaceContainerHigh = surface.tintedWith(shade, 0.06f),
+        surfaceContainerHighest = surface.tintedWith(shade, 0.08f),
+        outline = surface.tintedWith(scheme.onSurface, 0.62f),
+        outlineVariant = surface.tintedWith(scheme.onSurface, 0.18f),
+        primary = primary,
+        surfaceTint = primary,
+        secondary = scheme.secondary.withTextContrast(limitingSurface, scheme.onSurface),
+        tertiary = scheme.tertiary.withTextContrast(limitingSurface, scheme.onSurface),
+        error = scheme.error.withTextContrast(limitingSurface, scheme.onSurface)
+    )
+}
+
+private fun Color.tintedWith(tint: Color, amount: Float): Color =
+    tint.copy(alpha = amount).compositeOver(this)
+
+private fun Color.withTextContrast(background: Color, onSurface: Color): Color {
+    val backgroundLuminance = background.luminance()
+    fun contrast(color: Color): Float {
+        val luminance = color.luminance()
+        return (maxOf(luminance, backgroundLuminance) + 0.05f) /
+            (minOf(luminance, backgroundLuminance) + 0.05f)
+    }
+
+    if (contrast(this) >= 4.5f) return this
+
+    // Find the smallest tint toward the palette's normal text color that reaches 4.5:1.
+    var lower = 0f
+    var upper = 1f
+    repeat(8) {
+        val amount = (lower + upper) / 2f
+        if (contrast(tintedWith(onSurface, amount)) >= 4.5f) {
+            upper = amount
+        } else {
+            lower = amount
+        }
+    }
+    return tintedWith(onSurface, upper)
+}
+
 @Composable
 fun ScheduleTheme(
     themeConfig: ThemeConfig = ThemeConfig(),
@@ -100,28 +177,18 @@ fun ScheduleTheme(
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val baseScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
-    val colorScheme = remember(baseScheme, darkTheme, themeConfig.backgroundPreset) {
-        val preset = themeConfig.backgroundPreset
-        val customBg = if (darkTheme) preset.darkColor else preset.lightColor
-        val customSurface = if (darkTheme) preset.darkSurface else preset.lightSurface
-        if (customBg != null) {
-            val bg = Color(customBg)
-            val surf = customSurface?.let { Color(it) } ?: bg
-            baseScheme.copy(
-                background = bg,
-                surface = surf
-            )
-        } else {
-            baseScheme
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val preset = themeConfig.backgroundPreset
+    val colorScheme = remember(context, configuration, dynamicColor, darkTheme, preset) {
+        resolveScheduleColorScheme(preset, darkTheme) { useDarkPalette ->
+            when {
+                dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                    if (useDarkPalette) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+                }
+                useDarkPalette -> DarkColorScheme
+                else -> LightColorScheme
+            }
         }
     }
 
@@ -132,8 +199,10 @@ fun ScheduleTheme(
             val window = (view.context as Activity).window
             window.statusBarColor = Color.Transparent.toArgb()
             window.navigationBarColor = Color.Transparent.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
-            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkTheme
+            val lightBars = colorScheme.background.luminance() >= DARK_BACKGROUND_THRESHOLD
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = lightBars
+            insetsController.isAppearanceLightNavigationBars = lightBars
         }
     }
 

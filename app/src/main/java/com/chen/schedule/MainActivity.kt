@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import com.chen.schedule.ui.navigation.AppNavHost
+import com.chen.schedule.ui.theme.BackgroundPreset
 import com.chen.schedule.ui.theme.ScheduleTheme
 import com.chen.schedule.ui.theme.ThemePrefs
 import com.chen.schedule.util.BackgroundFileManager
@@ -55,11 +56,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val themeConfig by ThemePrefs.state.collectAsState()
-            ScheduleTheme(themeConfig = themeConfig) {
-                val bgBitmap = remember(themeConfig.customBackgroundPath, themeConfig.customBackgroundRevision) {
-                    BackgroundFileManager.loadBitmap(themeConfig.customBackgroundPath)?.asImageBitmap()
-                }
-
+            val bgBitmap = remember(themeConfig.customBackgroundPath, themeConfig.customBackgroundRevision) {
+                BackgroundFileManager.loadBitmap(themeConfig.customBackgroundPath)?.asImageBitmap()
+            }
+            val activeTheme = if (bgBitmap == null) themeConfig else {
+                themeConfig.copy(backgroundPreset = BackgroundPreset.DEFAULT)
+            }
+            ScheduleTheme(themeConfig = activeTheme) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     if (bgBitmap != null) {
                         Image(
