@@ -96,6 +96,23 @@ class TimeSchemeRepository @Inject constructor(
      * 其他学期、其他方案完全不受影响。
      */
     suspend fun selectSchemeForSemester(semesterId: Long, schemeId: Long) = database.withTransaction {
+        require(schemeId == TimeScheme.LEGACY_ID || schemeDao.getSchemeById(schemeId) != null) { "作息方案不存在" }
+        bindScheme(semesterId, schemeId, getSlotsOfSchemeDirect(schemeId))
+    }
+
+    private suspend fun requireCourseCoverage(semesterId: Long, slots: List<TimeSlot>) {
+        val available = slots.map { it.slotNumber }.toSet()
+        val uncovered = courseDao.getCoursesBySemesterDirect(semesterId).firstOrNull { course ->
+            val needed = course.endSlot.toLong() - course.startSlot + 1
+            available.count { it in course.startSlot..course.endSlot }.toLong() != needed
+        } ?: return
+        throw IllegalArgumentException(
+            "新作息未覆盖「${uncovered.name}」使用的第 ${uncovered.startSlot}–${uncovered.endSlot} 节"
+        )
+    }
+
+    private suspend fun bindScheme(semesterId: Long, schemeId: Long, slots: List<TimeSlot>) {
+        requireCourseCoverage(semesterId, slots)
         semesterDao.setSemesterScheme(semesterId, schemeId)
     }
 
@@ -127,19 +144,21 @@ class TimeSchemeRepository @Inject constructor(
         )
         timeSlotDao.replaceScheme(id, slots.map { it.copy(id = 0, schemeId = id).toEntity() })
         if (setCurrent) {
-            semesterDao.getCurrentSemester()?.let { semesterDao.setSemesterScheme(it.id, id) }
+            semesterDao.getCurrentSemester()?.let { bindScheme(it.id, id, slots) }
         }
         id
     }
 
-    /** 保存(覆盖)某自定义方案的整套节次,所有改动在事务内完成。 */
-    suspend fun saveSchemeSlots(schemeId: Long, slots: List<TimeSlot>) = database.withTransaction {
+    /** 保存名称和节次，并在同一事务中处理当前学期的绑定。 */
+    suspend fun updateCustomScheme(schemeId: Long, name: String, slots: List<TimeSlot>, setCurrent: Boolean) = database.withTransaction {
+        val scheme = requireNotNull(schemeDao.getSchemeById(schemeId)) { "作息方案不存在" }
+        require(scheme.kind == TimeScheme.KIND_CUSTOM) { "只能修改自定义方案" }
+        val current = if (setCurrent) semesterDao.getCurrentSemester() else null
+        val referencedIds = semesterDao.getSemestersUsingScheme(schemeId).map { it.id }
+        (referencedIds + listOfNotNull(current?.id)).distinct().forEach { requireCourseCoverage(it, slots) }
+        schemeDao.update(scheme.copy(name = name))
         timeSlotDao.replaceScheme(schemeId, slots.map { it.copy(id = 0, schemeId = schemeId).toEntity() })
-    }
-
-    /** 重命名自定义方案。 */
-    suspend fun renameScheme(schemeId: Long, name: String) = database.withTransaction {
-        schemeDao.getSchemeById(schemeId)?.let { schemeDao.update(it.copy(name = name)) }
+        current?.let { semesterDao.setSemesterScheme(it.id, schemeId) }
     }
 
     /**
@@ -170,7 +189,7 @@ class TimeSchemeRepository @Inject constructor(
             ?: TimeSchemeTemplates.slotsOf(builtIn.startTimes)
         timeSlotDao.replaceScheme(id, finalSlots.map { it.copy(id = 0, schemeId = id).toEntity() })
         if (setCurrent) {
-            semesterDao.getCurrentSemester()?.let { semesterDao.setSemesterScheme(it.id, id) }
+            semesterDao.getCurrentSemester()?.let { bindScheme(it.id, id, finalSlots) }
         }
         id
     }
@@ -193,7 +212,7 @@ class TimeSchemeRepository @Inject constructor(
             )
             timeSlotDao.replaceScheme(id, slots.map { it.copy(id = 0, schemeId = id).toEntity() })
             if (setCurrent) {
-                semesterDao.getCurrentSemester()?.let { semesterDao.setSemesterScheme(it.id, id) }
+                semesterDao.getCurrentSemester()?.let { bindScheme(it.id, id, slots) }
             }
             id
         }
@@ -219,7 +238,8 @@ class TimeSchemeRepository @Inject constructor(
             require(target == TimeScheme.LEGACY_ID || schemeDao.getSchemeById(target) != null) {
                 "替代作息方案不存在"
             }
-            referencing.forEach { semesterDao.setSemesterScheme(it.id, target) }
+            val replacementSlots = getSlotsOfSchemeDirect(target)
+            referencing.forEach { bindScheme(it.id, target, replacementSlots) }
         }
 
         // 只删除本方案自己的节次,绝不并入 0 号桶

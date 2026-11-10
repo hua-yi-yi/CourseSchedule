@@ -180,7 +180,8 @@ class ScheduleBackupService @Inject constructor(
                     }
 
                     // 2) 用纯逻辑计划器算出「要建哪些学期、课程归哪个学期」
-                    val plan = com.chen.schedule.util.BackupRestorePlanner.plan(data) { old ->
+                    val localSemesters = semesterRepository.getAllSemesters().first()
+                    val plan = com.chen.schedule.util.BackupRestorePlanner.plan(data, localSemesters) { old ->
                         if (old == 0L) 0L else schemeMap[old] ?: 0L
                     }
 

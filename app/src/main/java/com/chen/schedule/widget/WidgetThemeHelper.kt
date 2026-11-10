@@ -47,42 +47,30 @@ object WidgetThemeHelper {
     }
 
     fun resolveWithConfig(context: Context? = null, config: ThemeConfig, isDarkTheme: Boolean): WidgetVisualStyle {
-        val mode = config.widgetBackgroundMode
+        val requestedMode = config.widgetBackgroundMode
+        val bgBitmap = when (requestedMode) {
+            WidgetBackgroundMode.APP_IMAGE ->
+                BackgroundFileManager.loadWidgetBitmap(config.customBackgroundPath, 720, 720)
+            WidgetBackgroundMode.CUSTOM_IMAGE ->
+                BackgroundFileManager.loadWidgetBitmap(config.widgetCustomBgPath, 720, 720)
+                    ?: BackgroundFileManager.loadWidgetBitmap(config.customBackgroundPath, 720, 720)
+            else -> null
+        }
+        val missingWallpaper = bgBitmap == null &&
+            (requestedMode == WidgetBackgroundMode.APP_IMAGE || requestedMode == WidgetBackgroundMode.CUSTOM_IMAGE)
+        val mode = if (missingWallpaper) WidgetBackgroundMode.DEFAULT else requestedMode
         val opacity = config.widgetOpacity.coerceIn(0f, 1f)
-        val contrast = config.widgetTextContrast
+        val contrast = if (missingWallpaper) WidgetTextContrast.AUTO else config.widgetTextContrast
 
-        var containerColor: Color? = null
-        var bgBitmap: Bitmap? = null
-
-        when (mode) {
-            WidgetBackgroundMode.DEFAULT -> {
-                containerColor = null
-            }
-            WidgetBackgroundMode.TRANSPARENT -> {
-                containerColor = Color.Transparent
-            }
-            WidgetBackgroundMode.TRANSLUCENT_LIGHT -> {
-                containerColor = Color.White.copy(alpha = opacity * 0.78f)
-            }
-            WidgetBackgroundMode.TRANSLUCENT_DARK -> {
-                containerColor = DarkColorScheme.surface.copy(alpha = opacity * 0.78f)
-            }
-            WidgetBackgroundMode.SOLID_WHITE -> {
-                containerColor = Color.White.copy(alpha = opacity)
-            }
-            WidgetBackgroundMode.SOLID_BLACK -> {
-                containerColor = Color(0xFF121212).copy(alpha = opacity)
-            }
-            WidgetBackgroundMode.APP_IMAGE -> {
-                containerColor = Color.Transparent
-                val path = config.customBackgroundPath
-                bgBitmap = BackgroundFileManager.loadWidgetBitmap(path, 720, 720)
-            }
-            WidgetBackgroundMode.CUSTOM_IMAGE -> {
-                containerColor = Color.Transparent
-                val path = config.widgetCustomBgPath ?: config.customBackgroundPath
-                bgBitmap = BackgroundFileManager.loadWidgetBitmap(path, 720, 720)
-            }
+        val containerColor = when (mode) {
+            WidgetBackgroundMode.DEFAULT -> null
+            WidgetBackgroundMode.TRANSPARENT,
+            WidgetBackgroundMode.APP_IMAGE,
+            WidgetBackgroundMode.CUSTOM_IMAGE -> Color.Transparent
+            WidgetBackgroundMode.TRANSLUCENT_LIGHT -> Color.White.copy(alpha = opacity * 0.78f)
+            WidgetBackgroundMode.TRANSLUCENT_DARK -> DarkColorScheme.surface.copy(alpha = opacity * 0.78f)
+            WidgetBackgroundMode.SOLID_WHITE -> Color.White.copy(alpha = opacity)
+            WidgetBackgroundMode.SOLID_BLACK -> Color(0xFF121212).copy(alpha = opacity)
         }
 
         val shouldUseLightText = when (contrast) {

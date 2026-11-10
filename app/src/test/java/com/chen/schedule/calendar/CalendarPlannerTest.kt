@@ -5,6 +5,7 @@ import com.chen.schedule.domain.model.Semester
 import com.chen.schedule.domain.model.TimeSlot
 import com.chen.schedule.domain.model.WeekType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -179,7 +180,7 @@ class CalendarPlannerTest {
     }
 
     @Test
-    fun planCourse_endBeforeStartCorrectsSafely() {
+    fun planCourse_endBeforeStartIsRejected() {
         val abnormalSlots = listOf(
             TimeSlot(slotNumber = 1, startTime = "10:00", endTime = "09:00") // 异常节次
         )
@@ -193,27 +194,26 @@ class CalendarPlannerTest {
             endWeek = 1,
             weekType = WeekType.ALL
         )
-        val events = CalendarPlanner.planEvents(semester, listOf(course), abnormalSlots, testZone)
-        assertEquals(1, events.size)
-        val event = events.first()
-        assertTrue("结束时间必须晚于开始时间", event.endMillis > event.startMillis)
-        assertEquals(event.startMillis + 45 * 60 * 1000L, event.endMillis)
+        assertThrows(IllegalArgumentException::class.java) {
+            CalendarPlanner.planEvents(semester, listOf(course), abnormalSlots, testZone)
+        }
     }
 
     @Test
-    fun planCourse_missingSlotsInSchemeDefaultsSafely() {
+    fun planCourse_missingIntermediateSlotIsRejected() {
         val course = Course(
             id = 504L,
             name = "越界节次课程",
             dayOfWeek = 1,
-            startSlot = 99,
-            endSlot = 99,
+            startSlot = 1,
+            endSlot = 3,
             startWeek = 1,
             endWeek = 1,
             weekType = WeekType.ALL
         )
-        val events = CalendarPlanner.planEvents(semester, listOf(course), slots, testZone)
-        assertEquals(1, events.size)
-        assertTrue(events.first().endMillis > events.first().startMillis)
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            CalendarPlanner.planEvents(semester, listOf(course), slots.filter { it.slotNumber != 2 }, testZone)
+        }
+        assertTrue(error.message.orEmpty().contains("节次 2"))
     }
 }

@@ -184,7 +184,9 @@ class SettingsViewModel @Inject constructor(
                             val mirrorTag = if (res.isMirrorUsed && !res.mirrorName.isNullOrBlank()) {
                                 " · 经由「${res.mirrorName}」检测"
                             } else ""
-                            Toast.makeText(context, "当前已是最新版本 (${res.currentVersion})$mirrorTag", Toast.LENGTH_SHORT).show()
+                            val message = if (res.isMirrorUsed) "暂未发现更新 (${res.currentVersion})$mirrorTag"
+                            else "当前已是最新版本 (${res.currentVersion})"
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                         }
                         is UpdateCheckResult.Error -> {
                             Toast.makeText(context, "检查更新失败: ${res.message}", Toast.LENGTH_LONG).show()
@@ -315,7 +317,8 @@ class SettingsViewModel @Inject constructor(
                     } else {
                         themePrefs.customBackgroundPath = path
                     }
-                    if (isWidget || themePrefs.widgetBackgroundMode == WidgetBackgroundMode.APP_IMAGE) {
+                    if (isWidget || themePrefs.widgetBackgroundMode == WidgetBackgroundMode.APP_IMAGE ||
+                        themePrefs.widgetBackgroundMode == WidgetBackgroundMode.CUSTOM_IMAGE) {
                         WidgetUpdater.refreshAll(context)
                     }
                 }
@@ -455,25 +458,22 @@ class SettingsViewModel @Inject constructor(
 
     fun prepareCalendarSyncPreview() {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val sem = semesterRepository.getCurrentSemester()
-                if (sem == null) {
-                    calendarSyncPreview = null
-                    return@withContext
+            calendarSyncPreview = null
+            try {
+                calendarSyncPreview = withContext(Dispatchers.IO) {
+                    val sem = semesterRepository.getCurrentSemester() ?: return@withContext null
+                    val courses = courseRepository.getCoursesBySemester(sem.id).first()
+                    val slots = timeSlotRepository.getTimeSlotsBySchemeDirect(sem.schemeId)
+                    val planned = com.chen.schedule.calendar.CalendarPlanner.planEvents(sem, courses, slots)
+                    val syncedCount = if (com.chen.schedule.calendar.CalendarSyncManager.hasCalendarPermissions(context)) {
+                        com.chen.schedule.calendar.CalendarSyncManager.querySyncedEventCount(context, sem.id)
+                    } else 0
+                    CalendarSyncPreview(sem.name, courses.size, planned.size, syncedCount)
                 }
-                val courses = courseRepository.getCoursesBySemester(sem.id).first()
-                val slots = timeSlotRepository.getTimeSlotsBySchemeDirect(sem.schemeId)
-                val planned = com.chen.schedule.calendar.CalendarPlanner.planEvents(sem, courses, slots)
-                val syncedCount = if (com.chen.schedule.calendar.CalendarSyncManager.hasCalendarPermissions(context)) {
-                    com.chen.schedule.calendar.CalendarSyncManager.querySyncedEventCount(context, sem.id)
-                } else 0
-
-                calendarSyncPreview = CalendarSyncPreview(
-                    semesterName = sem.name,
-                    courseCount = courses.size,
-                    totalEvents = planned.size,
-                    syncedCount = syncedCount
-                )
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Toast.makeText(context, "无法预览同步：${error.message}", Toast.LENGTH_LONG).show()
             }
         }
     }

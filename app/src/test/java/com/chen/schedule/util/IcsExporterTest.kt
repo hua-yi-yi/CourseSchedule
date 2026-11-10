@@ -69,15 +69,15 @@ class IcsExporterTest {
 
         // 单周实验应生成第 1 周 (2026-09-07)、第 3 周 (2026-09-21) 两个事件
         assertTrue(ics.contains("SUMMARY:单周实验"))
-        assertTrue(ics.contains("DTSTART;TZID=Asia/Shanghai:20260907T080000"))
-        assertTrue(ics.contains("DTSTART;TZID=Asia/Shanghai:20260921T080000"))
-        assertFalse(ics.contains("DTSTART;TZID=Asia/Shanghai:20260914T080000")) // 第 2 周不应有单周课
+        assertTrue(ics.contains("DTSTART:20260907T000000Z"))
+        assertTrue(ics.contains("DTSTART:20260921T000000Z"))
+        assertFalse(ics.contains("DTSTART:20260914T000000Z")) // 第 2 周不应有单周课
 
         // 双周研讨应生成第 2 周 (2026-09-15)、第 4 周 (2026-09-29) 两个事件
         assertTrue(ics.contains("SUMMARY:双周研讨"))
-        assertTrue(ics.contains("DTSTART;TZID=Asia/Shanghai:20260915T100000"))
-        assertTrue(ics.contains("DTSTART;TZID=Asia/Shanghai:20260929T100000"))
-        assertFalse(ics.contains("DTSTART;TZID=Asia/Shanghai:20260908T100000")) // 第 1 周不应有双周课
+        assertTrue(ics.contains("DTSTART:20260915T020000Z"))
+        assertTrue(ics.contains("DTSTART:20260929T020000Z"))
+        assertFalse(ics.contains("DTSTART:20260908T020000Z")) // 第 1 周不应有双周课
     }
 
     @Test
@@ -97,11 +97,22 @@ class IcsExporterTest {
 
         val ics = IcsExporter.export(semester, listOf(course), slots, testZone, alarmMinutes = 20)
 
-        assertTrue(ics.contains("DTSTART;TZID=Asia/Shanghai:20260909T080000"))
-        assertTrue(ics.contains("DTEND;TZID=Asia/Shanghai:20260909T094000"))
+        assertTrue(ics.contains("DTSTART:20260909T000000Z"))
+        assertTrue(ics.contains("DTEND:20260909T014000Z"))
+        assertFalse(ics.contains("TZID="))
         assertTrue(ics.contains("LOCATION:公教楼 A101"))
         assertTrue(ics.contains("任课教师: 张教授"))
         assertTrue(ics.contains("TRIGGER:-PT20M"))
+    }
+
+    @Test
+    fun exportCourse_usesEachDatesUtcOffsetAcrossDaylightSaving() {
+        val zone = ZoneId.of("America/New_York")
+        val start = LocalDate.of(2026, 3, 2).atStartOfDay(zone).toInstant().toEpochMilli()
+        val course = Course(name = "DST", startSlot = 1, endSlot = 1, startWeek = 1, endWeek = 2)
+        val ics = IcsExporter.export(semester.copy(startDate = start), listOf(course), slots, zone)
+        assertTrue(ics.contains("DTSTART:20260302T130000Z"))
+        assertTrue(ics.contains("DTSTART:20260309T120000Z"))
     }
 
     @Test

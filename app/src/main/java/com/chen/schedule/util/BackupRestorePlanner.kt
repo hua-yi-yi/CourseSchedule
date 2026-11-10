@@ -13,7 +13,7 @@ import com.chen.schedule.domain.model.TimeSlot
  * 正是容易出错的地方。
  *
  * 约定:
- * - 返回的 [RestorePlan.semesters] 中 `id = 0`(待插入),`schemeId` 已通过 [schemeIdMapper] 映射;
+ * - [RestorePlan.semesters] 保留唯一匹配的本机学期 ID，新学期使用 0 待分配；作息 ID 已映射。
  * - 课程按「学期下标」返回,由调用方在插入学期后把下标换成真实 id;
  * - 引用不完整的备份在恢复前会被拒绝,避免丢课或把课程挂到别的学期。
  */
@@ -64,15 +64,27 @@ object BackupRestorePlanner {
     /**
      * @param schemeIdMapper 把备份中的方案 id 映射为本地新建的方案 id;0(原有作息)必须原样返回 0
      */
-    fun plan(backup: ScheduleBackup, schemeIdMapper: (Long) -> Long): RestorePlan {
+    fun plan(
+        backup: ScheduleBackup,
+        localSemesters: List<Semester> = emptyList(),
+        schemeIdMapper: (Long) -> Long
+    ): RestorePlan {
         // 1) 学期:旧备份只有单个学期;v2 用 semesters 全量
         val sourceSemesters = if (backup.semesters.isNotEmpty()) backup.semesters else listOf(backup.semester)
         val indexByOldId = sourceSemesters
             .mapIndexed { index, semester -> semester.id to index }
             .toMap()
 
+        val localByIdentity = localSemesters.groupBy { it.name to it.startDate }
+        val sourceByIdentity = sourceSemesters.groupBy { it.name to it.startDate }
         val semesters = sourceSemesters.map { old ->
-            old.copy(id = 0, isCurrent = false, schemeId = schemeIdMapper(old.schemeId))
+            val identity = old.name to old.startDate
+            val localId = if (sourceByIdentity.getValue(identity).size == 1) {
+                localByIdentity[identity]?.singleOrNull()?.id ?: 0
+            } else {
+                0
+            }
+            old.copy(id = localId, isCurrent = false, schemeId = schemeIdMapper(old.schemeId))
         }
 
         // 2) 当前学期:优先匹配备份中标记的当前学期,否则第一个

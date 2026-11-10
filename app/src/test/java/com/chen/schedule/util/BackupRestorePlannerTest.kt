@@ -14,6 +14,22 @@ import org.junit.Test
  */
 class BackupRestorePlannerTest {
 
+    @Test fun restoresMatchingLocalIdentityInsteadOfForeignNumericIds() {
+        val matching = semester(4, "秋季", 0)
+        val incoming = semester(55, "秋季", 0)
+        val unrelated = semester(4, "春季", 0)
+        val backup = ScheduleBackup(
+            semester = incoming,
+            courses = emptyList(),
+            timeSlots = emptyList(),
+            semesters = listOf(incoming, unrelated)
+        )
+        val plan = BackupRestorePlanner.plan(backup, listOf(matching)) { it }
+        assertEquals(listOf(4L, 0L), plan.semesters.map { it.id })
+        val ambiguous = BackupRestorePlanner.plan(backup, listOf(matching, matching.copy(id = 6))) { it }
+        assertEquals(listOf(0L, 0L), ambiguous.semesters.map { it.id })
+    }
+
     private fun semester(id: Long, name: String, schemeId: Long, isCurrent: Boolean = false) =
         Semester(id = id, name = name, startDate = 1_700_000_000_000L, totalWeeks = 18,
             isCurrent = isCurrent, schemeId = schemeId)

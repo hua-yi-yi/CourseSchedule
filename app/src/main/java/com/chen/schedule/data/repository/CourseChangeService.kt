@@ -12,7 +12,11 @@ class CourseChangeService @Inject constructor(private val db: AppDatabase, priva
         require(courses.getCourseById(original.id) == original) { "课程已变化，请重新打开" }
         val plan = CourseChangePlanner.plan(original, edited, scope, week)
         backup.createRecoveryPoint("课程修改前")
-        courses.delete(original)
-        courses.insertAll(plan)
+        if (scope == ChangeScope.ALL && plan.isNotEmpty()) {
+            courses.update(plan.single())
+        } else {
+            courses.delete(original)
+            courses.insertAll(plan)
+        }
     }
 }

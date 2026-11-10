@@ -304,12 +304,16 @@ fun SetupWizardScreen(
 
     if (showDatePicker) {
         val initial = state.dateMillis ?: System.currentTimeMillis()
-        val pickerState = rememberDatePickerState(initialSelectedDateMillis = initial)
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = WeekCalculator.toPickerDateMillis(initial)
+        )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.updateDate(pickerState.selectedDateMillis)
+                    viewModel.updateDate(
+                        pickerState.selectedDateMillis?.let { WeekCalculator.fromPickerDateMillis(it) }
+                    )
                     showDatePicker = false
                 }) { Text("确定") }
             },

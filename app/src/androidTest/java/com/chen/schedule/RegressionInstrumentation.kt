@@ -50,6 +50,9 @@ class RegressionInstrumentation : Instrumentation() {
             "migration3to4" to { migration(3) },
             "reviewedUpdatesScopesAndRecovery" to { reviewedUpdates() },
             "wallpaperImportAndReplacement" to { wallpaperImportAndReplacement() },
+            "calendarSyncKeepsPreviousEventsOnFailure" to {
+                com.chen.schedule.calendar.calendarSyncKeepsPreviousEventsOnFailure(targetContext)
+            },
             "backupRoundTripAndRollback" to { backupRoundTrip() },
             "legacyBackupWithAndWithoutCourses" to { legacyBackup() },
             "invalidFullBackupRejectedBeforeWrites" to { invalidFullBackup() },
@@ -194,7 +197,10 @@ class RegressionInstrumentation : Instrumentation() {
             check(updated.classroom == "A102")
             check(backup.recoveryPoints().isNotEmpty())
             check(runCatching { imports.applyReviewed(selection, review) }.isFailure)
-            changes.change(updated, updated.copy(dayOfWeek = 5), com.chen.schedule.util.ChangeScope.ONCE, 6)
+            changes.change(updated, updated.copy(note = "只改备注"), com.chen.schedule.util.ChangeScope.ALL, 6)
+            val edited = checkNotNull(courses.getCourseById(updated.id))
+            check(edited.note == "只改备注" && edited.importSource.isEmpty())
+            changes.change(edited, edited.copy(dayOfWeek = 5), com.chen.schedule.util.ChangeScope.ONCE, 6)
             val split = courses.getCoursesBySemester(sem).first().filter { it.name == "数学" }
             check(split.single { it.appliesToWeek(6) }.dayOfWeek == 5)
             check(split.single { it.appliesToWeek(5) }.dayOfWeek == 1)
@@ -227,12 +233,21 @@ class RegressionInstrumentation : Instrumentation() {
             val second = semesters.insert(Semester(name = "第二学期", startDate = 1740960000000, totalWeeks = 20, schemeId = scheme))
             courses.insert(Course(name = "A", dayOfWeek = 1, startSlot = 1, endSlot = 1, startWeek = 1, endWeek = 20, semesterId = first))
             courses.insert(Course(name = "B", dayOfWeek = 2, startSlot = 1, endSlot = 1, startWeek = 1, endWeek = 20, semesterId = second))
+            val missingSlot = listOf(TimeSlot(slotNumber = 2, startTime = "08:00", endTime = "08:45"))
+            val incompatible = schemes.createCustomScheme("缺少第 1 节", missingSlot, false)
+            check(runCatching { schemes.selectSchemeForSemester(first, incompatible) }.isFailure)
+            check(runCatching { schemes.updateCustomScheme(scheme, "不可保存的名称", missingSlot, false) }.isFailure)
+            check(semesters.getSemesterById(first)?.schemeId == scheme)
+            check(schemes.getSchemeById(scheme)?.name == "测试作息")
+            check(schemes.getSlotsOfSchemeDirect(scheme).single().slotNumber == 1)
+            schemes.deleteScheme(incompatible)
             service.exportToUri(Uri.fromFile(file))
             repeat(2) {
                 val result = service.importData(Uri.fromFile(file))
                 check(result.fullRestore && result.count == 2)
                 val allSemesters = semesters.getAllSemesters().first()
                 check(allSemesters.size == 2)
+                check(allSemesters.map { it.id }.toSet() == setOf(first, second))
                 check(schemes.getAllSchemesDirect().count { it.name == "测试作息" } == 1)
                 check(courses.getAllCourses().first().associate { course ->
                     course.name to allSemesters.single { it.id == course.semesterId }.name

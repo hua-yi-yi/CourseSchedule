@@ -60,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.chen.schedule.domain.model.Semester
+import com.chen.schedule.util.WeekCalculator
 
 /**
  * 选择已有学期。
@@ -237,12 +238,16 @@ fun SemesterEditScreen(
 
     if (showDatePicker) {
         val initial = form.dateMillis ?: System.currentTimeMillis()
-        val pickerState = rememberDatePickerState(initialSelectedDateMillis = initial)
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = WeekCalculator.toPickerDateMillis(initial)
+        )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.updateSemesterDate(pickerState.selectedDateMillis)
+                    viewModel.updateSemesterDate(
+                        pickerState.selectedDateMillis?.let { WeekCalculator.fromPickerDateMillis(it) }
+                    )
                     showDatePicker = false
                 }) { Text("确定") }
             },

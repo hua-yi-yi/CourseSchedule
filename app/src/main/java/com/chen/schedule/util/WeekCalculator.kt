@@ -4,11 +4,20 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 
 /** Calendar weeks run Monday through Sunday in the device time zone. */
 object WeekCalculator {
+    fun toPickerDateMillis(millis: Long, zone: ZoneId = ZoneId.systemDefault()): Long =
+        Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
+            .atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+    fun fromPickerDateMillis(millis: Long, zone: ZoneId = ZoneId.systemDefault()): Long =
+        Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+            .atStartOfDay(zone).toInstant().toEpochMilli()
+
     /** Real teaching week, or null outside the semester. UI browsing still uses currentWeek. */
     fun activeWeek(startDate: Long, totalWeeks: Int, nowMillis: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): Int? {
         if (startDate <= 0L || totalWeeks !in 1..53) return null

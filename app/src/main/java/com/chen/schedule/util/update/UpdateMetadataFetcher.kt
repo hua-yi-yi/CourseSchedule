@@ -24,8 +24,9 @@ internal class UpdateMetadataFetcher(
     private val client: OkHttpClient,
     private val userAgent: String
 ) {
-    fun fetch(candidates: List<UpdateEndpointCandidate>): Result<ValidUpdateMetadata> {
+    fun fetch(candidates: List<UpdateEndpointCandidate>, currentVersion: String): Result<ValidUpdateMetadata> {
         var lastError: Exception? = null
+        var best: ValidUpdateMetadata? = null
         for (candidate in candidates) {
             try {
                 val request = Request.Builder()
@@ -44,12 +45,18 @@ internal class UpdateMetadataFetcher(
                     if (!isValidVersionTag(tag)) throw IOException("更新信息缺少有效的版本号")
                     ValidUpdateMetadata(json, tag, candidate.name)
                 }
-                return Result.success(metadata)
+                if (VersionComparator.isNewer(metadata.versionTag, currentVersion)) {
+                    return Result.success(metadata)
+                }
+                if (best == null || VersionComparator.isNewer(metadata.versionTag, best.versionTag)) {
+                    best = metadata
+                }
             } catch (error: Exception) {
                 lastError = error
             }
         }
-        return Result.failure(lastError ?: IOException("无法连接到更新服务器，请检查网络"))
+        return best?.let { Result.success(it) }
+            ?: Result.failure(lastError ?: IOException("无法连接到更新服务器，请检查网络"))
     }
 
     private fun stringField(json: JsonObject, name: String): String {

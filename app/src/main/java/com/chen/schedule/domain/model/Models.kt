@@ -26,6 +26,9 @@ data class Course(
         }
         return typeMatch && week >= startWeek && week <= endWeek
     }
+
+    fun hasEffectiveWeeks(): Boolean =
+        appliesToWeek(startWeek) || (startWeek < endWeek && appliesToWeek(startWeek + 1))
 }
 
 enum class WeekType(val label: String) {

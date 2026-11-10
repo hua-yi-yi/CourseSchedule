@@ -106,23 +106,29 @@ class WidgetThemeHelperTest {
     }
 
     @Test
-    fun `image modes set container color transparent and handle null paths safely`() {
+    fun `missing wallpapers fall back to the default system surfaces`() {
         val configAppImage = ThemeConfig(
             widgetBackgroundMode = WidgetBackgroundMode.APP_IMAGE,
-            customBackgroundPath = null
+            customBackgroundPath = null,
+            widgetTextContrast = WidgetTextContrast.LIGHT
         )
         val styleApp = WidgetThemeHelper.resolveWithConfig(config = configAppImage, isDarkTheme = false)
-        assertEquals(Color.Transparent, styleApp.containerColor)
+        assertNull(styleApp.containerColor)
         assertNull(styleApp.backgroundBitmap)
+        assertNull(styleApp.titleColor)
+        assertFalse(styleApp.isLightText)
 
         val configCustomImage = ThemeConfig(
             widgetBackgroundMode = WidgetBackgroundMode.CUSTOM_IMAGE,
             widgetCustomBgPath = null,
-            customBackgroundPath = null
+            customBackgroundPath = null,
+            widgetTextContrast = WidgetTextContrast.DARK
         )
         val styleCustom = WidgetThemeHelper.resolveWithConfig(config = configCustomImage, isDarkTheme = true)
-        assertEquals(Color.Transparent, styleCustom.containerColor)
+        assertNull(styleCustom.containerColor)
         assertNull(styleCustom.backgroundBitmap)
+        assertNull(styleCustom.titleColor)
+        assertTrue(styleCustom.isLightText)
     }
 
     @Test

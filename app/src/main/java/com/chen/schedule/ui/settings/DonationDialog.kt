@@ -1,6 +1,11 @@
 package com.chen.schedule.ui.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -26,16 +31,45 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 
 @Composable
 internal fun DonationDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
+    var openWeChatAfterPermission by rememberSaveable { mutableStateOf(false) }
+
+    fun save(openAfterSave: Boolean) {
+        if (saveQrCodeToGallery(context, showToast = !openAfterSave) && openAfterSave) {
+            Toast.makeText(context, "收款码已保存，正在调起微信扫一扫…", Toast.LENGTH_SHORT).show()
+            openWeChat(context)
+        }
+    }
+
+    val requestStorage = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) save(openWeChatAfterPermission)
+        else Toast.makeText(context, "需要存储权限才能保存到相册", Toast.LENGTH_SHORT).show()
+    }
+
+    fun requestSave(openAfterSave: Boolean) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            openWeChatAfterPermission = openAfterSave
+            requestStorage.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            save(openAfterSave)
+        }
+    }
+
     // 打赏作者弹窗
     run {
         AlertDialog(
@@ -120,19 +154,13 @@ internal fun DonationDialog(onDismiss: () -> Unit) {
                     ) {
                         FilledTonalButton(
                             modifier = Modifier.weight(1f),
-                            onClick = { saveQrCodeToGallery(context, showToast = true) }
+                            onClick = { requestSave(openAfterSave = false) }
                         ) {
                             Text("保存到相册", fontSize = 12.sp)
                         }
                         Button(
                             modifier = Modifier.weight(1f),
-                            onClick = {
-                                val saved = saveQrCodeToGallery(context, showToast = false)
-                                if (saved) {
-                                    Toast.makeText(context, "收款码已保存，正在调起微信扫一扫...", Toast.LENGTH_SHORT).show()
-                                }
-                                openWeChat(context)
-                            }
+                            onClick = { requestSave(openAfterSave = true) }
                         ) {
                             Text("保存并打开微信", fontSize = 12.sp)
                         }

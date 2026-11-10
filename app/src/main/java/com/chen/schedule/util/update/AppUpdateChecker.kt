@@ -53,7 +53,7 @@ class AppUpdateChecker @Inject constructor(
         val candidateEndpoints = buildCandidateEndpoints(useMirror, selected)
 
         val metadata = UpdateMetadataFetcher(client, "CourseSchedule-App/${BuildConfig.VERSION_NAME}")
-            .fetch(candidateEndpoints).getOrElse { error ->
+            .fetch(candidateEndpoints, BuildConfig.VERSION_NAME).getOrElse { error ->
                 return@withContext UpdateCheckResult.Error(
                     error.message ?: "无法连接到更新服务器，请检查网络", canOpenWeb = true
                 )

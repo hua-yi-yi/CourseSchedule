@@ -6,6 +6,28 @@ import org.junit.Test
 
 class UserFlowRegressionTest {
     private val original = Course(id = 9, name = "数学", classroom = "A101", startWeek = 1, endWeek = 20, importSource = "file")
+    @Test fun editsWithNoEffectiveWeekAreRejected() {
+        val weekTwo = original.copy(startWeek = 2, endWeek = 2)
+        val oddOnly = weekTwo.copy(weekType = WeekType.ODD)
+        assertFalse(oddOnly.hasEffectiveWeeks())
+        assertTrue(oddOnly.copy(endWeek = 3).hasEffectiveWeeks())
+        assertThrows(IllegalArgumentException::class.java) {
+            CourseChangePlanner.plan(weekTwo, oddOnly, ChangeScope.ALL, 2)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            CourseChangePlanner.plan(weekTwo, oddOnly, ChangeScope.FUTURE, 2)
+        }
+    }
+
+    @Test fun wholeCourseEditRetainsPreferredCourseId() {
+        val competing = original.copy(id = 1, name = "英语")
+        val edited = CourseChangePlanner.plan(original, original.copy(note = "更新备注"), ChangeScope.ALL, 1).single()
+        assertEquals(original.id, edited.id)
+        assertTrue(edited.importSource.isEmpty())
+        val cluster = CourseConflictDetector.resolveClusters(listOf(competing, edited), setOf(original.id)).single()
+        assertEquals(edited, cluster.primaryCourse)
+    }
+
     @Test fun onceMovesOnlyTheChosenOccurrence() {
         val result = CourseChangePlanner.plan(original, original.copy(dayOfWeek = 5, classroom = "A102"), ChangeScope.ONCE, 6)
         assertEquals(3, result.size)

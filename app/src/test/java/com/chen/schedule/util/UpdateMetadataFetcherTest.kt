@@ -32,7 +32,7 @@ class UpdateMetadataFetcherTest {
         UpdateEndpointCandidate(path, server.url(path).toString(), isRawVersion)
 
     private fun fetch(vararg candidates: UpdateEndpointCandidate) =
-        UpdateMetadataFetcher(client, "CourseSchedule-Test").fetch(candidates.toList())
+        UpdateMetadataFetcher(client, "CourseSchedule-Test").fetch(candidates.toList(), "1.3.2")
 
     @Test fun emptyObjectFallsBackToValidRelease() {
         server.enqueue(MockResponse().setBody("{}"))
@@ -87,17 +87,28 @@ class UpdateMetadataFetcherTest {
         assertEquals(2, server.requestCount)
     }
 
-    @Test fun validEqualAndOlderReleasesRemainUsableWithoutFallback() {
+    @Test fun equalAndOlderMirrorsDoNotHideNewerOfficialRelease() {
         for (tag in listOf("v1.3.2", "1.3.1")) {
             server.enqueue(MockResponse().setBody("""{"versionTag":"$tag"}"""))
+            server.enqueue(MockResponse().setBody("""{"tag_name":"v1.3.3"}"""))
 
-            val metadata = fetch(candidate("/valid-$tag"), candidate("/must-not-request")).getOrThrow()
+            val metadata = fetch(candidate("/mirror"), candidate("/official", false)).getOrThrow()
 
-            assertEquals(tag, metadata.versionTag)
-            assertFalse(VersionComparator.isNewer(metadata.versionTag, "1.3.2"))
-            assertEquals("/valid-$tag", server.takeRequest().path)
+            assertEquals("v1.3.3", metadata.versionTag)
+            assertEquals("/mirror", server.takeRequest().path)
+            assertEquals("/official", server.takeRequest().path)
         }
-        assertEquals(2, server.requestCount)
+        assertEquals(4, server.requestCount)
+    }
+
+    @Test fun highestValidVersionIsRetainedWhenNoCandidateHasAnUpdate() {
+        server.enqueue(MockResponse().setBody("""{"versionTag":"1.3.1"}"""))
+        server.enqueue(MockResponse().setBody("""{"versionTag":"1.3.2"}"""))
+        server.enqueue(MockResponse().setResponseCode(503))
+
+        val metadata = fetch(candidate("/old"), candidate("/current"), candidate("/unavailable")).getOrThrow()
+        assertEquals("1.3.2", metadata.versionTag)
+        assertEquals(3, server.requestCount)
     }
 
     @Test fun supportedVersionFormsAndGithubAliasRemainAccepted() {

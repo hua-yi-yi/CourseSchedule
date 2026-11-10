@@ -536,11 +536,7 @@ class ScheduleConfigViewModel @Inject constructor(
                         )
 
                     else -> {
-                        timeSchemeRepository.renameScheme(form.editingId, name)
-                        timeSchemeRepository.saveSchemeSlots(form.editingId, form.slots)
-                        if (form.setCurrent && current != null) {
-                            timeSchemeRepository.selectSchemeForSemester(current.id, form.editingId)
-                        }
+                        timeSchemeRepository.updateCustomScheme(form.editingId, name, form.slots, form.setCurrent)
                         form.editingId
                     }
                 }

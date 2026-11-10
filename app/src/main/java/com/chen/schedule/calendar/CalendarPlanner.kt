@@ -3,8 +3,8 @@ package com.chen.schedule.calendar
 import com.chen.schedule.domain.model.Course
 import com.chen.schedule.domain.model.Semester
 import com.chen.schedule.domain.model.TimeSlot
+import com.chen.schedule.util.ScheduleStatus
 import com.chen.schedule.util.WeekCalculator
-import java.time.LocalTime
 import java.time.ZoneId
 
 /**
@@ -44,30 +44,21 @@ object CalendarPlanner {
         slots: List<TimeSlot>,
         zone: ZoneId = ZoneId.systemDefault()
     ): List<CalendarEventItem> {
+        if (courses.isEmpty()) return emptyList()
+        val check = ScheduleStatus.checkScheme(semester, slots, courses)
+        require(check.done) {
+            if (check.missingSlots.isNotEmpty()) "作息缺少节次 ${check.missingSlots.joinToString()}，请先补全"
+            else "作息时间无效，请先检查节次设置"
+        }
         val slotMap = slots.associateBy { it.slotNumber }
         val semesterMonday = WeekCalculator.semesterMonday(semester.startDate, zone)
         val planned = mutableListOf<CalendarEventItem>()
 
         for (course in courses) {
-            val startSlot = slotMap[course.startSlot]
-            val endSlot = slotMap[course.endSlot] ?: startSlot
-
-            val startTimeStr = startSlot?.startTime ?: "08:00"
-            val endTimeStr = endSlot?.endTime ?: "08:45"
-
-            val startLocalTime = runCatching {
-                LocalTime.parse(startTimeStr.padStart(5, '0'))
-            }.getOrDefault(LocalTime.of(8, 0))
-
-            val rawEndLocalTime = runCatching {
-                LocalTime.parse(endTimeStr.padStart(5, '0'))
-            }.getOrDefault(startLocalTime.plusMinutes(45))
-
-            val endLocalTime = if (rawEndLocalTime.isAfter(startLocalTime)) {
-                rawEndLocalTime
-            } else {
-                startLocalTime.plusMinutes(45)
-            }
+            val startTimeStr = slotMap.getValue(course.startSlot).startTime
+            val endTimeStr = slotMap.getValue(course.endSlot).endTime
+            val startLocalTime = checkNotNull(ScheduleStatus.parseTime(startTimeStr))
+            val endLocalTime = checkNotNull(ScheduleStatus.parseTime(endTimeStr))
 
             val slotRangeLabel = if (course.endSlot > course.startSlot) {
                 "第 ${course.startSlot}-${course.endSlot} 节"
@@ -84,6 +75,7 @@ object CalendarPlanner {
 
                 val startZdt = eventDate.atTime(startLocalTime).atZone(zone)
                 val endZdt = eventDate.atTime(endLocalTime).atZone(zone)
+                require(endZdt.isAfter(startZdt)) { "${course.name}在 ${eventDate} 的结束时间无效，请检查作息和时区" }
 
                 val desc = buildString {
                     if (course.teacher.isNotBlank()) append("任课教师: ").append(course.teacher).append("\n")

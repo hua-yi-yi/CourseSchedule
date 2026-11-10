@@ -203,6 +203,7 @@ class CourseEditViewModel @Inject constructor(
                 if (courseId != null) {
                     changeService.change(requireNotNull(original), course, scope, week)
                 } else {
+                    require(course.hasEffectiveWeeks()) { "所选周次内没有符合单双周设置的课程" }
                     courseRepository.insert(course)
                 }
                 _state.update { it.copy(saved = true, isSaving = false) }
