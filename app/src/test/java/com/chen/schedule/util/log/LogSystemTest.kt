@@ -273,4 +273,119 @@ class LogSystemTest {
             server.shutdown()
         }
     }
+
+    @Test
+    fun `SettingsViewModel initializes all MutableState delegates before calling member methods in init`() {
+        val vmClass = com.chen.schedule.ui.settings.SettingsViewModel::class.java
+        val classBytes = vmClass.getResourceAsStream("SettingsViewModel.class")?.use { it.readBytes() }
+        assertNotNull("SettingsViewModel.class must be loadable", classBytes)
+        val dis = java.io.DataInputStream(java.io.ByteArrayInputStream(classBytes!!))
+        assertEquals(0xCAFEBABE.toInt(), dis.readInt())
+        dis.readUnsignedShort() // minor
+        dis.readUnsignedShort() // major
+
+        val cpCount = dis.readUnsignedShort()
+        val utf8Pool = HashMap<Int, String>()
+        val classRefPool = HashMap<Int, Int>()
+        val nameAndTypePool = HashMap<Int, Pair<Int, Int>>()
+        val memberRefPool = HashMap<Int, Pair<Int, Int>>() // tag 9 (Fieldref) or 10 (Methodref) -> (classIdx, natIdx)
+
+        var idx = 1
+        while (idx < cpCount) {
+            when (val tag = dis.readUnsignedByte()) {
+                1 -> utf8Pool[idx] = dis.readUTF()
+                7 -> classRefPool[idx] = dis.readUnsignedShort()
+                8, 16, 19, 20 -> dis.skipBytes(2)
+                3, 4 -> dis.skipBytes(4)
+                5, 6 -> { dis.skipBytes(8); idx++ }
+                9, 10, 11 -> memberRefPool[idx] = dis.readUnsignedShort() to dis.readUnsignedShort()
+                12 -> nameAndTypePool[idx] = dis.readUnsignedShort() to dis.readUnsignedShort()
+                15 -> dis.skipBytes(3)
+                17, 18 -> dis.skipBytes(4)
+                else -> error("Unexpected constant pool tag: $tag")
+            }
+            idx++
+        }
+
+        dis.skipBytes(6) // access_flags, this_class, super_class
+        val interfacesCount = dis.readUnsignedShort()
+        dis.skipBytes(interfacesCount * 2)
+
+        val fieldsCount = dis.readUnsignedShort()
+        val delegateFieldNames = HashSet<String>()
+        repeat(fieldsCount) {
+            dis.skipBytes(2) // access
+            val name = utf8Pool[dis.readUnsignedShort()].orEmpty()
+            dis.skipBytes(2) // descriptor
+            if (name.endsWith("\$delegate")) delegateFieldNames.add(name)
+            val attrCount = dis.readUnsignedShort()
+            repeat(attrCount) {
+                dis.skipBytes(2)
+                dis.skipBytes(dis.readInt())
+            }
+        }
+        assertTrue("Expected MutableState delegate fields in SettingsViewModel", delegateFieldNames.size >= 15)
+
+        val methodsCount = dis.readUnsignedShort()
+        var initCode: ByteArray? = null
+        repeat(methodsCount) {
+            dis.skipBytes(2)
+            val mName = utf8Pool[dis.readUnsignedShort()].orEmpty()
+            dis.skipBytes(2)
+            val attrCount = dis.readUnsignedShort()
+            repeat(attrCount) {
+                val attrName = utf8Pool[dis.readUnsignedShort()].orEmpty()
+                val attrLen = dis.readInt()
+                if (mName == "<init>" && attrName == "Code") {
+                    val codeAttr = ByteArray(attrLen)
+                    dis.readFully(codeAttr)
+                    val cDis = java.io.DataInputStream(java.io.ByteArrayInputStream(codeAttr))
+                    cDis.skipBytes(4) // max_stack, max_locals
+                    val codeLen = cDis.readInt()
+                    initCode = ByteArray(codeLen).also { cDis.readFully(it) }
+                } else {
+                    dis.skipBytes(attrLen)
+                }
+            }
+        }
+        assertNotNull("Expected <init> Code attribute", initCode)
+        val code = initCode!!
+
+        val ownerInternalName = vmClass.name.replace('.', '/')
+        val initializedDelegatesBeforeSelfCall = HashSet<String>()
+        var sawSelfMethodCall = false
+
+        var pc = 0
+        while (pc < code.size) {
+            val opcode = code[pc].toInt() and 0xFF
+            when (opcode) {
+                0xB5 /* putfield */, 0xB6 /* invokevirtual */, 0xB7 /* invokespecial */ -> {
+                    val cpIdx = ((code[pc + 1].toInt() and 0xFF) shl 8) or (code[pc + 2].toInt() and 0xFF)
+                    val ref = memberRefPool[cpIdx]
+                    val owner = ref?.let { utf8Pool[classRefPool[it.first]] }.orEmpty()
+                    val memberName = ref?.let { nameAndTypePool[it.second]?.first }?.let { utf8Pool[it] }.orEmpty()
+                    if (owner == ownerInternalName) {
+                        if (opcode == 0xB5 && memberName in delegateFieldNames && !sawSelfMethodCall) {
+                            initializedDelegatesBeforeSelfCall.add(memberName)
+                        } else if ((opcode == 0xB6 || opcode == 0xB7) && memberName != "<init>" && !memberName.startsWith("get")) {
+                            sawSelfMethodCall = true
+                        }
+                    }
+                    pc += 3
+                }
+                // 常见定长字节码步进
+                0x10, 0x12, 0x15, 0x16, 0x17, 0x18, 0x19, 0x36, 0x37, 0x38, 0x39, 0x3A, 0xBC -> pc += 2
+                0x11, 0x13, 0x14, 0x84, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F, 0xA0,
+                0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xB2, 0xB3, 0xB4, 0xB8, 0xBB, 0xBD, 0xC0, 0xC1, 0xC6, 0xC7 -> pc += 3
+                0xB9, 0xBA, 0xC8 -> pc += 5
+                else -> pc += 1
+            }
+        }
+
+        assertEquals(
+            "All MutableState delegates must be initialized before SettingsViewModel.<init> invokes any member method",
+            delegateFieldNames,
+            initializedDelegatesBeforeSelfCall
+        )
+    }
 }

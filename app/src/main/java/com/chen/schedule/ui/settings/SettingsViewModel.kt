@@ -126,6 +126,37 @@ class SettingsViewModel @Inject constructor(
     var isTestingMirrors by androidx.compose.runtime.mutableStateOf(false); private set
     var mirrorLatencies by androidx.compose.runtime.mutableStateOf<Map<GithubMirror, Long?>>(emptyMap()); private set
 
+    var restorePreview by mutableStateOf<ScheduleBackupService.RestorePreview?>(null); private set
+    var dataBusy by mutableStateOf(false); private set
+    var dataMessage by mutableStateOf(""); private set
+    var recoveryFiles by mutableStateOf<List<java.io.File>>(emptyList()); private set
+
+    // ===== 系统日历直接同步 =====
+    data class CalendarSyncPreview(
+        val semesterName: String,
+        val courseCount: Int,
+        val totalEvents: Int,
+        val syncedCount: Int
+    )
+
+    var calendarSyncPreview by mutableStateOf<CalendarSyncPreview?>(null); private set
+    var isCalendarSyncing by mutableStateOf(false); private set
+
+    // ===== 运行日志保存、自主上传与导入日志专区 =====
+    var logSaveEnabled by mutableStateOf(true); private set
+    var logStats by mutableStateOf(LogStorageStats()); private set
+    var importedLogs by mutableStateOf<List<ImportedLogMeta>>(emptyList()); private set
+    var logServerUrl by mutableStateOf(""); private set
+    var importSnapshotCount by mutableStateOf(0); private set
+
+    var isLoadingLogs by mutableStateOf(false); private set
+    var activeLogDocument by mutableStateOf<ParsedLogDocument?>(null); private set
+    var activeLogIsRuntime by mutableStateOf(false); private set
+
+    var isUploadingLog by mutableStateOf(false); private set
+    var logUploadMessage by mutableStateOf<String?>(null); private set
+    var logUploadSuccess by mutableStateOf(false); private set
+
     init {
         reminderEnabled = reminderPrefs.enabled
         reminderLead = reminderPrefs.leadMinutes
@@ -376,10 +407,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    var restorePreview by mutableStateOf<ScheduleBackupService.RestorePreview?>(null); private set
-    var dataBusy by mutableStateOf(false); private set
-    var dataMessage by mutableStateOf(""); private set
-    var recoveryFiles by mutableStateOf<List<java.io.File>>(emptyList()); private set
     fun refreshRecoveryPoints() { recoveryFiles = backupService.recoveryPoints() }
     fun dismissRestore() { if (!dataBusy) restorePreview = null }
     fun previewRestore(uri: Uri) {
@@ -456,17 +483,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    // ===== 系统日历直接同步 =====
-    data class CalendarSyncPreview(
-        val semesterName: String,
-        val courseCount: Int,
-        val totalEvents: Int,
-        val syncedCount: Int
-    )
-
-    var calendarSyncPreview by mutableStateOf<CalendarSyncPreview?>(null); private set
-    var isCalendarSyncing by mutableStateOf(false); private set
-
     fun prepareCalendarSyncPreview() {
         viewModelScope.launch {
             calendarSyncPreview = null
@@ -539,21 +555,6 @@ class SettingsViewModel @Inject constructor(
             }
         }
     }
-
-    // ===== 运行日志保存、自主上传与导入日志专区 =====
-    var logSaveEnabled by mutableStateOf(true); private set
-    var logStats by mutableStateOf(LogStorageStats()); private set
-    var importedLogs by mutableStateOf<List<ImportedLogMeta>>(emptyList()); private set
-    var logServerUrl by mutableStateOf(""); private set
-    var importSnapshotCount by mutableStateOf(0); private set
-
-    var isLoadingLogs by mutableStateOf(false); private set
-    var activeLogDocument by mutableStateOf<ParsedLogDocument?>(null); private set
-    var activeLogIsRuntime by mutableStateOf(false); private set
-
-    var isUploadingLog by mutableStateOf(false); private set
-    var logUploadMessage by mutableStateOf<String?>(null); private set
-    var logUploadSuccess by mutableStateOf(false); private set
 
     fun refreshLogState() {
         logSaveEnabled = AppLogger.isSaveEnabled(context)

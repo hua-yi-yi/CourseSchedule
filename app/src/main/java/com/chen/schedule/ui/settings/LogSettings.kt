@@ -672,20 +672,18 @@ private fun LogEntryItemCard(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 6.dp)
-                        .heightIn(max = 140.dp),
+                        .padding(top = 6.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
                     shape = MaterialTheme.shapes.extraSmall
                 ) {
                     Text(
-                        text = entry.stackTrace.orEmpty(),
+                        text = entry.stackTrace.orEmpty().take(3000),
                         fontFamily = FontFamily.Monospace,
                         fontSize = 10.sp,
                         lineHeight = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .padding(6.dp)
-                            .verticalScroll(rememberScrollState())
                             .horizontalScroll(rememberScrollState())
                     )
                 }
