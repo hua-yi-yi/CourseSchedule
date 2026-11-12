@@ -40,6 +40,15 @@ import com.chen.schedule.reminders.ClassReminderManager
 import com.chen.schedule.reminders.ExactAlarmPermissionObserver
 import com.chen.schedule.reminders.ReminderPrefs
 import com.chen.schedule.reminders.ReminderStatus
+import com.chen.schedule.util.ImportSnapshotManager
+import com.chen.schedule.util.log.AppLogger
+import com.chen.schedule.util.log.ImportedLogMeta
+import com.chen.schedule.util.log.LogCodec
+import com.chen.schedule.util.log.LogLevel
+import com.chen.schedule.util.log.LogStorageStats
+import com.chen.schedule.util.log.LogUploadPayload
+import com.chen.schedule.util.log.LogUploader
+import com.chen.schedule.util.log.ParsedLogDocument
 import dagger.hilt.android.qualifiers.ApplicationContext
 
 private val wallpaperMutex = Mutex()
@@ -71,6 +80,7 @@ class SettingsViewModel @Inject constructor(
         exactAlarmPermissionObserver.onResume()
         refreshReminderStatus()
         refreshRecoveryPoints()
+        refreshLogState()
     }
 
     fun refreshReminderStatus() {
@@ -124,6 +134,7 @@ class SettingsViewModel @Inject constructor(
         useMirror = updatePrefs.useMirror
         selectedMirror = updatePrefs.selectedMirror
         updateLastCheckSummary()
+        refreshLogState()
 
         val currentDl = updateDownloader.downloadState.value
         if (currentDl is DownloadState.Downloading || currentDl is DownloadState.Completed) {
@@ -525,6 +536,273 @@ class SettingsViewModel @Inject constructor(
             } else {
                 val errorMsg = result.exceptionOrNull()?.message ?: "清除失败"
                 onComplete(false, "清除日历失败: $errorMsg")
+            }
+        }
+    }
+
+    // ===== 运行日志保存、自主上传与导入日志专区 =====
+    var logSaveEnabled by mutableStateOf(true); private set
+    var logStats by mutableStateOf(LogStorageStats()); private set
+    var importedLogs by mutableStateOf<List<ImportedLogMeta>>(emptyList()); private set
+    var logServerUrl by mutableStateOf(""); private set
+    var importSnapshotCount by mutableStateOf(0); private set
+
+    var isLoadingLogs by mutableStateOf(false); private set
+    var activeLogDocument by mutableStateOf<ParsedLogDocument?>(null); private set
+    var activeLogIsRuntime by mutableStateOf(false); private set
+
+    var isUploadingLog by mutableStateOf(false); private set
+    var logUploadMessage by mutableStateOf<String?>(null); private set
+    var logUploadSuccess by mutableStateOf(false); private set
+
+    fun refreshLogState() {
+        logSaveEnabled = AppLogger.isSaveEnabled(context)
+        logServerUrl = AppLogger.getServerUrl(context)
+        viewModelScope.launch {
+            runCatching {
+                val stats = AppLogger.getStorageStats(context)
+                val imported = AppLogger.listImportedLogs(context)
+                val snapshots = ImportSnapshotManager.listSnapshots(context).size
+                Triple(stats, imported, snapshots)
+            }.onSuccess { (stats, imported, snapshots) ->
+                logStats = stats
+                importedLogs = imported
+                importSnapshotCount = snapshots
+            }
+        }
+    }
+
+    fun updateLogSaveEnabled(enabled: Boolean) {
+        AppLogger.setSaveEnabled(context, enabled)
+        logSaveEnabled = enabled
+        refreshLogState()
+    }
+
+    fun updateLogServerUrl(url: String) {
+        logServerUrl = url
+        AppLogger.setServerUrl(context, url)
+    }
+
+    fun openRuntimeLogViewer() {
+        if (isLoadingLogs) return
+        isLoadingLogs = true
+        viewModelScope.launch {
+            try {
+                val entries = AppLogger.readRecentEntries(context, limit = 500)
+                val exportText = AppLogger.buildExportText(context, includeSnapshots = true, limit = 500)
+                activeLogIsRuntime = true
+                activeLogDocument = ParsedLogDocument(
+                    title = "本机运行与崩溃日志",
+                    formatLabel = "本机实时日志",
+                    metadata = AppLogger.buildDeviceMetadata(),
+                    entries = entries,
+                    rawText = exportText
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(context, "读取本地日志失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                isLoadingLogs = false
+            }
+        }
+    }
+
+    fun closeLogViewer() {
+        activeLogDocument = null
+    }
+
+    fun importExternalLog(uri: Uri) {
+        if (isLoadingLogs) return
+        isLoadingLogs = true
+        viewModelScope.launch {
+            try {
+                val (meta, doc) = AppLogger.importLogFromUri(context, uri)
+                refreshLogState()
+                activeLogIsRuntime = false
+                activeLogDocument = doc
+                Toast.makeText(
+                    context,
+                    "成功导入日志「${meta.fileName}」，解析到 ${doc.entries.size} 条记录",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(context, "导入日志失败: ${e.message}", Toast.LENGTH_LONG).show()
+            } finally {
+                isLoadingLogs = false
+            }
+        }
+    }
+
+    fun openImportedLog(meta: ImportedLogMeta) {
+        if (isLoadingLogs) return
+        isLoadingLogs = true
+        viewModelScope.launch {
+            try {
+                val doc = AppLogger.loadImportedLog(context, meta.id)
+                if (doc != null) {
+                    activeLogIsRuntime = false
+                    activeLogDocument = doc
+                } else {
+                    Toast.makeText(context, "该导入日志文件已不存在", Toast.LENGTH_SHORT).show()
+                    refreshLogState()
+                }
+            } finally {
+                isLoadingLogs = false
+            }
+        }
+    }
+
+    fun deleteImportedLog(id: String) {
+        viewModelScope.launch {
+            AppLogger.deleteImportedLog(context, id)
+            refreshLogState()
+            Toast.makeText(context, "已移除该条导入日志", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun clearAllImportedLogs() {
+        viewModelScope.launch {
+            AppLogger.clearImportedLogs(context)
+            refreshLogState()
+            Toast.makeText(context, "已清空全部导入日志记录", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun clearRuntimeLogs() {
+        viewModelScope.launch {
+            AppLogger.clearRuntimeLogs(context)
+            if (activeLogIsRuntime && activeLogDocument != null) {
+                activeLogDocument = activeLogDocument?.copy(entries = emptyList(), rawText = "")
+            }
+            refreshLogState()
+            Toast.makeText(context, "已清空本机运行与崩溃日志", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun exportRuntimeLogToUri(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                AppLogger.exportToUri(context, uri, includeSnapshots = true)
+                refreshLogState()
+                Toast.makeText(context, "运行日志导出成功", Toast.LENGTH_SHORT).show()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(context, "导出日志失败: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    fun shareRuntimeLogs() {
+        viewModelScope.launch {
+            try {
+                val content = AppLogger.buildExportText(context, includeSnapshots = true, limit = 500)
+                val stamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US)
+                    .format(java.util.Date())
+                AppLogger.shareLogFile(
+                    context = context,
+                    fileName = "course_schedule_log_$stamp.log",
+                    content = content,
+                    chooserTitle = "分享应用诊断日志"
+                )
+            } catch (e: Exception) {
+                Toast.makeText(context, "分享日志失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun shareLogDocument(doc: ParsedLogDocument) {
+        viewModelScope.launch {
+            try {
+                val content = doc.rawText.ifBlank {
+                    LogCodec.buildExportDocument(doc.entries, doc.metadata)
+                }
+                val fileName = if (doc.title.contains('.')) doc.title else "${doc.title}.log"
+                AppLogger.shareLogFile(
+                    context = context,
+                    fileName = fileName,
+                    content = content,
+                    chooserTitle = "分享日志文件"
+                )
+            } catch (e: Exception) {
+                Toast.makeText(context, "分享失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun clearLogUploadFeedback() {
+        logUploadMessage = null
+        logUploadSuccess = false
+    }
+
+    suspend fun prepareUploadPayload(
+        userNote: String,
+        includeSnapshots: Boolean,
+        targetDocument: ParsedLogDocument? = null
+    ): LogUploadPayload {
+        val entries = targetDocument?.entries ?: AppLogger.readRecentEntries(context, limit = 400)
+        val snapshots = if (includeSnapshots && targetDocument == null) {
+            AppLogger.loadSnapshotBriefs(context)
+        } else {
+            emptyList()
+        }
+        val sourceLabel = if (targetDocument != null) {
+            "imported:${targetDocument.title}"
+        } else {
+            "runtime"
+        }
+        return LogUploader.buildPayload(
+            entries = entries,
+            appVersion = com.chen.schedule.BuildConfig.VERSION_NAME,
+            versionCode = com.chen.schedule.BuildConfig.VERSION_CODE,
+            androidSdk = android.os.Build.VERSION.SDK_INT,
+            deviceModel = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
+            userNote = userNote,
+            sourceLabel = sourceLabel,
+            importSnapshots = snapshots
+        )
+    }
+
+    fun uploadLogs(
+        serverUrl: String,
+        userNote: String,
+        includeSnapshots: Boolean,
+        targetDocument: ParsedLogDocument? = null
+    ) {
+        if (isUploadingLog) return
+        updateLogServerUrl(serverUrl)
+        isUploadingLog = true
+        logUploadMessage = null
+        logUploadSuccess = false
+
+        viewModelScope.launch {
+            try {
+                val payload = prepareUploadPayload(userNote, includeSnapshots, targetDocument)
+                if (payload.entries.isEmpty() && payload.importSnapshots.isEmpty() && userNote.isBlank()) {
+                    logUploadSuccess = false
+                    logUploadMessage = "当前暂无可上传的日志记录，请先复现问题或导入日志文件"
+                    return@launch
+                }
+                val res = LogUploader.upload(serverUrl, payload)
+                res.fold(
+                    onSuccess = { msg ->
+                        logUploadSuccess = true
+                        logUploadMessage = msg
+                        AppLogger.i("LogUploader", "用户自主上传日志成功: $msg")
+                        refreshLogState()
+                    },
+                    onFailure = { err ->
+                        logUploadSuccess = false
+                        logUploadMessage = err.message ?: "上传失败"
+                        AppLogger.w("LogUploader", "自主上传日志未成功: ${err.message}")
+                        refreshLogState()
+                    }
+                )
+            } finally {
+                isUploadingLog = false
             }
         }
     }

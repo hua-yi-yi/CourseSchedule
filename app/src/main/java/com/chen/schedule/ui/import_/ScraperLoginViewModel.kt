@@ -10,6 +10,7 @@ import com.chen.schedule.data.scraper.ScraperAdapter
 import com.chen.schedule.data.scraper.ScraperException
 import com.chen.schedule.data.scraper.ScraperManager
 import com.chen.schedule.data.scraper.ZhengfangScraper
+import com.chen.schedule.util.log.AppLogger
 import com.chen.schedule.widget.WidgetUpdater
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -110,6 +111,7 @@ class ScraperLoginViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                AppLogger.w("ZhengfangScraper", "获取验证码失败 (host=${android.net.Uri.parse(_state.value.url).host.orEmpty()})", e)
                 _state.update {
                     it.copy(isLoading = false, message = "获取验证码失败:${e.message}", isError = true)
                 }
@@ -139,6 +141,7 @@ class ScraperLoginViewModel @Inject constructor(
                     _state.value.captchaCode.trim().ifBlank { null }
                 )
                 if (loginResult is LoginResult.Failure) {
+                    AppLogger.w("ZhengfangScraper", "教务登录返回失败 (host=${android.net.Uri.parse(_state.value.url).host.orEmpty()}): ${loginResult.reason}")
                     _state.update {
                         it.copy(isLoading = false, message = "登录失败:${loginResult.reason}", isError = true)
                     }
@@ -185,8 +188,10 @@ class ScraperLoginViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: ScraperException) {
+                AppLogger.e("ZhengfangScraper", "教务课表抓取异常: ${e.message}", e)
                 _state.update { it.copy(isLoading = false, message = e.message ?: "导入失败", isError = true) }
             } catch (e: Exception) {
+                AppLogger.e("ZhengfangScraper", "教务连接异常", e)
                 _state.update {
                     it.copy(isLoading = false, message = "连接失败:${e.message}", isError = true)
                 }

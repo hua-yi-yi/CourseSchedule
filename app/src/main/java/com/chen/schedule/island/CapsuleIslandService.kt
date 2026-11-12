@@ -16,7 +16,6 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.DisplayMetrics
-import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
@@ -24,6 +23,7 @@ import android.view.WindowManager
 import com.chen.schedule.MainActivity
 import com.chen.schedule.R
 import com.chen.schedule.domain.model.Course
+import com.chen.schedule.util.log.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -179,7 +179,7 @@ class CapsuleIslandService : Service() {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                     })
                 } catch (error: Exception) {
-                    Log.w(TAG, "Unable to open schedule", error)
+                    AppLogger.w(TAG, "Unable to open schedule", error)
                 }
                 setExpanded(false, animate = false)
             }
@@ -237,7 +237,7 @@ class CapsuleIslandService : Service() {
         } catch (error: Exception) {
             if (error is kotlinx.coroutines.CancellationException) throw error
             view.visibility = View.GONE
-            Log.e(TAG, "Unable to read current island state", error)
+            AppLogger.e(TAG, "Unable to read current island state", error)
         }
     }
 
@@ -361,7 +361,7 @@ class CapsuleIslandService : Service() {
     private fun failAndStop(message: String, error: Exception) {
         isReady = false
         tickerJob?.cancel()
-        Log.e(TAG, message, error)
+        AppLogger.e(TAG, message, error)
         CapsuleIslandManager.onFailure(message)
         stopSelf()
     }
@@ -372,11 +372,11 @@ class CapsuleIslandService : Service() {
         scope.cancel()
         screenReceiver?.let {
             try { unregisterReceiver(it) }
-            catch (error: Exception) { Log.w(TAG, "Unable to unregister screen receiver", error) }
+            catch (error: Exception) { AppLogger.w(TAG, "Unable to unregister screen receiver", error) }
         }
         if (isViewAttached) {
             try { capsuleView?.let(windowManager::removeView) }
-            catch (error: Exception) { Log.w(TAG, "Unable to remove floating view", error) }
+            catch (error: Exception) { AppLogger.w(TAG, "Unable to remove floating view", error) }
             finally { isViewAttached = false }
         }
         stopForeground(STOP_FOREGROUND_REMOVE)

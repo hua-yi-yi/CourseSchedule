@@ -1,9 +1,9 @@
 {
-  "versionName": "1.3.15",
-  "versionTag": "v1.3.15",
-  "title": "v1.3.15 · 修复预设底色配色",
-  "publishedAt": "2026-11-10",
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.15/CourseSchedule-v1.3.15.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.15",
-  "changelog": "- 修复切换预设底色后文字难以看清的问题。选择纯黑或炭灰时，即使处于浅色模式也会自动使用浅色文字。\n- 按钮、卡片、边框和系统栏图标随底色调整。使用相册壁纸时，应用按所选主题模式配色。"
+  "versionName": "1.3.16",
+  "versionTag": "v1.3.16",
+  "title": "v1.3.16 · 日志保存、自主上传与导入日志专区",
+  "publishedAt": "2026-11-12",
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.16/CourseSchedule-v1.3.16.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.16",
+  "changelog": "- 新增运行与崩溃日志本地持久化保存：自动对密码、Cookie、学号、手机号等隐私信息进行掩码脱敏，按体积滚动清理并独立保留崩溃堆栈。\n- 新增日志自主上传功能：在设置与导入快照中支持由用户主动确认后上报至指定诊断接口（绝不后台静默上传），同时保留复制报告与 GitHub Issue 反馈。\n- 设置页新增专门的「导入日志专区」：支持选择导入外部 .log / .txt / .json 日志、Logcat 与诊断包并在本机结构化解析、筛选错误堆栈及二次上传，同时集中管理课表导入历史快照。"
 }

@@ -3,7 +3,7 @@ package com.chen.schedule.reminders
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
+import com.chen.schedule.util.log.AppLogger
 import com.chen.schedule.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +24,7 @@ class BootReceiver : BroadcastReceiver() {
                 WidgetUpdater.refreshAll(appContext)
                 withContext(Dispatchers.Main) { com.chen.schedule.island.CapsuleIslandManager.sync(appContext) }
             } catch (error: Exception) {
-                Log.w("CourseRestore", "Could not restore course presentation", error)
+                AppLogger.w("CourseRestore", "Could not restore course presentation (${intent.action})", error)
             } finally {
                 pending.finish()
             }

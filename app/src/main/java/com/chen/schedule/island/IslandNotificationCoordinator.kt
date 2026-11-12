@@ -8,11 +8,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import android.util.Log
 import androidx.core.content.ContextCompat
 import com.chen.schedule.MainActivity
 import com.chen.schedule.R
 import com.chen.schedule.reminders.ClassReminderManager
+import com.chen.schedule.util.log.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,7 +57,7 @@ object IslandNotificationCoordinator {
             var capability = try {
                 IslandNativeAdapters.decorate(context, builder, liveState)
             } catch (error: Exception) {
-                Log.w("CourseIsland", "Native adapter unavailable; keeping standard notification", error)
+                AppLogger.w("CourseIsland", "Native adapter unavailable; keeping standard notification", error)
                 null
             }
             // Binder/native checks may cross a course boundary or a settings change.
@@ -84,7 +84,7 @@ object IslandNotificationCoordinator {
             manager.notify(NOTIFICATION_ID, builder.build())
             _status.value = if (capability?.nativeAvailable == true) IslandSystemStatus.NATIVE else IslandSystemStatus.STANDARD
         } catch (error: Exception) {
-            Log.w("CourseIsland", "Could not publish course notification", error)
+            AppLogger.w("CourseIsland", "Could not publish course notification", error)
             dismiss(context)
             _status.value = IslandSystemStatus.FAILED
         }

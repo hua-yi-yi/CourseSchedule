@@ -4,6 +4,7 @@ import android.app.Application
 import com.chen.schedule.reminders.ClassReminderManager
 import com.chen.schedule.island.CapsuleIslandManager
 import com.chen.schedule.island.IslandPrefs
+import com.chen.schedule.util.log.AppLogger
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,7 @@ import kotlinx.coroutines.withContext
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
+        AppLogger.init(this)
         com.chen.schedule.ui.theme.ThemePrefs.init(this)
         IslandPrefs.init(this)
         CapsuleIslandManager.sync(this)

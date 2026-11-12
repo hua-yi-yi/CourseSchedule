@@ -7,7 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
+import com.chen.schedule.util.log.AppLogger
 import com.chen.schedule.island.IslandDisplayMode
 import com.chen.schedule.island.IslandEventPlanner
 import com.chen.schedule.island.IslandNotificationCoordinator
@@ -54,7 +54,7 @@ object ClassReminderManager {
         scope.launch {
             try { rescheduleNow(appContext) }
             catch (error: Exception) {
-                Log.w("ClassReminder", "Could not reschedule course events", error)
+                AppLogger.w("ClassReminder", "Could not reschedule course events", error)
                 IslandNotificationCoordinator.dismiss(appContext)
             }
         }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.chen.schedule.domain.model.Course
+import com.chen.schedule.util.log.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -152,6 +153,12 @@ object ImportSnapshotManager {
                     .drop(MAX_SNAPSHOT_COUNT)
                     .forEach { it.delete() }
             }
+        }
+
+        if (!error.isNullOrBlank()) {
+            AppLogger.w("CourseImport", "课表导入提取异常 [来源=$source, 学期=$semesterName]: $error")
+        } else {
+            AppLogger.i("CourseImport", "课表导入解析完成 [来源=$source, 学期=$semesterName]: 识别到 ${courses.size} 门课程安排")
         }
 
         snapshot

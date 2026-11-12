@@ -7,7 +7,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.util.Log
+import com.chen.schedule.util.log.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,7 +36,7 @@ object CapsuleIslandManager {
                 Uri.parse("package:" + context.packageName)
             ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK })
         } catch (error: Exception) {
-            Log.w(TAG, "Unable to open overlay permission page", error)
+            AppLogger.w(TAG, "Unable to open overlay permission page", error)
             context.startActivity(Intent(Settings.ACTION_SETTINGS).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             })
@@ -68,7 +68,7 @@ object CapsuleIslandManager {
             if (Build.VERSION.SDK_INT >= 26) appContext.startForegroundService(intent)
             else appContext.startService(intent)
         } catch (error: Exception) {
-            Log.e(TAG, "Unable to start compatible overlay", error)
+            AppLogger.e(TAG, "Unable to start compatible overlay", error)
             onFailure("系统未允许启动悬浮服务，请返回应用重试")
         }
     }

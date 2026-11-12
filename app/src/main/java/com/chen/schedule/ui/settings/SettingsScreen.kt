@@ -110,6 +110,20 @@ fun SettingsScreen(
         uri?.let(viewModel::previewRestore)
     }
 
+    // Export runtime log launcher
+    val exportLogLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        uri?.let(viewModel::exportRuntimeLogToUri)
+    }
+
+    // Import external log launcher
+    val importLogLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let(viewModel::importExternalLog)
+    }
+
     // 此授权回调仅供课前提醒；灵动岛使用自己的授权回调，避免联动开启声音提醒。
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -257,6 +271,19 @@ fun SettingsScreen(
             Spacer(Modifier.height(16.dp))
 
             UpdateSettings(viewModel, downloadState) { showMirrorDialog = true }
+
+            LogSettings(
+                viewModel = viewModel,
+                onPickExternalLog = {
+                    val stampTypes = arrayOf("text/plain", "application/json", "text/*", "*/*")
+                    importLogLauncher.launch(stampTypes)
+                },
+                onExportRuntimeLog = {
+                    val stamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US)
+                        .format(java.util.Date())
+                    exportLogLauncher.launch("course_schedule_log_$stamp.log")
+                }
+            )
 
             // ===== 支持与交流 =====
             SettingsGroup(title = "支持与交流") {

@@ -4,7 +4,7 @@ import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
+import com.chen.schedule.util.log.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,7 +22,7 @@ class ExactAlarmPermissionReceiver : BroadcastReceiver() {
             try {
                 ClassReminderManager.rescheduleNow(appContext)
             } catch (error: Exception) {
-                Log.w("ExactAlarmPermission", "Could not reschedule reminders after permission grant", error)
+                AppLogger.w("ExactAlarmPermission", "Could not reschedule reminders after permission grant", error)
             } finally {
                 pending.finish()
             }

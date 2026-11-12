@@ -6,11 +6,11 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import com.chen.schedule.MainActivity
 import com.chen.schedule.R
 import com.chen.schedule.island.CapsuleIslandManager
 import com.chen.schedule.island.IslandStateRepository
+import com.chen.schedule.util.log.AppLogger
 import com.chen.schedule.widget.WidgetUpdater
 import com.chen.schedule.util.ScheduleStatus
 import kotlinx.coroutines.CoroutineScope
@@ -35,7 +35,7 @@ class ClassReminderReceiver : BroadcastReceiver() {
                 withContext(Dispatchers.Main) { CapsuleIslandManager.refresh(appContext) }
                 if (intent.action == ClassReminderManager.ACTION_RESCHEDULE) WidgetUpdater.refreshAll(appContext)
             } catch (error: Exception) {
-                Log.w("ClassReminder", "Course alarm reconciliation failed", error)
+                AppLogger.w("ClassReminder", "Course alarm reconciliation failed (${intent.action})", error)
             } finally { pending.finish() }
         }
     }
@@ -75,6 +75,6 @@ class ClassReminderReceiver : BroadcastReceiver() {
             .setAutoCancel(true).setTimeoutAfter(actualStart - commitTime).build()
         try { context.getSystemService(NotificationManager::class.java)
             .notify(intent.getIntExtra(ClassReminderManager.EXTRA_REQUEST_CODE, 0), notification) }
-        catch (error: SecurityException) { Log.w("ClassReminder", "Notification permission changed", error) }
+        catch (error: SecurityException) { AppLogger.w("ClassReminder", "Notification permission changed", error) }
     }
 }

@@ -26,6 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chen.schedule.ui.theme.ScheduleStyle
+import com.chen.schedule.util.DiagnosticPayload
+import com.chen.schedule.util.DiagnosticReporter
 import com.chen.schedule.util.ImportSnapshot
 import com.chen.schedule.util.ImportSnapshotManager
 import kotlinx.coroutines.launch
@@ -39,6 +41,7 @@ fun ImportSnapshotHistoryDialog(
     var snapshots by remember { mutableStateOf<List<ImportSnapshot>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var expandedId by remember { mutableStateOf<String?>(null) }
+    var uploadingId by remember { mutableStateOf<String?>(null) }
 
     fun refreshList() {
         scope.launch {
@@ -144,6 +147,33 @@ fun ImportSnapshotHistoryDialog(
                                     clipboard.setPrimaryClip(android.content.ClipData.newPlainText("课表快照", report))
                                     Toast.makeText(context, "已复制快照完整报告！", Toast.LENGTH_SHORT).show()
                                 },
+                                isUploading = uploadingId == item.id,
+                                onUpload = {
+                                    if (uploadingId == null) {
+                                        uploadingId = item.id
+                                        scope.launch {
+                                            val payload = DiagnosticPayload(
+                                                source = item.source,
+                                                semesterName = item.semesterName,
+                                                totalWeeks = item.totalWeeks,
+                                                incomingCount = item.courseCount,
+                                                courses = item.courses,
+                                                error = item.error.orEmpty(),
+                                                extraNote = "快照时间: ${item.formattedTime}\n" + item.rawSnippet.take(12_000)
+                                            )
+                                            val serverUrl = DiagnosticReporter.getServerUrl(context)
+                                            DiagnosticReporter.upload(serverUrl, payload).fold(
+                                                onSuccess = { msg ->
+                                                    Toast.makeText(context, "上传成功: $msg", Toast.LENGTH_SHORT).show()
+                                                },
+                                                onFailure = { err ->
+                                                    Toast.makeText(context, "上传未成功: ${err.message}", Toast.LENGTH_LONG).show()
+                                                }
+                                            )
+                                            uploadingId = null
+                                        }
+                                    }
+                                },
                                 onDelete = {
                                     scope.launch {
                                         ImportSnapshotManager.deleteSnapshot(context, item.id)
@@ -165,6 +195,7 @@ fun ImportSnapshotHistoryDialog(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SnapshotCard(
     snapshot: ImportSnapshot,
@@ -173,6 +204,8 @@ private fun SnapshotCard(
     onShare: () -> Unit,
     onOpenGithub: () -> Unit,
     onCopy: () -> Unit,
+    isUploading: Boolean,
+    onUpload: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
@@ -272,10 +305,10 @@ private fun SnapshotCard(
             Spacer(Modifier.height(6.dp))
 
             // 操作按钮条
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.Center
             ) {
                 TextButton(
                     onClick = onDelete,
@@ -283,14 +316,19 @@ private fun SnapshotCard(
                 ) {
                     Text("删除", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.error)
                 }
-                Spacer(Modifier.width(4.dp))
                 TextButton(
                     onClick = onCopy,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text("复制报告", fontSize = 11.5.sp)
                 }
-                Spacer(Modifier.width(4.dp))
+                TextButton(
+                    enabled = !isUploading,
+                    onClick = onUpload,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(if (isUploading) "上传中…" else "自主上传", fontSize = 11.5.sp)
+                }
                 TextButton(
                     onClick = onOpenGithub,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
