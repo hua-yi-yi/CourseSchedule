@@ -1,5 +1,6 @@
 package com.chen.schedule.ui.timetable
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,15 +19,10 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,13 +34,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chen.schedule.domain.model.Course
 import com.chen.schedule.domain.model.TimeSlot
+import com.chen.schedule.ui.theme.ScheduleStyle
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -59,12 +55,14 @@ fun DayView(
     onCourseClick: (primaryCourse: Course, cluster: List<Course>) -> Unit,
     onBlankCellClick: (slotNumber: Int, positionInCell: Offset) -> Unit = { _, _ -> },
     pendingCell: PendingBlankCell? = null,
-    cardAlpha: Float = 1.0f
+    cardAlpha: Float = 1.0f,
+    hasWallpaper: Boolean = false
 ) {
     val allCourses = clusters.flatMap { it.allCourses }
     val visibleSlots = com.chen.schedule.util.TimetableSlots.rows(timeSlots, allCourses)
     val density = LocalDensity.current
     val slotHeight = (DSLOT_H * density.fontScale.coerceAtLeast(1f)).dp
+    val colors = MaterialTheme.colorScheme
 
     val now = LocalTime.now()
     val currentSlot = visibleSlots.takeIf { isToday }?.find { slot ->
@@ -81,13 +79,11 @@ fun DayView(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 4.dp),
-        shape = RoundedCornerShape(10.dp),
+        shape = ScheduleStyle.CardShape,
+        border = if (hasWallpaper) BorderStroke(0.5.dp, colors.outlineVariant) else null,
         colors = CardDefaults.cardColors(
-            containerColor = if (cardAlpha < 1.0f) {
-                MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha)
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
+            containerColor = colors.timetableGrid(cardAlpha),
+            contentColor = colors.onSurface
         )
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -95,6 +91,7 @@ fun DayView(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .then(if (hasWallpaper) Modifier.background(colors.timetableControls) else Modifier)
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -166,6 +163,7 @@ fun DayView(
                                 modifier = Modifier
                                     .width(DTIME_COL.dp)
                                     .fillMaxHeight()
+                                    .then(if (hasWallpaper) Modifier.background(colors.timetableControls) else Modifier)
                                     .padding(end = 8.dp, top = 6.dp),
                                 horizontalAlignment = Alignment.End,
                                 verticalArrangement = Arrangement.Top
@@ -235,7 +233,7 @@ fun DayView(
                     val xPx = timeColPx.toInt()
                     val yPx = (firstRow * slotHPx).toInt()
 
-                    val accent = Color(course.color)
+                    val courseColors = colors.courseCardColors(Color(course.color))
 
                     // 若有多门课重叠, 绘制底层底框产生层叠视觉
                     if (cluster.isOverlapping) {
@@ -246,8 +244,8 @@ fun DayView(
                                 .height(slotHeight * span)
                                 .padding(3.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(accent.copy(alpha = 0.10f))
-                                .border(0.8.dp, accent.copy(alpha = 0.30f), RoundedCornerShape(12.dp))
+                                .background(colors.surfaceContainerHigh)
+                                .border(0.8.dp, courseColors.accent.copy(alpha = 0.30f), RoundedCornerShape(12.dp))
                         )
                     }
 
@@ -258,8 +256,8 @@ fun DayView(
                             .height(slotHeight * span)
                             .padding(3.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(accent.copy(alpha = 0.15f))
-                            .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                            .background(courseColors.container)
+                            .border(1.dp, courseColors.accent.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
                             .clickable { onCourseClick(course, cluster.allCourses) }
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
@@ -269,7 +267,7 @@ fun DayView(
                                     .width(3.5.dp)
                                     .fillMaxHeight()
                                     .clip(RoundedCornerShape(2.dp))
-                                    .background(accent)
+                                    .background(courseColors.accent)
                             )
                             Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
                                 Text(
@@ -289,7 +287,7 @@ fun DayView(
                                         maxLines = 4,
                                         softWrap = true,
                                         overflow = TextOverflow.Ellipsis,
-                                        color = accent.copy(alpha = 0.95f)
+                                        color = courseColors.accentText
                                     )
                                 }
                                 if (course.teacher.isNotBlank()) {
@@ -298,7 +296,7 @@ fun DayView(
                                         fontSize = 11.5.sp,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = courseColors.supportingText
                                     )
                                 }
                                 Spacer(Modifier.height(1.dp))
@@ -306,21 +304,21 @@ fun DayView(
                                     "${course.startSlot}-${course.endSlot}节 · ${course.weekType.label}",
                                     fontSize = 10.5.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = accent
+                                    color = courseColors.accentText
                                 )
                             }
                             if (cluster.isOverlapping) {
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
-                                        .background(accent)
+                                        .background(courseColors.accent)
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
                                     Text(
                                         "${cluster.overlapCount}门",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                        color = courseColors.badgeText
                                     )
                                 }
                             }

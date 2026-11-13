@@ -76,12 +76,15 @@ import com.chen.schedule.domain.model.DayOfWeek
 import com.chen.schedule.util.WeekCalculator
 import com.chen.schedule.ui.schedule.StatusAmber
 import com.chen.schedule.ui.schedule.StatusBadge
+import com.chen.schedule.ui.theme.ScheduleStyle
 import com.chen.schedule.ui.theme.ThemePrefs
+import com.chen.schedule.ui.theme.TimetableWallpaper
+import com.chen.schedule.ui.theme.TimetableWallpaperImage
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TimetableScreen(
+internal fun TimetableScreen(
     /** (semesterId, 预填位置) —— 位置为 null 表示从 FAB 进入的空白新增。 */
     onAddCourse: (Long, BlankClickTarget?) -> Unit,
     onEditCourse: (Long, Long, Int) -> Unit,
@@ -91,11 +94,12 @@ fun TimetableScreen(
     onNavigateToSchemeSettings: () -> Unit,
     onNavigateToImport: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    wallpaper: TimetableWallpaper? = null,
     viewModel: TimetableViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
     val themeConfig by ThemePrefs.state.collectAsState()
-    val hasCustomBg = !themeConfig.customBackgroundPath.isNullOrBlank()
+    val hasWallpaper = wallpaper != null
     var selectedCluster by remember { mutableStateOf<List<Course>?>(null) }
     var activeCourseIndex by remember { mutableStateOf(0) }
     var pendingCancel by remember { mutableStateOf<Course?>(null) }
@@ -140,7 +144,7 @@ fun TimetableScreen(
         dismissButton = { TextButton(onClick = { pendingCancel = null }) { Text("保留") } }) }
     Scaffold(
         snackbarHost = { androidx.compose.material3.SnackbarHost(snackbar) },
-        containerColor = if (hasCustomBg) Color.Transparent else MaterialTheme.colorScheme.background,
+        containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             if (state.currentSemester != null) FloatingActionButton(
                 onClick = {
@@ -153,23 +157,25 @@ fun TimetableScreen(
             }
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            if (wallpaper != null) {
+                TimetableWallpaperImage(wallpaper, themeConfig.backgroundDim, Modifier.matchParentSize())
+            }
             val semester = state.currentSemester
             if (semester == null) {
-                // 还没有学期 - 空状态(左上角菜单仍可用)
-                TopMenu(
-                    onNavigateToImport = onNavigateToImport,
-                    onNavigateToSettings = onNavigateToSettings
-                )
-                EmptySemesterState(
-                    modifier = Modifier.fillMaxSize(),
-                    onNavigateToSetupWizard = onNavigateToSetupWizard,
-                    onNavigateToScheduleConfig = onNavigateToScheduleConfig
-                )
+                Column(Modifier.fillMaxSize()) {
+                    TopMenu(
+                        modifier = Modifier.wallpaperPanel(hasWallpaper),
+                        onNavigateToImport = onNavigateToImport,
+                        onNavigateToSettings = onNavigateToSettings
+                    )
+                    EmptySemesterState(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        hasWallpaper = hasWallpaper,
+                        onNavigateToSetupWizard = onNavigateToSetupWizard,
+                        onNavigateToScheduleConfig = onNavigateToScheduleConfig
+                    )
+                }
             } else {
                 // 整页统一滚动，紧凑顶栏随课表一起滑出屏幕。
                 Column(
@@ -180,6 +186,7 @@ fun TimetableScreen(
                     // ===== 极简紧凑顶栏: 菜单+学期名 | ‹ 第 N 周 › 回本周 | 周末 | 视图切换 =====
                     val actualWeek = WeekCalculator.currentWeek(semester.startDate, semester.totalWeeks)
                     CompactTopBar(
+                        modifier = Modifier.wallpaperPanel(hasWallpaper),
                         onSelectSemester = onNavigateToSemesterSettings,
                         semesterName = semester.name,
                         currentWeek = state.currentWeek,
@@ -214,7 +221,8 @@ fun TimetableScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 8.dp, vertical = 6.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                                containerColor = if (hasWallpaper) MaterialTheme.colorScheme.timetableControls
+                                else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
                             ),
                             shape = com.chen.schedule.ui.theme.ScheduleStyle.CardShape
                         ) {
@@ -296,6 +304,7 @@ fun TimetableScreen(
                         if (state.isDayView) {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 DaySelector(
+                                    modifier = Modifier.wallpaperPanel(hasWallpaper),
                                     selectedDay = state.selectedDay,
                                     onDaySelected = viewModel::selectDay,
                                     showWeekend = state.showWeekend,
@@ -307,7 +316,8 @@ fun TimetableScreen(
                                     clusters = viewModel.getCourseClusters(week),
                                     timeSlots = state.timeSlots,
                                     pendingCell = pendingBlankCell?.takeIf { it.week == week && it.dayOfWeek == state.selectedDay },
-                                    cardAlpha = if (hasCustomBg) themeConfig.cardAlpha else 1.0f,
+                                    cardAlpha = if (hasWallpaper) themeConfig.cardAlpha else 1f,
+                                    hasWallpaper = hasWallpaper,
                                     onCourseClick = { primary, cluster ->
                                         pendingBlankCell = null
                                         selectedCluster = cluster
@@ -326,7 +336,8 @@ fun TimetableScreen(
                                 semesterStartDate = semester.startDate,
                                 currentWeek = week,
                                 pendingCell = pendingBlankCell,
-                                cardAlpha = if (hasCustomBg) themeConfig.cardAlpha else 1.0f,
+                                cardAlpha = if (hasWallpaper) themeConfig.cardAlpha else 1f,
+                                hasWallpaper = hasWallpaper,
                                 onCourseClick = { primary, cluster ->
                                     pendingBlankCell = null
                                     selectedCluster = cluster
@@ -415,14 +426,24 @@ fun TimetableScreen(
 
 /* ===================== 头部 ===================== */
 
+@Composable
+private fun Modifier.wallpaperPanel(hasWallpaper: Boolean): Modifier {
+    if (!hasWallpaper) return this
+    val colors = MaterialTheme.colorScheme
+    return padding(horizontal = 4.dp, vertical = 2.dp)
+        .background(colors.timetableControls, ScheduleStyle.CardShape)
+        .border(0.5.dp, colors.outlineVariant, ScheduleStyle.CardShape)
+}
+
 /** 左上角菜单栏:包含「导入课表」与「设置」 */
 @Composable
 private fun TopMenu(
     onNavigateToImport: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    Box {
+    Box(modifier) {
         IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(34.dp)) {
             Icon(
                 Icons.Default.Menu,
@@ -466,10 +487,11 @@ private fun CompactTopBar(
     onToggleWeekend: () -> Unit,
     onToggleView: () -> Unit,
     onNavigateToImport: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(start = 4.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -481,7 +503,7 @@ private fun CompactTopBar(
         )
         Row(
             modifier = Modifier
-                .weight(1f, fill = false)
+                .weight(1f)
                 .clip(RoundedCornerShape(6.dp))
                 .clickable(onClick = onSelectSemester)
                 .padding(horizontal = 4.dp, vertical = 2.dp),
@@ -503,7 +525,7 @@ private fun CompactTopBar(
             )
         }
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.width(4.dp))
 
         // 2. 中间: 周切换 ‹ 第 N 周 › (+ 回本周微胶囊)
         Row(
@@ -557,17 +579,17 @@ private fun CompactTopBar(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.width(4.dp))
 
         // 3. 右侧: 周末开关微按钮 + 视图切换微按钮
         Text(
             text = if (showWeekend) "周末" else "五天",
             fontSize = 10.5.sp,
             fontWeight = FontWeight.Medium,
-            color = if (showWeekend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (showWeekend) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .clip(RoundedCornerShape(4.dp))
-                .background(if (showWeekend) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent)
+                .background(if (showWeekend) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
                 .clickable(onClick = onToggleWeekend)
                 .padding(horizontal = 5.dp, vertical = 2.5.dp)
         )
@@ -591,6 +613,7 @@ private fun CompactTopBar(
 private fun DaySelector(
     selectedDay: Int,
     onDaySelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
     showWeekend: Boolean = false,
     semesterStartDate: Long? = null,
     currentWeek: Int = 1
@@ -601,7 +624,7 @@ private fun DaySelector(
         com.chen.schedule.util.WeekCalculator.semesterMonday(it)
     }
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 6.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -617,7 +640,7 @@ private fun DaySelector(
                     .background(
                         when {
                             selected -> MaterialTheme.colorScheme.primary
-                            isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            isToday -> MaterialTheme.colorScheme.primaryContainer
                             else -> Color.Transparent
                         }
                     )
@@ -636,7 +659,7 @@ private fun DaySelector(
                         },
                         color = when {
                             selected -> MaterialTheme.colorScheme.onPrimary
-                            isToday -> MaterialTheme.colorScheme.primary
+                            isToday -> MaterialTheme.colorScheme.onPrimaryContainer
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
                     )
@@ -645,9 +668,9 @@ private fun DaySelector(
                             "${date.monthValue}/${date.dayOfMonth}",
                             fontSize = 9.sp,
                             color = when {
-                                selected -> MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
-                                isToday -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                selected -> MaterialTheme.colorScheme.onPrimary
+                                isToday -> MaterialTheme.colorScheme.onPrimaryContainer
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
                         )
                     }
@@ -662,11 +685,17 @@ private fun DaySelector(
 @Composable
 private fun EmptySemesterState(
     modifier: Modifier = Modifier,
+    hasWallpaper: Boolean,
     onNavigateToSetupWizard: () -> Unit,
     onNavigateToScheduleConfig: () -> Unit
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp)
+                .wallpaperPanel(hasWallpaper)
+                .padding(if (hasWallpaper) 16.dp else 0.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -727,6 +756,7 @@ private fun CourseDetailDialog(
     AlertDialog(
         onDismissRequest = { onDismiss(currentCourse) },
         shape = RoundedCornerShape(22.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         title = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -802,7 +832,9 @@ private fun CourseDetailDialog(
                 key = { page -> "${cluster[page].id}_$page" }
             ) { page ->
                 val course = cluster[page]
-                val accent = Color(course.color)
+                val courseColors = MaterialTheme.colorScheme.courseCardColors(
+                    Color(course.color), MaterialTheme.colorScheme.surfaceContainerHigh
+                )
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -817,15 +849,15 @@ private fun CourseDetailDialog(
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(accent.copy(alpha = 0.18f))
-                                .border(1.2.dp, accent.copy(alpha = 0.40f), RoundedCornerShape(14.dp)),
+                                .background(courseColors.container)
+                                .border(1.2.dp, courseColors.accent.copy(alpha = 0.40f), RoundedCornerShape(14.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 course.name.take(1),
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = accent
+                                color = courseColors.accentText
                             )
                         }
                         Spacer(Modifier.width(12.dp))

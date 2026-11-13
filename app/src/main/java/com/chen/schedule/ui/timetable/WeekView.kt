@@ -1,5 +1,6 @@
 package com.chen.schedule.ui.timetable
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,9 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -38,9 +37,8 @@ import androidx.compose.ui.unit.sp
 import com.chen.schedule.domain.model.Course
 import com.chen.schedule.domain.model.DayOfWeek
 import com.chen.schedule.domain.model.TimeSlot
-import java.time.Instant
+import com.chen.schedule.ui.theme.ScheduleStyle
 import java.time.LocalDate
-import java.time.ZoneId
 
 private val SLOT_H = 60
 private val TIME_COL = 36
@@ -55,7 +53,8 @@ fun WeekView(
     onCourseClick: (primaryCourse: Course, cluster: List<Course>) -> Unit,
     onBlankCellClick: (dayOfWeek: Int, slotNumber: Int, positionInCell: Offset) -> Unit = { _, _, _ -> },
     pendingCell: PendingBlankCell? = null,
-    cardAlpha: Float = 1.0f
+    cardAlpha: Float = 1.0f,
+    hasWallpaper: Boolean = false
 ) {
     val days = DayOfWeek.entries.filter { showWeekend || it.index <= 5 }
     val allCourses = clusters.flatMap { it.allCourses }
@@ -67,6 +66,7 @@ fun WeekView(
         com.chen.schedule.util.WeekCalculator.semesterMonday(it)
     }
     val today = LocalDate.now()
+    val colors = MaterialTheme.colorScheme
 
     fun dateOf(dayIndex: Int): LocalDate? = semesterMonday?.plusDays(
         ((currentWeek - 1) * 7 + (dayIndex - 1)).toLong()
@@ -76,13 +76,11 @@ fun WeekView(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 4.dp),
-        shape = RoundedCornerShape(10.dp),
+        shape = ScheduleStyle.CardShape,
+        border = if (hasWallpaper) BorderStroke(0.5.dp, colors.outlineVariant) else null,
         colors = CardDefaults.cardColors(
-            containerColor = if (cardAlpha < 1.0f) {
-                MaterialTheme.colorScheme.surface.copy(alpha = cardAlpha)
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
+            containerColor = colors.timetableGrid(cardAlpha),
+            contentColor = colors.onSurface
         )
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -90,13 +88,7 @@ fun WeekView(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        if (cardAlpha < 1.0f) {
-                            MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.85f * cardAlpha)
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerLow
-                        }
-                    )
+                    .background(colors.timetableControls)
                     .height((36 * density.fontScale.coerceAtLeast(1f)).dp)
             ) {
                 Box(
@@ -144,7 +136,7 @@ fun WeekView(
                                     "${d.monthValue}/${d.dayOfMonth}",
                                     fontSize = 8.5.sp,
                                     fontWeight = if (isToday) FontWeight.Medium else FontWeight.Normal,
-                                    color = if (isToday) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
+                                    color = if (isToday) MaterialTheme.colorScheme.onPrimary
                                     else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -257,7 +249,7 @@ fun WeekView(
                         val xPx = (timeColPx + dayIndex * cellWidthPx).toInt()
                         val yPx = (firstRow * slotHPx).toInt()
 
-                        val accent = Color(course.color)
+                        val courseColors = colors.courseCardColors(Color(course.color))
 
                         // 若有多门课重叠, 绘制一层底层底框产生层叠视觉提示
                         if (cluster.isOverlapping) {
@@ -268,23 +260,23 @@ fun WeekView(
                                     .height(slotHeight * span)
                                     .padding(1.5.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(accent.copy(alpha = 0.12f))
-                                    .border(0.8.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+                                    .background(colors.surfaceContainerHigh)
+                                    .border(0.8.dp, courseColors.accent.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
                             )
                         }
 
                         CourseBlock(
                             course = course,
                             span = span,
-                            accent = accent,
+                            courseColors = courseColors,
                             modifier = Modifier
                                 .offset { IntOffset(xPx, yPx) }
                                 .width(cellWidthDp)
                                 .height(slotHeight * span)
                                 .padding(1.5.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(accent.copy(alpha = 0.16f))
-                                .border(1.dp, accent.copy(alpha = 0.50f), RoundedCornerShape(8.dp))
+                                .background(courseColors.container)
+                                .border(1.dp, courseColors.accent.copy(alpha = 0.50f), RoundedCornerShape(8.dp))
                                 .clickable { onCourseClick(course, cluster.allCourses) }
                                 .padding(horizontal = if (cellWidthDp < 60.dp) 2.5.dp else 5.dp, vertical = 3.5.dp),
                             compact = span == 1,
@@ -341,25 +333,28 @@ fun WeekView(
     )
 }
 
-/** 课程块:左侧色条 + 信息列(周视图与日视图共用视觉语言)，右上角标注重叠门数 */
+/** 周视图课程块，重叠角标占用独立空间。 */
 @Composable
 internal fun CourseBlock(
     course: Course,
     span: Int,
-    accent: Color,
+    courseColors: CourseCardColors,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     narrow: Boolean = false,
     overlapCount: Int = 1
 ) {
     Box(modifier = modifier) {
-        Row(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxSize()
+                .padding(bottom = if (overlapCount > 1) 10.dp else 0.dp)
+        ) {
             if (!narrow) Box(
                 modifier = Modifier
                     .width(2.5.dp)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(1.5.dp))
-                    .background(accent)
+                    .background(courseColors.accent)
             )
             Column(modifier = Modifier.padding(start = if (narrow) 0.dp else 4.dp).fillMaxWidth()) {
                 Text(
@@ -382,7 +377,7 @@ internal fun CourseBlock(
                         maxLines = if (span >= 2) 5 else 3,
                         overflow = TextOverflow.Ellipsis,
                         softWrap = true,
-                        color = accent.copy(alpha = 0.95f)
+                        color = courseColors.accentText
                     )
                 }
                 if (!compact) {
@@ -393,25 +388,24 @@ internal fun CourseBlock(
                             lineHeight = 10.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                            color = courseColors.supportingText
                         )
                     }
                 }
             }
         }
 
-        // 重叠角标：右上角展示「X门」徽标
         if (overlapCount > 1) {
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
+                    .align(Alignment.BottomEnd)
                     .clip(RoundedCornerShape(3.5.dp))
-                    .background(accent.copy(alpha = 0.92f))
+                    .background(courseColors.accent)
                     .padding(horizontal = 3.dp, vertical = 0.5.dp)
             ) {
                 Text(
                     text = "${overlapCount}门",
-                    color = Color.White,
+                    color = courseColors.badgeText,
                     fontSize = 7.5.sp,
                     fontWeight = FontWeight.ExtraBold,
                     lineHeight = 8.5.sp

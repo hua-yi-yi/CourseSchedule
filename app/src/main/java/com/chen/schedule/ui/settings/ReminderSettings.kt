@@ -1,15 +1,15 @@
 package com.chen.schedule.ui.settings
 
-import com.chen.schedule.ui.theme.ScheduleStyle
-
+import android.Manifest
 import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
@@ -19,17 +19,29 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import com.chen.schedule.ui.theme.ScheduleStyle
 
 @Composable
-internal fun ReminderSettings(viewModel: SettingsViewModel, requestNotificationPermission: () -> Unit) {
-    // ===== 上课提醒 =====
-    SettingsGroup(title = "上课提醒") {
+internal fun ReminderSettings(viewModel: SettingsViewModel) {
+    val context = LocalContext.current
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onReminderSettingsResume() }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        viewModel.updateReminderEnabled(granted)
+        if (!granted) {
+            Toast.makeText(context, "未授予通知权限，将收不到上课提醒", Toast.LENGTH_LONG).show()
+        }
+    }
+    SettingsGroup {
         Text(viewModel.reminderStatus, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.primary)
         Text(viewModel.nextReminder, Modifier.padding(horizontal = ScheduleStyle.PagePadding), style = MaterialTheme.typography.bodySmall)
-        val context = androidx.compose.ui.platform.LocalContext.current
         Row(Modifier.fillMaxWidth()) {
             androidx.compose.material3.TextButton(onClick = {
                 val intent = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
@@ -66,7 +78,7 @@ internal fun ReminderSettings(viewModel: SettingsViewModel, requestNotificationP
                 checked = viewModel.reminderEnabled,
                 onCheckedChange = { enabled ->
                     if (enabled && Build.VERSION.SDK_INT >= 33 && !androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()) {
-                        requestNotificationPermission()
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     } else viewModel.updateReminderEnabled(enabled)
                 }
             )
@@ -87,14 +99,9 @@ internal fun ReminderSettings(viewModel: SettingsViewModel, requestNotificationP
                 )
             }
         }
-        GroupDivider()
-        Text(
-            "课程状态通知与悬浮胶囊在下方「胶囊灵动岛」中统一设置，可独立于课前提醒开启。",
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 
-    Spacer(Modifier.height(16.dp))
+    if (viewModel.reminderTestMessage.isNotBlank()) {
+        Text(viewModel.reminderTestMessage, Modifier.padding(8.dp), style = MaterialTheme.typography.bodySmall)
+    }
 }

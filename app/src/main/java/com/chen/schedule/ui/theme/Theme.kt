@@ -94,7 +94,7 @@ internal val DarkColorScheme = darkColorScheme(
 )
 
 // At this luminance, black and white have the same contrast against the background.
-private const val DARK_BACKGROUND_THRESHOLD = 0.179f
+private const val DARK_BACKGROUND_THRESHOLD = 0.17912878f
 
 internal fun resolveScheduleColorScheme(
     preset: BackgroundPreset,
@@ -142,7 +142,7 @@ internal fun resolveScheduleColorScheme(
 private fun Color.tintedWith(tint: Color, amount: Float): Color =
     tint.copy(alpha = amount).compositeOver(this)
 
-private fun Color.withTextContrast(background: Color, onSurface: Color): Color {
+internal fun Color.withTextContrast(background: Color, onSurface: Color): Color {
     val backgroundLuminance = background.luminance()
     fun contrast(color: Color): Float {
         val luminance = color.luminance()
@@ -152,18 +152,58 @@ private fun Color.withTextContrast(background: Color, onSurface: Color): Color {
 
     if (contrast(this) >= 4.5f) return this
 
-    // Find the smallest tint toward the palette's normal text color that reaches 4.5:1.
+    // Find the smallest tint toward a readable foreground that reaches 4.5:1.
+    val target = if (contrast(onSurface) >= 4.5f) onSurface else contrastingTextColor(background)
     var lower = 0f
     var upper = 1f
     repeat(8) {
         val amount = (lower + upper) / 2f
-        if (contrast(tintedWith(onSurface, amount)) >= 4.5f) {
+        if (contrast(tintedWith(target, amount)) >= 4.5f) {
             upper = amount
         } else {
             lower = amount
         }
     }
-    return tintedWith(onSurface, upper)
+    return tintedWith(target, upper)
+}
+
+internal fun contrastingTextColor(background: Color): Color =
+    if (background.luminance() < DARK_BACKGROUND_THRESHOLD) Color.White else Color.Black
+
+internal fun wallpaperColorScheme(scheme: ColorScheme, tint: Color): ColorScheme {
+    // Borrow the image hue while keeping the light/dark theme in control of brightness.
+    val gray = (tint.red + tint.green + tint.blue) / 3f
+    fun Color.withWallpaperHue() = Color(
+        red = (red + (tint.red - gray) * 0.14f).coerceIn(0f, 1f),
+        green = (green + (tint.green - gray) * 0.14f).coerceIn(0f, 1f),
+        blue = (blue + (tint.blue - gray) * 0.14f).coerceIn(0f, 1f)
+    )
+
+    val background = scheme.background.withWallpaperHue()
+    val surface = scheme.surface.withWallpaperHue()
+    val controls = scheme.surfaceContainerLow.withWallpaperHue()
+    val limitingSurface = if (contrastingTextColor(background) == Color.White) {
+        maxOf(background, surface, controls, compareBy { it.luminance() })
+    } else {
+        minOf(background, surface, controls, compareBy { it.luminance() })
+    }
+    val primary = scheme.primary.withTextContrast(limitingSurface, scheme.onSurface)
+    return scheme.copy(
+        background = background,
+        surface = surface,
+        surfaceVariant = scheme.surfaceVariant.withWallpaperHue(),
+        surfaceDim = scheme.surfaceDim.withWallpaperHue(),
+        surfaceBright = scheme.surfaceBright.withWallpaperHue(),
+        surfaceContainerLowest = scheme.surfaceContainerLowest.withWallpaperHue(),
+        surfaceContainerLow = controls,
+        surfaceContainer = scheme.surfaceContainer.withWallpaperHue(),
+        surfaceContainerHigh = scheme.surfaceContainerHigh.withWallpaperHue(),
+        surfaceContainerHighest = scheme.surfaceContainerHighest.withWallpaperHue(),
+        outlineVariant = scheme.outlineVariant.withWallpaperHue(),
+        primary = primary,
+        onPrimary = scheme.onPrimary.withTextContrast(primary, contrastingTextColor(primary)),
+        surfaceTint = primary
+    )
 }
 
 @Composable
@@ -175,13 +215,15 @@ fun ScheduleTheme(
         else -> false
     },
     dynamicColor: Boolean = false,
+    wallpaperTint: Color? = null,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val preset = themeConfig.backgroundPreset
-    val colorScheme = remember(context, configuration, dynamicColor, darkTheme, preset) {
-        resolveScheduleColorScheme(preset, darkTheme) { useDarkPalette ->
+    val colorScheme = remember(context, configuration, dynamicColor, darkTheme, preset, wallpaperTint) {
+        val activePreset = if (wallpaperTint == null) preset else BackgroundPreset.DEFAULT
+        val scheme = resolveScheduleColorScheme(activePreset, darkTheme) { useDarkPalette ->
             when {
                 dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
                     if (useDarkPalette) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -190,6 +232,7 @@ fun ScheduleTheme(
                 else -> LightColorScheme
             }
         }
+        if (wallpaperTint == null) scheme else wallpaperColorScheme(scheme, wallpaperTint)
     }
 
     val view = LocalView.current

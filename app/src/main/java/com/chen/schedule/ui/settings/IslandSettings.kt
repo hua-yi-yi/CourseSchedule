@@ -135,7 +135,7 @@ internal fun IslandSettings() {
         syncSettings()
     }
 
-    SettingsGroup(title = "胶囊灵动岛") {
+    SettingsGroup {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
             Text("显示方式", fontSize = 14.sp, fontWeight = FontWeight.Medium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -310,7 +310,6 @@ internal fun IslandSettings() {
             }
         }
     }
-    Spacer(Modifier.height(16.dp))
 }
 
 @Composable

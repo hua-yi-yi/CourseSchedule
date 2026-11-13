@@ -18,6 +18,11 @@ import androidx.compose.material3.LinearProgressIndicator
 import com.chen.schedule.util.update.DownloadState
 import com.chen.schedule.util.update.UpdateCheckResult
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -25,9 +30,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-internal fun UpdateSettings(viewModel: SettingsViewModel, downloadState: DownloadState, onShowMirrors: () -> Unit) {
-    // ===== 版本与更新 =====
-    SettingsGroup(title = "版本与更新") {
+internal fun UpdateSettings(viewModel: SettingsViewModel) {
+    val downloadState by viewModel.downloadState.collectAsState()
+    var showMirrorDialog by rememberSaveable { mutableStateOf(false) }
+    SettingsGroup {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -139,7 +145,7 @@ internal fun UpdateSettings(viewModel: SettingsViewModel, downloadState: Downloa
                 subtitle = "测试 GitHub 加速镜像延迟并选择最优节点",
                 onClick = {
                     viewModel.testAllMirrors()
-                    onShowMirrors()
+                    showMirrorDialog = true
                 }
             )
         }
@@ -273,5 +279,6 @@ internal fun UpdateSettings(viewModel: SettingsViewModel, downloadState: Downloa
         }
     }
 
-    Spacer(Modifier.height(16.dp))
+    AppUpdateDialog(viewModel, downloadState)
+    if (showMirrorDialog) MirrorSelectionDialog(viewModel) { showMirrorDialog = false }
 }

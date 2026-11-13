@@ -110,7 +110,7 @@ internal fun DonationDialog(onDismiss: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        "如果本应用为您的大学校园生活带来了便利，欢迎打赏支持作者一杯奶茶或咖啡 ☕\n您的认可与支持是项目持续维护和保持干净体验的最大动力！",
+                        "如果本应用为您的大学校园生活带来了便利，欢迎打赏支持作者一杯奶茶或咖啡 ☕",
                         style = MaterialTheme.typography.bodySmall,
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -65,6 +67,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.chen.schedule.ui.import_.ImportSnapshotHistoryDialog
 import com.chen.schedule.ui.theme.ScheduleStyle
 import com.chen.schedule.util.DiagnosticReporter
@@ -76,13 +80,26 @@ import com.chen.schedule.util.log.LogStorageStats
 import com.chen.schedule.util.log.LogUploader
 import com.chen.schedule.util.log.ParsedLogDocument
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
-internal fun LogSettings(
-    viewModel: SettingsViewModel,
-    onPickExternalLog: () -> Unit,
-    onExportRuntimeLog: () -> Unit
-) {
+internal fun LogSettings(viewModel: SettingsViewModel) {
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshLogState() }
+    val exportLogLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri -> uri?.let(viewModel::exportRuntimeLogToUri) }
+    val importLogLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let(viewModel::importExternalLog) }
+    val onPickExternalLog: () -> Unit = {
+        importLogLauncher.launch(arrayOf("text/plain", "application/json", "text/*", "*/*"))
+    }
+    val onExportRuntimeLog: () -> Unit = {
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        exportLogLauncher.launch("course_schedule_log_$stamp.log")
+    }
     var uploadTargetDoc by remember { mutableStateOf<ParsedLogDocument?>(null) }
     var showUploadDialog by remember { mutableStateOf(false) }
     var showImportSnapshotDialog by remember { mutableStateOf(false) }

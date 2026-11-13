@@ -1,7 +1,5 @@
 package com.chen.schedule.ui.settings
 
-import com.chen.schedule.ui.theme.ScheduleStyle
-
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -26,15 +24,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -53,14 +45,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chen.schedule.ui.theme.BackgroundPreset
+import com.chen.schedule.ui.theme.ScheduleStyle
 import com.chen.schedule.ui.theme.ThemePrefs
+import com.chen.schedule.ui.theme.TimetableWallpaper
 import com.chen.schedule.ui.theme.WidgetBackgroundMode
 import com.chen.schedule.ui.theme.WidgetTextContrast
 import com.chen.schedule.util.BackgroundFileManager
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun AppearanceSettings(viewModel: SettingsViewModel) {
+internal fun AppearanceSettings(viewModel: SettingsViewModel, wallpaper: TimetableWallpaper?) {
     val themeConfig by viewModel.themeConfig.collectAsState()
 
     // 相册选择器：应用背景
@@ -72,17 +65,7 @@ internal fun AppearanceSettings(viewModel: SettingsViewModel) {
         }
     }
 
-    // 相册选择器：小组件独立壁纸
-    val widgetBgPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            viewModel.setWidgetCustomBackground(uri)
-        }
-    }
-
-    // ===== 1. 应用外观与背景 =====
-    SettingsGroup(title = "应用外观与背景") {
+    SettingsGroup {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
             Text(
                 "主题模式",
@@ -171,71 +154,31 @@ internal fun AppearanceSettings(viewModel: SettingsViewModel) {
             // 自定义壁纸配置
             AnimatedVisibility(visible = hasCustomBg) {
                 Column(modifier = Modifier.padding(top = 12.dp)) {
-                    val appBitmap = remember(themeConfig.customBackgroundPath, themeConfig.customBackgroundRevision) {
-                        BackgroundFileManager.loadBitmap(themeConfig.customBackgroundPath, 400, 240)?.asImageBitmap()
+                    if (wallpaper != null) {
+                        WallpaperPreview(wallpaper, themeConfig.backgroundDim, themeConfig.cardAlpha)
                     }
-
-                    // 缩略图与操作
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                        shape = ScheduleStyle.CardShape
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        OutlinedButton(
+                            onClick = {
+                                appBgPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            }
                         ) {
-                            if (appBitmap != null) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(width = 80.dp, height = 70.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                                ) {
-                                    Image(
-                                        bitmap = appBitmap,
-                                        contentDescription = "当前壁纸预览",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                    if (themeConfig.backgroundDim > 0f) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(Color.Black.copy(alpha = themeConfig.backgroundDim))
-                                        )
-                                    }
-                                }
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("当前壁纸生效中", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                Text("已安全保存至应用内部存储", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(Modifier.height(6.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(
-                                        onClick = {
-                                            appBgPickerLauncher.launch(
-                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                            )
-                                        }
-                                    ) {
-                                        Text("更换", fontSize = 12.sp)
-                                    }
-                                    TextButton(onClick = { viewModel.clearCustomBackground() }) {
-                                        Text("移除壁纸", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
-                                    }
-                                }
-                            }
+                            Text("更换壁纸")
+                        }
+                        TextButton(onClick = { viewModel.clearCustomBackground() }) {
+                            Text("移除壁纸", color = MaterialTheme.colorScheme.error)
                         }
                     }
 
                     Spacer(Modifier.height(12.dp))
                     // 壁纸遮罩暗度
                     Text(
-                        "壁纸遮罩暗度 (压暗壁纸以保证课程文字清晰)",
+                        "壁纸遮罩",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium
                     )
@@ -247,11 +190,11 @@ internal fun AppearanceSettings(viewModel: SettingsViewModel) {
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         listOf(
-                            0.0f to "0% 无遮罩",
-                            0.15f to "15% 极轻",
-                            0.25f to "25% 推荐",
-                            0.40f to "40% 适中",
-                            0.60f to "60% 深度"
+                            0.0f to "无",
+                            0.15f to "15%",
+                            0.25f to "25%",
+                            0.40f to "40%",
+                            0.60f to "60%"
                         ).forEach { (dim, label) ->
                             FilterChip(
                                 selected = kotlin.math.abs(themeConfig.backgroundDim - dim) < 0.05f,
@@ -264,7 +207,7 @@ internal fun AppearanceSettings(viewModel: SettingsViewModel) {
                     Spacer(Modifier.height(10.dp))
                     // 课表卡片透明度
                     Text(
-                        "课表底板透明度 (透出背景壁纸)",
+                        "课表网格不透明度",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium
                     )
@@ -276,10 +219,10 @@ internal fun AppearanceSettings(viewModel: SettingsViewModel) {
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         listOf(
-                            1.0f to "100% 纯色不透",
-                            0.85f to "85% 轻微透出",
-                            0.65f to "65% 优雅半透",
-                            0.45f to "45% 通透晶莹"
+                            1.0f to "100%",
+                            0.85f to "85%",
+                            0.65f to "65%",
+                            0.45f to "45%"
                         ).forEach { (alpha, label) ->
                             FilterChip(
                                 selected = kotlin.math.abs(themeConfig.cardAlpha - alpha) < 0.05f,
@@ -293,10 +236,17 @@ internal fun AppearanceSettings(viewModel: SettingsViewModel) {
         }
     }
 
-    Spacer(Modifier.height(16.dp))
+}
 
-    // ===== 2. 桌面小组件背景设置 =====
-    SettingsGroup(title = "桌面小组件背景风格") {
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun WidgetAppearanceSettings(viewModel: SettingsViewModel) {
+    val themeConfig by viewModel.themeConfig.collectAsState()
+    val widgetBgPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let(viewModel::setWidgetCustomBackground) }
+
+    SettingsGroup(title = "小组件外观") {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
             Text(
                 "小组件背景样式",
@@ -452,5 +402,4 @@ internal fun AppearanceSettings(viewModel: SettingsViewModel) {
         }
     }
 
-    Spacer(Modifier.height(16.dp))
 }

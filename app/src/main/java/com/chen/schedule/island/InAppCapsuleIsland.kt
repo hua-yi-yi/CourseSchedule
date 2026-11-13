@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Place
@@ -44,13 +43,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chen.schedule.domain.model.Course
+import com.chen.schedule.ui.schedule.StatusAmber
+import com.chen.schedule.ui.schedule.StatusGreen
+import com.chen.schedule.ui.theme.ScheduleStyle
+import com.chen.schedule.ui.theme.withTextContrast
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -113,7 +116,7 @@ fun InAppCapsuleIsland(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp),
+                .padding(horizontal = 4.dp, vertical = 4.dp),
             contentAlignment = Alignment.Center
         ) {
             when (val state = islandState) {
@@ -149,14 +152,17 @@ private fun OngoingIslandCard(
     onDismiss: () -> Unit,
     onClickCourse: () -> Unit
 ) {
+    val colors = MaterialTheme.colorScheme
+    val statusContainer = StatusGreen.copy(alpha = 0.14f).compositeOver(colors.surfaceContainerLow)
+    val statusText = StatusGreen.withTextContrast(statusContainer, colors.onSurface)
     Card(
-        shape = RoundedCornerShape(if (isExpanded) 18.dp else 24.dp),
+        shape = ScheduleStyle.CardShape,
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xF20F172A)
+            containerColor = colors.surfaceContainerLow
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, Color(0x3338BDF8), RoundedCornerShape(if (isExpanded) 18.dp else 24.dp))
+            .border(0.5.dp, colors.outlineVariant, ScheduleStyle.CardShape)
             .clickable(onClick = onToggleExpand)
     ) {
         Column(
@@ -174,18 +180,18 @@ private fun OngoingIslandCard(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF10B981))
+                        .background(statusText)
                 )
                 Spacer(Modifier.width(8.dp))
 
                 // 正在上课胶囊标签
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = Color(0x3310B981)
+                    color = statusContainer
                 ) {
                     Text(
                         "正在上课",
-                        color = Color(0xFF34D399),
+                        color = statusText,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -196,7 +202,7 @@ private fun OngoingIslandCard(
 
                 Text(
                     state.courseName,
-                    color = Color.White,
+                    color = colors.onSurface,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -206,7 +212,7 @@ private fun OngoingIslandCard(
 
                 Text(
                     "剩 ${state.remainingMinutes} 分钟",
-                    color = Color(0xFF38BDF8),
+                    color = colors.primary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -214,7 +220,7 @@ private fun OngoingIslandCard(
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = null,
-                    tint = Color(0xFF94A3B8),
+                    tint = colors.onSurfaceVariant,
                     modifier = Modifier
                         .size(20.dp)
                         .padding(start = 4.dp)
@@ -232,20 +238,20 @@ private fun OngoingIslandCard(
                 ) {
                     if (state.classroom.isNotBlank()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.Place, contentDescription = null, tint = colors.onSurfaceVariant, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(2.dp))
-                            Text(state.classroom, color = Color(0xFFE2E8F0), fontSize = 11.5.sp)
+                            Text(state.classroom, color = colors.onSurface, fontSize = 11.5.sp)
                         }
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Schedule, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.Schedule, contentDescription = null, tint = colors.onSurfaceVariant, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(2.dp))
-                        Text("${state.slotRange} (${state.startTime}-${state.endTime})", color = Color(0xFFE2E8F0), fontSize = 11.5.sp)
+                        Text("${state.slotRange} (${state.startTime}-${state.endTime})", color = colors.onSurface, fontSize = 11.5.sp)
                     }
 
                     if (state.teacher.isNotBlank()) {
-                        Text(state.teacher, color = Color(0xFF94A3B8), fontSize = 11.5.sp)
+                        Text(state.teacher, color = colors.onSurfaceVariant, fontSize = 11.5.sp)
                     }
                 }
 
@@ -258,8 +264,8 @@ private fun OngoingIslandCard(
                         .fillMaxWidth()
                         .height(4.dp)
                         .clip(RoundedCornerShape(2.dp)),
-                    color = Color(0xFF38BDF8),
-                    trackColor = Color(0x33FFFFFF)
+                    color = colors.primary,
+                    trackColor = colors.surfaceContainerHighest
                 )
 
                 Spacer(Modifier.height(6.dp))
@@ -271,14 +277,14 @@ private fun OngoingIslandCard(
                 ) {
                     Text(
                         "${state.endTime} 下课",
-                        color = Color(0xFF94A3B8),
+                        color = colors.onSurfaceVariant,
                         fontSize = 11.sp
                     )
 
                     Row {
                         Text(
                             "查看课程详情",
-                            color = Color(0xFF38BDF8),
+                            color = colors.primary,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier
@@ -289,7 +295,7 @@ private fun OngoingIslandCard(
                         Spacer(Modifier.width(8.dp))
                         Text(
                             "暂时隐藏",
-                            color = Color(0xFF64748B),
+                            color = colors.onSurfaceVariant,
                             fontSize = 11.5.sp,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
@@ -311,14 +317,17 @@ private fun UpcomingIslandCard(
     onDismiss: () -> Unit,
     onClickCourse: () -> Unit
 ) {
+    val colors = MaterialTheme.colorScheme
+    val statusContainer = StatusAmber.copy(alpha = 0.14f).compositeOver(colors.surfaceContainerLow)
+    val statusText = StatusAmber.withTextContrast(statusContainer, colors.onSurface)
     Card(
-        shape = RoundedCornerShape(if (isExpanded) 18.dp else 24.dp),
+        shape = ScheduleStyle.CardShape,
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xF20F172A)
+            containerColor = colors.surfaceContainerLow
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, Color(0x33F59E0B), RoundedCornerShape(if (isExpanded) 18.dp else 24.dp))
+            .border(0.5.dp, colors.outlineVariant, ScheduleStyle.CardShape)
             .clickable(onClick = onToggleExpand)
     ) {
         Column(
@@ -334,17 +343,17 @@ private fun UpcomingIslandCard(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFF59E0B))
+                        .background(statusText)
                 )
                 Spacer(Modifier.width(8.dp))
 
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = Color(0x33F59E0B)
+                    color = statusContainer
                 ) {
                     Text(
                         "即将上课",
-                        color = Color(0xFFFBBF24),
+                        color = statusText,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -355,7 +364,7 @@ private fun UpcomingIslandCard(
 
                 Text(
                     state.courseName,
-                    color = Color.White,
+                    color = colors.onSurface,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -365,7 +374,7 @@ private fun UpcomingIslandCard(
 
                 Text(
                     "${state.minutesUntilStart} 分钟后",
-                    color = Color(0xFFFBBF24),
+                    color = colors.primary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -373,7 +382,7 @@ private fun UpcomingIslandCard(
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = null,
-                    tint = Color(0xFF94A3B8),
+                    tint = colors.onSurfaceVariant,
                     modifier = Modifier
                         .size(20.dp)
                         .padding(start = 4.dp)
@@ -390,20 +399,20 @@ private fun UpcomingIslandCard(
                 ) {
                     if (state.classroom.isNotBlank()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.Place, contentDescription = null, tint = colors.onSurfaceVariant, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(2.dp))
-                            Text(state.classroom, color = Color(0xFFE2E8F0), fontSize = 11.5.sp)
+                            Text(state.classroom, color = colors.onSurface, fontSize = 11.5.sp)
                         }
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Schedule, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.Schedule, contentDescription = null, tint = colors.onSurfaceVariant, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(2.dp))
-                        Text("${state.slotRange} (${state.startTime} 开始)", color = Color(0xFFE2E8F0), fontSize = 11.5.sp)
+                        Text("${state.slotRange} (${state.startTime} 开始)", color = colors.onSurface, fontSize = 11.5.sp)
                     }
 
                     if (state.teacher.isNotBlank()) {
-                        Text(state.teacher, color = Color(0xFF94A3B8), fontSize = 11.5.sp)
+                        Text(state.teacher, color = colors.onSurfaceVariant, fontSize = 11.5.sp)
                     }
                 }
 
@@ -416,14 +425,14 @@ private fun UpcomingIslandCard(
                 ) {
                     Text(
                         "${state.startTime} 开始上课",
-                        color = Color(0xFF94A3B8),
+                        color = colors.onSurfaceVariant,
                         fontSize = 11.sp
                     )
 
                     Row {
                         Text(
                             "查看课程详情",
-                            color = Color(0xFFFBBF24),
+                            color = colors.primary,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier
@@ -434,7 +443,7 @@ private fun UpcomingIslandCard(
                         Spacer(Modifier.width(8.dp))
                         Text(
                             "暂时隐藏",
-                            color = Color(0xFF64748B),
+                            color = colors.onSurfaceVariant,
                             fontSize = 11.5.sp,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))

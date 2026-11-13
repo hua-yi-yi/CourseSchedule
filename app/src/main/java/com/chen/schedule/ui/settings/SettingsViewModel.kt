@@ -76,11 +76,9 @@ class SettingsViewModel @Inject constructor(
 
     var reminderStatus by mutableStateOf(""); private set
     var nextReminder by mutableStateOf(""); private set
-    fun onSettingsResume() {
+    fun onReminderSettingsResume() {
         exactAlarmPermissionObserver.onResume()
         refreshReminderStatus()
-        refreshRecoveryPoints()
-        refreshLogState()
     }
 
     fun refreshReminderStatus() {
@@ -105,9 +103,14 @@ class SettingsViewModel @Inject constructor(
                 ?: "本学期没有待提醒的课程"
         }
     }
+    var reminderTestMessage by mutableStateOf(""); private set
     fun testReminder() {
-        try { com.chen.schedule.reminders.ReminderStatus.test(context); dataMessage = "已发送测试通知，请检查通知栏" }
-        catch (e: Exception) { dataMessage = e.message.orEmpty() }
+        reminderTestMessage = try {
+            ReminderStatus.test(context)
+            "已发送测试通知，请检查通知栏"
+        } catch (e: Exception) {
+            e.message.orEmpty()
+        }
         refreshReminderStatus()
     }
     var reminderEnabled by androidx.compose.runtime.mutableStateOf(false); private set

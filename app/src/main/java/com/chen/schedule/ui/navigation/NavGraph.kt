@@ -3,12 +3,17 @@ package com.chen.schedule.ui.navigation
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigation.navigation
 import com.chen.schedule.ui.course.CourseEditScreen
 import com.chen.schedule.ui.import_.ImportScreen
 import com.chen.schedule.ui.import_.ScraperLoginScreen
@@ -21,8 +26,13 @@ import com.chen.schedule.ui.schedule.SemesterListScreen
 import com.chen.schedule.ui.schedule.SemesterMenuScreen
 import com.chen.schedule.ui.schedule.SetupWizardScreen
 import com.chen.schedule.ui.settings.SettingsScreen
+import com.chen.schedule.ui.settings.SettingsSection
+import com.chen.schedule.ui.settings.SettingsSectionScreen
+import com.chen.schedule.ui.settings.SettingsViewModel
+import com.chen.schedule.ui.theme.TimetableWallpaper
 import com.chen.schedule.ui.timetable.BlankClickTarget
 import com.chen.schedule.ui.timetable.TimetableScreen
+import com.chen.schedule.util.update.UpdateCheckResult
 
 sealed class Screen(val route: String) {
     object Timetable : Screen("timetable")
@@ -61,8 +71,9 @@ sealed class Screen(val route: String) {
 }
 
 @Composable
-fun AppNavHost(openTimetableRequest: Int = 0) {
+internal fun AppNavHost(openTimetableRequest: Int = 0, wallpaper: TimetableWallpaper? = null) {
     val navController = rememberNavController()
+    val currentWallpaper by rememberUpdatedState(wallpaper)
     LaunchedEffect(openTimetableRequest) {
         if (openTimetableRequest > 0) {
             navController.navigate(Screen.Timetable.route) {
@@ -79,6 +90,7 @@ fun AppNavHost(openTimetableRequest: Int = 0) {
     ) {
         composable(Screen.Timetable.route) {
             TimetableScreen(
+                wallpaper = currentWallpaper,
                 onAddCourse = { semesterId, target: BlankClickTarget? ->
                     navController.navigate(
                         Screen.CourseEdit.createRoute(
@@ -122,11 +134,30 @@ fun AppNavHost(openTimetableRequest: Int = 0) {
             )
         }
 
-        composable(Screen.Settings.route) {
-            SettingsScreen(
-                onNavigateToScheduleConfig = { navController.navigate(Screen.ScheduleConfig.route) },
-                onNavigateBack = { navController.popBackStack() }
-            )
+        navigation(startDestination = "settings/home", route = Screen.Settings.route) {
+            composable("settings/home") { entry ->
+                val settingsGraph = remember(entry) { navController.getBackStackEntry(Screen.Settings.route) }
+                val viewModel: SettingsViewModel = hiltViewModel(settingsGraph)
+                SettingsScreen(
+                    onOpenSection = { section ->
+                        navController.navigate(section.route) { launchSingleTop = true }
+                    },
+                    onNavigateToScheduleConfig = { navController.navigate(Screen.ScheduleConfig.route) },
+                    onNavigateBack = { navController.popBackStack() },
+                    updateAvailable = viewModel.updateResult is UpdateCheckResult.HasUpdate
+                )
+            }
+            SettingsSection.entries.forEach { section ->
+                composable(section.route) { entry ->
+                    val settingsGraph = remember(entry) { navController.getBackStackEntry(Screen.Settings.route) }
+                    SettingsSectionScreen(
+                        section = section,
+                        viewModel = hiltViewModel(settingsGraph),
+                        wallpaper = currentWallpaper,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+            }
         }
 
         composable(

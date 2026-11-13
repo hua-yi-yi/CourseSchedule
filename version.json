@@ -1,9 +1,9 @@
 {
-  "versionName": "1.3.17",
-  "versionTag": "v1.3.17",
-  "title": "v1.3.17 · 修复设置页闪退与日志查看滚动体验",
-  "publishedAt": "2026-11-12",
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.17/CourseSchedule-v1.3.17.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.17",
-  "changelog": "- 修复进入「设置」页面时因 SettingsViewModel 状态委托属性初始化顺序早晚颠倒导致的空指针闪退问题，并补充构造函数初始化顺序回归测试。\n- 优化日志查看器异常堆栈卡片的滚动交互，避免列表内嵌套纵向滚动冲突。"
+  "versionName": "1.3.18",
+  "versionTag": "v1.3.18",
+  "title": "v1.3.18 · 优化壁纸与设置，修复周课表小组件",
+  "publishedAt": "2026-11-14",
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.18/CourseSchedule-v1.3.18.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.18",
+  "changelog": "- 自定义壁纸下，课表底色随图片色调调整，课程卡片和日期保持清晰。设置中可实时预览壁纸遮罩和网格不透明度。\n- 设置首页改为分类菜单，日志与诊断保留独立入口，隐藏胶囊灵动岛的设置入口，精简打赏弹窗文案。\n- 修复 4×4 桌面周课表刷新后可能停留在空白状态的问题。周末当天无课时，仍显示同一周其他日期的课程。"
 }

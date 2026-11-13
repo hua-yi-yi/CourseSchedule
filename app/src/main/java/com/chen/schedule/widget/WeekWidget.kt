@@ -5,9 +5,16 @@ import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.util.Log
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.glance.ExperimentalGlanceApi
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -17,14 +24,17 @@ import androidx.glance.LocalSize
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
 import androidx.glance.background
+import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -39,6 +49,7 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.unit.ColorProvider
 import com.chen.schedule.MainActivity
 import com.chen.schedule.data.local.entity.CourseEntity
@@ -49,7 +60,10 @@ import com.chen.schedule.domain.model.TimeSlot
 import com.chen.schedule.domain.model.WeekType
 import com.chen.schedule.util.WeekCalculator
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.CancellationException
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import kotlin.math.ceil
 
 /** 星期表头的一天数据 */
@@ -80,6 +94,7 @@ data class WeekWidgetData(
 )
 
 private val DAY_LABELS = listOf("一", "二", "三", "四", "五", "六", "日")
+private val WEEK_DATA_REVISION = longPreferencesKey("week_data_revision")
 
 /**
  * 4×4 周课表大组件:展示当前周的完整课程网格(节次 × 周一~周日)，包含时间与地点。
@@ -88,29 +103,47 @@ private val DAY_LABELS = listOf("一", "二", "三", "四", "五", "六", "日")
 class WeekWidget : GlanceAppWidget() {
 
     override val sizeMode: SizeMode = SizeMode.Exact
+    override val stateDefinition = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val data = loadWidgetData(context)
+        val initialData = loadWidgetData(context)
         provideContent {
+            val revision = currentState(WEEK_DATA_REVISION)
+            var data by remember { mutableStateOf(initialData) }
+            // Glance can reuse a running composition when an existing widget is updated.
+            LaunchedEffect(revision) { data = loadWidgetData(context) }
             ScheduleGlanceTheme {
                 WeekWidgetContent(data)
             }
         }
     }
 
+    internal suspend fun refreshAll(context: Context) {
+        val ids = GlanceAppWidgetManager(context).getGlanceIds(WeekWidget::class.java)
+        for (id in ids) {
+            updateAppWidgetState(context, id) { preferences ->
+                preferences[WEEK_DATA_REVISION] = (preferences[WEEK_DATA_REVISION] ?: 0L) + 1
+            }
+            update(context, id)
+        }
+    }
+
     private suspend fun loadWidgetData(context: Context): WeekWidgetData {
-        return runCatching {
+        val zone = ZoneId.systemDefault()
+        val now = System.currentTimeMillis()
+        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        return try {
             val entryPoint = EntryPointAccessors.fromApplication(
                 context.applicationContext,
                 DatabaseEntryPoint::class.java
             )
             val sem = entryPoint.semesterDao().getCurrentSemester()
             if (sem == null) {
-                return@runCatching emptyWidgetData("未设置学期", 0)
+                return emptyWidgetData("未设置学期", today)
             }
 
-            val week = WeekCalculator.activeWeek(sem.startDate, sem.totalWeeks)
-                ?: return@runCatching emptyWidgetData("${sem.name} · 学期外", 0)
+            val week = WeekCalculator.activeWeek(sem.startDate, sem.totalWeeks, now, zone)
+                ?: return emptyWidgetData("${sem.name} · 学期外", today)
             val entities = entryPoint.courseDao().getCoursesBySemesterDirect(sem.id)
             val courses = entities.map { it.toDomain() }
             val slotEntities = entryPoint.timeSlotDao().getTimeSlotsBySchemeDirect(sem.schemeId)
@@ -124,10 +157,9 @@ class WeekWidget : GlanceAppWidget() {
 
             val preferredIds = com.chen.schedule.util.CourseConflictDetector.loadPreferredCourseIds(context)
             val grid = WeekGridBuilder.build(courses, week, slotCount, configuredSlots, preferredIds)
-            val today = LocalDate.now()
             val todayDayOfWeek = today.dayOfWeek.value
 
-            val semesterMonday = WeekCalculator.semesterMonday(sem.startDate)
+            val semesterMonday = WeekCalculator.semesterMonday(sem.startDate, zone)
             val dayHeaders = (1..7).map { dayIndex ->
                 val date = semesterMonday.plusDays(((week - 1) * 7 + (dayIndex - 1)).toLong())
                 DayHeaderData(
@@ -158,14 +190,16 @@ class WeekWidget : GlanceAppWidget() {
                 rows = rows,
                 dayHeaders = dayHeaders
             )
-        }.getOrElse {
-            emptyWidgetData("周课表", 0)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w("WeekWidget", "Could not load the weekly timetable", e)
+            emptyWidgetData("周课表", today)
         }
     }
 
-    private fun emptyWidgetData(semesterName: String, week: Int): WeekWidgetData {
+    private fun emptyWidgetData(semesterName: String, today: LocalDate): WeekWidgetData {
         val grid = List(WeekGridBuilder.MIN_SLOTS) { List(7) { null } }
-        val today = LocalDate.now()
         val todayDayOfWeek = today.dayOfWeek.value
         val dayHeaders = (1..7).map { dayIndex ->
             DayHeaderData(
@@ -185,7 +219,7 @@ class WeekWidget : GlanceAppWidget() {
         }
         return WeekWidgetData(
             semesterName = semesterName,
-            currentWeek = week,
+            currentWeek = 0,
             slotCount = WeekGridBuilder.MIN_SLOTS,
             grid = grid,
             todayDayOfWeek = todayDayOfWeek,
@@ -501,10 +535,16 @@ class WeekWidgetReceiver : GlanceAppWidgetReceiver() {
 /** 数据变更后同时刷新今日课程(4×1)、今日看板(3×3)与周课表(4×4)组件 */
 object WidgetUpdater {
     suspend fun refreshAll(context: Context) {
+        try {
+            WeekWidget().refreshAll(context)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w("WeekWidget", "Could not refresh the weekly timetable", e)
+        }
         runCatching {
             TodayWidget().updateAll(context)
             Today3x3Widget().updateAll(context)
-            WeekWidget().updateAll(context)
         }
         // 课表数据变化后同步重排上课提醒(设置页/导入/编辑等所有写路径都会走到这里)
         com.chen.schedule.reminders.ClassReminderManager.rescheduleAsync(context)
