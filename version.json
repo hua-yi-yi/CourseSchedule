@@ -1,9 +1,9 @@
 {
-  "versionName": "1.3.18",
-  "versionTag": "v1.3.18",
-  "title": "v1.3.18 · 优化壁纸与设置，修复周课表小组件",
+  "versionName": "1.3.19",
+  "versionTag": "v1.3.19",
+  "title": "v1.3.19 · 精简设置菜单与预设底色选择",
   "publishedAt": "2026-11-14",
-  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.18/CourseSchedule-v1.3.18.apk",
-  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.18",
-  "changelog": "- 自定义壁纸下，课表底色随图片色调调整，课程卡片和日期保持清晰。设置中可实时预览壁纸遮罩和网格不透明度。\n- 设置首页改为分类菜单，日志与诊断保留独立入口，隐藏胶囊灵动岛的设置入口，精简打赏弹窗文案。\n- 修复 4×4 桌面周课表刷新后可能停留在空白状态的问题。周末当天无课时，仍显示同一周其他日期的课程。"
+  "officialDownloadUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/download/v1.3.19/CourseSchedule-v1.3.19.apk",
+  "htmlUrl": "https://github.com/hua-yi-yi/CourseSchedule/releases/tag/v1.3.19",
+  "changelog": "- 精简设置首页，移除菜单项的图标和右箭头。支持与交流回到首页，可直接打赏或复制开发者 QQ。\n- 预设底色改为带色块预览的两列网格，窄屏或大字体时自动排成一列。"
 }

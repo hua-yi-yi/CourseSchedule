@@ -98,13 +98,11 @@ internal fun SettingsItem(
     title: String,
     subtitle: String,
     isDanger: Boolean = false,
-    leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     onClick: () -> Unit
 ) {
     ListItem(
         modifier = Modifier.clickable { onClick() },
-        leadingContent = leading,
         colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
         headlineContent = {
             Text(

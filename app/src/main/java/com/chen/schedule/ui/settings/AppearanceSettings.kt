@@ -9,8 +9,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -19,10 +21,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,6 +46,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,6 +57,7 @@ import com.chen.schedule.ui.theme.ThemePrefs
 import com.chen.schedule.ui.theme.TimetableWallpaper
 import com.chen.schedule.ui.theme.WidgetBackgroundMode
 import com.chen.schedule.ui.theme.WidgetTextContrast
+import com.chen.schedule.ui.theme.resolveScheduleColorScheme
 import com.chen.schedule.util.BackgroundFileManager
 
 @Composable
@@ -134,20 +142,11 @@ internal fun AppearanceSettings(viewModel: SettingsViewModel, wallpaper: Timetab
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        BackgroundPreset.entries.forEach { preset ->
-                            FilterChip(
-                                selected = themeConfig.backgroundPreset == preset,
-                                onClick = { viewModel.updateBackgroundPreset(preset) },
-                                label = { Text(preset.label, fontSize = 12.sp) }
-                            )
-                        }
-                    }
+                    BackgroundPresetPicker(
+                        selected = themeConfig.backgroundPreset,
+                        themeMode = themeConfig.themeMode,
+                        onSelect = viewModel::updateBackgroundPreset
+                    )
                 }
             }
 
@@ -236,6 +235,78 @@ internal fun AppearanceSettings(viewModel: SettingsViewModel, wallpaper: Timetab
         }
     }
 
+}
+
+@Composable
+private fun BackgroundPresetPicker(
+    selected: BackgroundPreset,
+    themeMode: Int,
+    onSelect: (BackgroundPreset) -> Unit
+) {
+    val darkTheme = when (themeMode) {
+        ThemePrefs.THEME_MODE_SYSTEM -> isSystemInDarkTheme()
+        ThemePrefs.THEME_MODE_DARK -> true
+        else -> false
+    }
+    val previews = remember(darkTheme) {
+        BackgroundPreset.entries.associateWith { resolveScheduleColorScheme(it, darkTheme).background }
+    }
+    val colors = MaterialTheme.colorScheme
+    val spacing = 8.dp
+    val shape = ScheduleStyle.CardShape
+    val swatchShape = RoundedCornerShape(6.dp)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val twoColumns = maxWidth >= 250.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
+        Column(
+            modifier = Modifier.fillMaxWidth().selectableGroup(),
+            verticalArrangement = Arrangement.spacedBy(spacing)
+        ) {
+            BackgroundPreset.entries.chunked(if (twoColumns) 2 else 1).forEach { presets ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing)
+                ) {
+                    presets.forEach { preset ->
+                        val isSelected = selected == preset
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp)
+                                .clip(shape)
+                                .background(if (isSelected) colors.secondaryContainer else colors.surface)
+                                .border(
+                                    if (isSelected) 2.dp else 1.dp,
+                                    if (isSelected) colors.primary else colors.outlineVariant,
+                                    shape
+                                )
+                                .selectable(
+                                    selected = isSelected,
+                                    role = Role.RadioButton,
+                                    onClick = { onSelect(preset) }
+                                )
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                Modifier.size(24.dp)
+                                    .background(previews.getValue(preset), swatchShape)
+                                    .border(1.dp, colors.outline, swatchShape)
+                            )
+                            Text(
+                                text = preset.label,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (isSelected) colors.onSecondaryContainer else colors.onSurface
+                            )
+                        }
+                    }
+                    if (twoColumns && presets.size == 1) {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

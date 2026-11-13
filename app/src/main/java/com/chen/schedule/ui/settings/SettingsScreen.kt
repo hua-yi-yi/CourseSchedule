@@ -5,25 +5,12 @@ import android.content.ClipboardManager
 import android.widget.Toast
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.CloudUpload
-import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Palette
-import androidx.compose.material.icons.outlined.SystemUpdate
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.chen.schedule.ui.theme.TimetableWallpaper
@@ -31,16 +18,14 @@ import com.chen.schedule.ui.theme.TimetableWallpaper
 internal enum class SettingsSection(
     val route: String,
     val title: String,
-    val subtitle: String,
-    val icon: ImageVector
+    val subtitle: String
 ) {
-    APPEARANCE("settings/appearance", "外观与壁纸", "主题、课表背景与预览", Icons.Outlined.Palette),
-    REMINDERS("settings/reminders", "上课提醒", "课前通知、提前时间与权限", Icons.Outlined.Notifications),
-    WIDGETS("settings/widgets", "桌面小组件", "添加小组件、背景与文字对比度", Icons.Outlined.Dashboard),
-    DATA("settings/data", "数据管理", "备份、恢复与日历同步", Icons.Outlined.CloudUpload),
-    UPDATES("settings/updates", "版本与更新", "检查更新与下载线路", Icons.Outlined.SystemUpdate),
-    LOGS("settings/logs", "日志与诊断", "查看运行日志、导入日志与导出", Icons.Outlined.Description),
-    SUPPORT("settings/support", "支持与交流", "联系开发者、打赏作者", Icons.Outlined.Info)
+    APPEARANCE("settings/appearance", "外观与壁纸", "主题、课表背景与预览"),
+    REMINDERS("settings/reminders", "上课提醒", "课前通知、提前时间与权限"),
+    WIDGETS("settings/widgets", "桌面小组件", "添加小组件、背景与文字对比度"),
+    DATA("settings/data", "数据管理", "备份、恢复与日历同步"),
+    UPDATES("settings/updates", "版本与更新", "检查更新与下载线路"),
+    LOGS("settings/logs", "日志与诊断", "查看运行日志、导入日志与导出")
 }
 
 @Composable
@@ -52,15 +37,14 @@ internal fun SettingsScreen(
 ) {
     SettingsPage(title = "设置", onNavigateBack = onNavigateBack) {
         SettingsGroup {
-            SettingsMenuItem(
+            SettingsItem(
                 title = "学期与作息",
                 subtitle = "学期、作息方案与节次时间",
-                icon = Icons.Outlined.CalendarMonth,
                 onClick = onNavigateToScheduleConfig
             )
             SettingsSection.entries.takeWhile { it != SettingsSection.DATA }.forEach { section ->
                 GroupDivider()
-                SettingsMenuItem(section.title, section.subtitle, section.icon) { onOpenSection(section) }
+                SettingsItem(section.title, section.subtitle) { onOpenSection(section) }
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -72,9 +56,11 @@ internal fun SettingsScreen(
                 } else {
                     section.subtitle
                 }
-                SettingsMenuItem(section.title, subtitle, section.icon) { onOpenSection(section) }
+                SettingsItem(section.title, subtitle) { onOpenSection(section) }
             }
         }
+        Spacer(Modifier.height(12.dp))
+        SupportSettings()
     }
 }
 
@@ -93,33 +79,15 @@ internal fun SettingsSectionScreen(
             SettingsSection.DATA -> DataSettings(viewModel)
             SettingsSection.UPDATES -> UpdateSettings(viewModel)
             SettingsSection.LOGS -> LogSettings(viewModel)
-            SettingsSection.SUPPORT -> SupportSettings()
         }
     }
 }
 
 @Composable
-private fun SettingsMenuItem(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) {
-    SettingsItem(
-        title = title,
-        subtitle = subtitle,
-        leading = { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-        trailing = {
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        },
-        onClick = onClick
-    )
-}
-
-@Composable
-internal fun SupportSettings() {
+private fun SupportSettings() {
     val context = LocalContext.current
     var showDonationDialog by rememberSaveable { mutableStateOf(false) }
-    SettingsGroup {
+    SettingsGroup(title = "支持与交流") {
         SettingsItem(
             title = "打赏作者",
             subtitle = "支持开发者的持续维护",
